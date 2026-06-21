@@ -1,0 +1,51 @@
+root = true
+
+# Alle Dateien
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 4
+
+# Markdown: nachgestellte Leerzeichen können bedeutsam sein (harte Umbrüche)
+[*.md]
+trim_trailing_whitespace = false
+
+# Projekt-/Konfig-Dateien
+[*.{csproj,props,targets,json,yml,yaml}]
+indent_size = 2
+
+[*.{xml,xsd,razor}]
+indent_size = 2
+
+# C#-Konventionen
+[*.cs]
+indent_size = 4
+
+# Namespaces & Usings
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+
+# var-Präferenzen
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+
+# Moderne Sprachfeatures
+csharp_prefer_braces = true:suggestion
+csharp_style_expression_bodied_members = true:suggestion
+dotnet_style_prefer_conditional_expression_over_assignment = true:suggestion
+dotnet_style_null_propagation = true:suggestion
+dotnet_style_coalesce_expression = true:suggestion
+
+# Benennung: private Felder mit _camelCase
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_prefix
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_prefix.capitalization = camel_case
+dotnet_naming_style.underscore_prefix.required_prefix = _
