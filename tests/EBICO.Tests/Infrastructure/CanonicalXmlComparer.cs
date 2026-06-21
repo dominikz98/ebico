@@ -1,6 +1,6 @@
-using System.Security.Cryptography.Xml;
 using System.Text;
 using System.Xml;
+using EBICO.Core.Serialization;
 
 namespace EBICO.Tests.Infrastructure;
 
@@ -10,9 +10,10 @@ namespace EBICO.Tests.Infrastructure;
 /// <para>
 /// Insensitive to insignificant whitespace/indentation, attribute ordering and
 /// namespace-declaration ordering; sensitive to element/attribute content and
-/// document structure. Intended as a test helper for protocol/serialization
-/// tests — the production C14N implementation arrives with the Core protocol
-/// work (M1, issue #15).
+/// document structure. This is a <b>test helper</b>: it delegates the canonical
+/// form to the production canonicalizer
+/// (<see cref="XmlCanonicalizer"/>, issue #15, inclusive C14N 1.0) and additionally
+/// drops insignificant whitespace so that pure formatting differences compare equal.
 /// </para>
 /// </summary>
 public static class CanonicalXmlComparer
@@ -29,15 +30,11 @@ public static class CanonicalXmlComparer
 
         // PreserveWhitespace = false drops whitespace-only text nodes, so pure
         // formatting differences (indentation) do not affect the canonical form.
+        // The canonical octets themselves come from the production canonicalizer.
         var document = new XmlDocument { PreserveWhitespace = false };
         document.LoadXml(xml);
 
-        var transform = new XmlDsigC14NTransform();
-        transform.LoadInput(document);
-
-        using var output = (Stream)transform.GetOutput(typeof(Stream));
-        using var reader = new StreamReader(output, Encoding.UTF8);
-        return reader.ReadToEnd();
+        return Encoding.UTF8.GetString(XmlCanonicalizer.Canonicalize(document, C14nMode.Inclusive));
     }
 
     /// <summary>

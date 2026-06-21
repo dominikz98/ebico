@@ -47,8 +47,11 @@ Test-Assembly finden.
 
 ### `CanonicalXmlComparer` — kanonisierter XML-Vergleich
 
-Vergleicht XML nach **Canonical XML 1.0** (C14N, `XmlDsigC14NTransform`) — die
-Kanonisierung, auf die EBICS-XML-Signaturen aufsetzen. Unempfindlich gegen
+Vergleicht XML nach **Canonical XML 1.0** (C14N) — die Kanonisierung, auf die
+EBICS-XML-Signaturen aufsetzen. Die Kanonform liefert seit #15 der **produktive**
+Canonicalizer (`EBICO.Core.Serialization.XmlCanonicalizer`, Modus `Inclusive`),
+an den dieser Test-Helfer delegiert; zusätzlich verwirft er belanglosen Whitespace,
+sodass reine Formatierungsunterschiede gleich verglichen werden. Unempfindlich gegen
 belanglose Whitespace/Einrückung, Attribut-Reihenfolge und Reihenfolge der
 Namespace-Deklarationen; empfindlich gegen Inhalt und Struktur.
 
@@ -59,7 +62,8 @@ CanonicalXmlComparer.AreEqual("<a><b/></a>", "<a>\n  <b></b>\n</a>");  // true
 Eigene Unit-Tests decken Happy Path (Whitespace, Attribut-Reihenfolge,
 leeres Element ↔ explizites Schließen) und Negativ-/Grenzfälle (abweichender
 Inhalt/Attributwert, `null`, nicht-wohlgeformtes XML) ab. Die produktive
-C14N-Implementierung für die Signaturen folgt in M1 (Issue #15).
+C14N-Implementierung (inkl./exkl.) liegt in
+[XML-Serialisierung & C14N](../protocol/serialization-c14n.md) (Issue #15).
 
 ### `TestCertificates` — Schlüssel- und Zertifikat-Fixtures
 

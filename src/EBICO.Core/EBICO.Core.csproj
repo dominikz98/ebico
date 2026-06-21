@@ -4,4 +4,13 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
+  <!--
+    XML-Canonicalization (C14N) für Signaturen (#15). Liefert die BCL-Transforms
+    XmlDsigC14NTransform / XmlDsigExcC14NTransform. Unabhängig von der noch offenen
+    M2-Entscheidung zur RSA-Krypto-Bibliothek; Version zentral in Directory.Packages.props.
+  -->
+  <ItemGroup>
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+  </ItemGroup>
+
 </Project>
