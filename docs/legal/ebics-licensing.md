@@ -50,15 +50,14 @@ die Bindings werden committet, die XSDs selbst bleiben ungetrackt.** So baut/tes
 die CI den Protokoll-Kern ohne proprietäre Schemas; die schriftliche Genehmigung
 der EBICS SC wird parallel verfolgt.
 
-Optionen (zur Einordnung):
+Optionen (zur Einordnung, Details in [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)):
 
 - **(A) Bindings nicht committen — beim Build aus lokal bezogenen XSDs generieren.**
-  *(empfohlener Default bis zur Klärung)* Konservativ, keine proprietären
-  Ableitungen im Repo. Nachteil: Contributor/CI brauchen die lokal bezogenen XSDs
-  zum Bauen → der Build der betroffenen Bindings ist ohne Schemas nicht möglich
-  (separates, optionales Target).
-- **(B) Schriftliche Genehmigung der EBICS SC einholen**, dann Bindings (und ggf.
-  XSDs) committen. Beste Developer-Experience, erfordert aber eine Freigabe.
+  Konservativ, keine generierten Ableitungen im Repo. Nachteil: Contributor/CI
+  brauchen die lokal bezogenen XSDs zum Bauen → der schema-abhängige Teil von
+  `EBICO.Core` ist ohne Schemas nicht baubar/testbar. **Verworfen.**
+- **(B) Bindings committen (XSDs bleiben ungetrackt).** Beste Developer-Experience;
+  CI baut/testet den Protokoll-Kern ohne proprietäre Schemas. **Gewählt.**
 - **(C) Handgeschriebene Modelle** statt generierter Bindings — kein direkter
   derivative use des XSD-Texts, dafür deutlich höherer Aufwand und Fehlerrisiko.
 
