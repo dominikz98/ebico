@@ -21,6 +21,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 ## Protokoll & Schemas
 
 - [Schema-Quellen & Lizenz](protocol/schema-sources.md) — Bezug der EBICS-XSDs, Lizenzlage
+- [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; offene Frage generierte Bindings (M1-Gate)
 
 ---
 
