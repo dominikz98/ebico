@@ -44,7 +44,7 @@ das Issue *„Schemas & Specs beschaffen"*.
 | `ebics_keymgmt_request_H005.xsd` | Protokoll-Schema für Key-Management-Requests |
 | `ebics_keymgmt_response_H005.xsd` | Protokoll-Schema für Key-Management-Responses |
 | `ebics_hev.xsd` | H000 — OrderType HEV |
-| `ebics_signature.xsd` | S002 — elektronische Signatur (Minor-Update von S001) |
+| `ebics_signature_S002.xsd` | S002 — elektronische Signatur (Minor-Update von S001) |
 | `xmldsig-core-schema.xsd` | W3C — Standard-Schema für XML-Signatur |
 
 **Instant Payments:** Für das Clearing von Instant Payments gibt es eine
@@ -64,7 +64,9 @@ Archiv-ZIP verifizieren.
 
 ### H003 (EBICS 2.4)
 
-Aus dem Schema-Archiv. Älter, teils abweichende Struktur — beim Bezug prüfen.
+Aus dem Schema-Archiv. Älter, teils abweichende Struktur. Die Dateien sind
+**unsuffigiert** benannt (Master `ebics.xsd`, dazu `ebics_request.xsd`,
+`ebics_orders.xsd`, … sowie `ebics_signature.xsd` für S001) — beim Bezug prüfen.
 
 ---
 
@@ -110,9 +112,10 @@ Aus den Terms of Use (Stand der Erfassung):
 - **XSDs ins Repo?** Solange ungeklärt: **nicht committen.** Stattdessen jeder
   Entwickler/CI-Job zieht sie lokal per `fetch-schemas.sh`. Ein
   `.gitignore`-Eintrag für `schemas/**/*.xsd` verhindert versehentliche Commits.
-- **Generierte XSD-Bindings** (z. B. via `XmlSerializer`-Codegen) könnten als
-  *derivative use* gewertet werden. Risiko bewerten; im Zweifel bei
-  `info@ebics.de` anfragen.
+- **Generierte XSD-Bindings** (via `XmlSerializer`-Codegen) werden **committet**
+  (Entscheidung Option B, [../adr/0006-generierte-xsd-bindings-committen.md](../adr/0006-generierte-xsd-bindings-committen.md));
+  die XSDs selbst bleiben ungetrackt. Genehmigung der EBICS SC wird parallel bei
+  `info@ebics.de` verfolgt. Details: [xsd-bindings.md](xsd-bindings.md).
 - **Copyright-Vermerke** reproduzierter Inhalte vollständig übernehmen.
 
 Entscheidung und Begründung gehören in eine ADR sowie nach

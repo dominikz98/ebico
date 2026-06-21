@@ -55,7 +55,10 @@ vollständige BTF/Order-Palette.
 - **LIZENZ:** Die EBICS-Schemas/Specs sind proprietär (EBICS SC). Modifikation /
   derivative uses ohne Genehmigung nicht erlaubt. XSDs und offizielle Beispiel-XML
   werden **nicht** ins Repo committet (`.gitignore`); lokal via
-  `scripts/fetch-schemas.sh` beziehen. Lizenzfrage vor M1 klären (Issue #5).
+  `scripts/fetch-schemas.sh` beziehen. Die **generierten C#-Bindings** unter
+  `src/EBICO.Core/Schema/` **werden hingegen committet** (ADR-0006, Option B; via
+  `scripts/generate-bindings.sh` reproduzierbar) — so baut/testet die CI ohne
+  Schemas. Genehmigung der EBICS SC wird parallel verfolgt.
 - Die Architektur in `docs/connector/architecture.md` ist ein begründeter
   Vorschlag, **kein** gegen die Spec verifiziertes Design. Sobald die echten
   Schemas vorliegen, Details (z. B. Reihenfolge E002/A00x/X002, Segmentschleife je

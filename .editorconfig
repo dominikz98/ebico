@@ -49,3 +49,16 @@ dotnet_naming_symbols.private_fields.applicable_kinds = field
 dotnet_naming_symbols.private_fields.applicable_accessibilities = private
 dotnet_naming_style.underscore_prefix.capitalization = camel_case
 dotnet_naming_style.underscore_prefix.required_prefix = _
+
+# Generierte XSD-Bindings (ADR-0006): aus den proprietaeren EBICS-XSDs via
+# scripts/generate-bindings.sh erzeugt — NICHT von Hand editieren.
+# generated_code = true laesst Roslyn Compiler-Doc-/Nullable-Warnungen
+# (CS1591/CS86xx) und Analyzer-Diagnosen (CAxxxx/IDExxxx) fuer genau diese
+# Dateien ueberspringen, ohne die strengen Regeln (TreatWarningsAsErrors) fuer
+# handgeschriebenen Core-Code aufzuweichen. Block niemals breiter ziehen.
+[src/EBICO.Core/Schema/**.cs]
+generated_code = true
+# CS1591 (fehlender XML-Doc-Kommentar) wird von generated_code allein NICHT
+# unterdrueckt; die W3C-xmldsig-Typen tragen keine XSD-Annotationen und damit
+# keine <summary>. Doc-Pflicht gilt nur fuer handgeschriebene Public-APIs.
+dotnet_diagnostic.CS1591.severity = none

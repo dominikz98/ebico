@@ -28,9 +28,9 @@ Vollständige Einordnung: [../legal/ebics-licensing.md](../legal/ebics-licensing
 - Lizenzkonform: keine proprietären Inhalte im öffentlichen Repo.
 - Contributor/CI müssen Schemas (und ggf. Beispiele) lokal beziehen, um die
   schema-abhängigen Teile zu bauen/zu testen.
-- **Offene Folgeentscheidung (M1-Gate):** ob generierte **Bindings** als derivative
-  works gelten und committet werden dürfen — Optionen in der Lizenz-Doku; eigene
-  ADR folgt mit der Entscheidung.
+- **Folgeentscheidung (M1-Gate) — entschieden:** ob generierte **Bindings**
+  committet werden — geklärt in [ADR-0006](0006-generierte-xsd-bindings-committen.md)
+  (Option B: Bindings committen, XSDs bleiben ungetrackt).
 
 ## Alternativen
 

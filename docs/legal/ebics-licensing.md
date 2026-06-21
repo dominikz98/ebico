@@ -41,13 +41,16 @@ EBICS SC** (EBICS Société par Actions Simplifiée). Auf Basis der Quellen
 Diese Policy ist bereits umgesetzt (M0): `.gitignore`, `fetch-schemas.sh`,
 `schema-sources.md` und die Test-Fixture-READMEs spiegeln sie wider.
 
-## Offene Frage: Sind generierte Bindings „derivative works"? (Gate für M1)
+## Generierte Bindings: „derivative works"? (M1-Gate — entschieden)
 
-M1 erzeugt aus den XSDs **C#-Bindings** (Klassen). Bevor diese committet werden,
-ist zu entscheiden, ob sie als **derivative use** der proprietären Schemas gelten.
-Bis zur Klärung gilt **Default: Bindings nicht einchecken**.
+M1 erzeugt aus den XSDs **C#-Bindings** (Klassen). Ob diese als **derivative use**
+der proprietären Schemas gelten, war das M1-Gate. **Entschieden (Option B,
+[../adr/0006-generierte-xsd-bindings-committen.md](../adr/0006-generierte-xsd-bindings-committen.md)):
+die Bindings werden committet, die XSDs selbst bleiben ungetrackt.** So baut/testet
+die CI den Protokoll-Kern ohne proprietäre Schemas; die schriftliche Genehmigung
+der EBICS SC wird parallel verfolgt.
 
-Optionen:
+Optionen (zur Einordnung):
 
 - **(A) Bindings nicht committen — beim Build aus lokal bezogenen XSDs generieren.**
   *(empfohlener Default bis zur Klärung)* Konservativ, keine proprietären
@@ -59,9 +62,11 @@ Optionen:
 - **(C) Handgeschriebene Modelle** statt generierter Bindings — kein direkter
   derivative use des XSD-Texts, dafür deutlich höherer Aufwand und Fehlerrisiko.
 
-**Empfehlung:** Mit **(A)** starten (M1 ohne committete Bindings, Generierung als
-opt-in Build-Schritt), parallel **(B)** prüfen. Die finale Wahl wird als
-Architektur-Entscheidung (ADR) festgehalten.
+**Entscheidung:** **(B)** — die generierten Bindings werden committet (XSDs
+bleiben ungetrackt), Genehmigung der EBICS SC parallel verfolgt. Begründung und
+Konsequenzen: [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md). Es
+werden nur generierte Artefakte committet, nicht der XSD-Originaltext; lässt die
+EBICS SC dies nicht zu, sind die Bindings entfernbar/neu generierbar.
 
 ## Bezug zu EBICO
 
