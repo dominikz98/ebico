@@ -55,3 +55,26 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+
+# Coverage / Test-Ergebnisse
+TestResults/
+coverage*.xml
+coverage*.json
+*.coverage
+*.cobertura.xml
+
+# Rider / JetBrains
+.idea/
+
+#############################################################################
+# EBICS-Schemas/Specs sind proprietaeres Eigentum der EBICS SC und duerfen
+# NICHT ungeprueft ins Repo. Lokal via scripts/fetch-schemas.sh beziehen.
+# Siehe docs/protocol/schema-sources.md und Lizenz-Issue #5.
+#############################################################################
+schemas/**/*.xsd
+schemas/**/MANIFEST.sha256
+schemas/manifest.json
+
+# Offizielle EBICS-Beispiel-XML (ebics.org/examples) sind ebenfalls proprietaer.
+# Verzeichnisstruktur + README werden eingecheckt, die Beispiel-Payloads nicht.
+tests/**/Fixtures/Xml/**/*.xml

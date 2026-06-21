@@ -1,0 +1,33 @@
+<Project>
+
+  <!--
+    Zentrale, projektweite Build-Konventionen für alle EBICO-Projekte.
+    Siehe docs/development/solution-layout.md für die Begründung.
+  -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Definition of Done: keine neuen Warnungen. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+
+    <!--
+      Style-Regeln (IDExxxx) leiten nur die IDE und brechen den Build NICHT.
+      Echte Compiler-/Analyzer-Warnungen werden via TreatWarningsAsErrors hart.
+    -->
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!--
+    XML-Doc wird nur für die Bibliotheks-Projekte mit öffentlicher API erzwungen
+    (DoD: "XML-Doc-Kommentare an öffentlichen APIs"). Server/Suite sind Apps,
+    keine veröffentlichte API-Fläche; Tests brauchen keine Doc-Files.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>
