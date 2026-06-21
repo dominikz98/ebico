@@ -14,6 +14,10 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [CI-Pipeline (GitHub Actions)](development/ci.md) — Build/Test, Coverage-Artefakt, Doku-Link-Check
 - [Test-Harness & Fixtures](development/testing.md) — xUnit v3, AwesomeAssertions, `CanonicalXmlComparer`, Fixtures
 
+## Architektur-Entscheidungen
+
+- [ADR-Index](adr/README.md) — Architecture Decision Records (Solution-Layout, Test-Stack, Schemas, Multi-Version, Connector-Dispatch)
+
 ## Connector
 
 - [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Designentscheidungen
