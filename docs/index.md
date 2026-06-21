@@ -12,7 +12,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 
 - [Solution-Layout & Build-Konventionen](development/solution-layout.md) — Projektaufteilung, `Directory.Build.props`, zentrale Paketverwaltung
 - [CI-Pipeline (GitHub Actions)](development/ci.md) — Build/Test, Coverage-Artefakt, Doku-Link-Check
-- *(folgt mit #8)* Test-Harness & Fixtures — `development/testing.md`
+- [Test-Harness & Fixtures](development/testing.md) — xUnit v3, AwesomeAssertions, `CanonicalXmlComparer`, Fixtures
 
 ## Connector
 

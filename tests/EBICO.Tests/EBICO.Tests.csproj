@@ -12,12 +12,19 @@
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="AwesomeAssertions" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EBICO.Core\EBICO.Core.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Connector\EBICO.Connector.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" />
+  </ItemGroup>
+
+  <!-- Fixtures (inkl. proprietärer, nicht eingecheckter Beispiel-XML) in den Output kopieren. -->
+  <ItemGroup>
+    <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
