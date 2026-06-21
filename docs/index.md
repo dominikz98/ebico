@@ -26,6 +26,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 
 - [Schema-Quellen & Lizenz](protocol/schema-sources.md) — Bezug der EBICS-XSDs, Lizenzlage
 - [XSD-Bindings](protocol/xsd-bindings.md) — generierte C#-Klassen je Version, Namespaces/Layout, Regenerierung, XmlSerializer-Hinweise
+- [Versions-Dispatch](protocol/version-dispatch.md) — `EbicsVersion`-Registry, Envelope-Schnittstellen, Versionserkennung (`EbicsVersionDetector`)
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---
