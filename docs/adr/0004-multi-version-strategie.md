@@ -1,7 +1,7 @@
 # 0004 — Multi-Version-Strategie (H003/H004/H005)
 
-- Status: proposed
-- Datum: 2026-06-21
+- Status: accepted
+- Datum: 2026-06-21 (in M1 gegen die echten Schemas verifiziert)
 
 ## Kontext
 
@@ -26,9 +26,14 @@ echten Schemas verifiziert (siehe Randbedingung in `CLAUDE.md`).
 - Eine Stelle, an der die Zielversion gewählt wird (vgl. Connector-DI:
   `o.Version = EbicsVersion.H005`).
 - Gemeinsame Logik bleibt versionsunabhängig testbar; Unterschiede sind lokal.
-- **Status `proposed`:** Details (z. B. Reihenfolge E002/A00x/X002, Segmentschleife
-  je Version) sind erst gegen die offiziellen XSDs/Annexe in M1 zu verifizieren;
-  diese ADR wird dann auf `accepted` aktualisiert oder verfeinert.
+- **In M1 verifiziert (`accepted`):** Die XSD-Bindings (#11–#13) sind pro Version in
+  eigenen Namespaces realisiert — `EBICO.Core.Schema.{H003,H004,H005}` —, während
+  die echt geteilten Schemas (xmldsig, HEV/H000, Signatur S001/S002) **einmal**
+  unter `EBICO.Core.Schema.{XmlDsig,Hev,Signature.S001,Signature.S002}` liegen
+  (Layout-Details: [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md)).
+  Offene Detailpunkte zum Ablauf (Reihenfolge E002/A00x/X002, Segmentschleife je
+  Version) werden mit der Krypto-/Transport-Arbeit (M2 ff.) gegen die Annexe
+  konkretisiert.
 
 ## Alternativen
 

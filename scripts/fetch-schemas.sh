@@ -100,7 +100,7 @@ ebics_types_H005.xsd
 ebics_keymgmt_request_H005.xsd
 ebics_keymgmt_response_H005.xsd
 ebics_hev.xsd
-ebics_signature.xsd
+ebics_signature_S002.xsd
 xmldsig-core-schema.xsd
 EOF
       ;;
@@ -119,14 +119,17 @@ xmldsig-core-schema.xsd
 EOF
       ;;
     H003)
+      # H003 verwendet (anders als H004/H005) UNSUFFIXIERTE Dateinamen;
+      # das Master-Schema heisst ebics.xsd.
       cat <<EOF
-ebics_H003.xsd
-ebics_request_H003.xsd
-ebics_response_H003.xsd
-ebics_orders_H003.xsd
-ebics_types_H003.xsd
-ebics_keymgmt_request_H003.xsd
-ebics_keymgmt_response_H003.xsd
+ebics.xsd
+ebics_request.xsd
+ebics_response.xsd
+ebics_orders.xsd
+ebics_types.xsd
+ebics_keymgmt_request.xsd
+ebics_keymgmt_response.xsd
+ebics_hev.xsd
 ebics_signature.xsd
 xmldsig-core-schema.xsd
 EOF
