@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nur der jeweils neueste Lauf pro Branch/PR; ältere werden abgebrochen.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET (aus global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      # NuGet-Cache über die Projekt-/CPM-Dateien verschlüsselt. Es werden
+      # bewusst keine packages.lock.json verwendet (siehe
+      # docs/development/solution-layout.md), daher der explizite actions/cache
+      # statt der setup-dotnet-Cache-Option.
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore EBICO.sln
+
+      - name: Build (Release, keine neuen Warnungen)
+        run: dotnet build EBICO.sln -c Release --no-restore
+
+      - name: Test (+ Coverage)
+        run: >-
+          dotnet test EBICO.sln -c Release --no-build
+          --collect:"XPlat Code Coverage"
+          --results-directory ./TestResults
+          --logger "trx;LogFileName=test-results.trx"
+
+      - name: Upload Coverage-Artefakt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: '**/coverage.cobertura.xml'
+          if-no-files-found: error
+
+      - name: Upload Testergebnisse (TRX)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: '**/*.trx'
+          if-no-files-found: warn
+
+  docs-link-check:
+    name: Docs Link Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Offline: prüft relative Doku-Links (Docs-as-Code), ohne flakige
+      # externe Requests (z. B. die vielen ebics.org-URLs). Externe Links
+      # können später als nicht-blockierender Scheduled-Job dazukommen.
+      - name: Link Checker (offline, relative Links)
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: --offline --no-progress --verbose "**/*.md"
+          fail: true
+
+# -----------------------------------------------------------------------------
+# Später (M9 / #62): Pack + Publish des Connector-NuGet-Pakets.
+# Bewusst noch deaktiviert, bis EBICO.Connector packbar ist.
+#
+#  pack-connector:
+#    name: Pack Connector (NuGet)
+#    needs: build-test
+#    if: github.ref == 'refs/heads/main'
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: actions/setup-dotnet@v4
+#        with:
+#          global-json-file: global.json
+#      - run: dotnet pack src/EBICO.Connector/EBICO.Connector.csproj -c Release -o ./artifacts
+#      - uses: actions/upload-artifact@v4
+#        with:
+#          name: nuget
+#          path: ./artifacts/*.nupkg
+# -----------------------------------------------------------------------------
