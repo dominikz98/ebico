@@ -29,6 +29,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Versions-Dispatch](protocol/version-dispatch.md) — `EbicsVersion`-Registry, Envelope-Schnittstellen, Versionserkennung (`EbicsVersionDetector`)
 - [XML-Serialisierung & C14N](protocol/serialization-c14n.md) — deterministische Serialisierung (Namespaces/Präfixe, stabile Ausgabe), Kanonisierung (inklusiv/exklusiv)
 - [Domänenmodell](protocol/domain-model.md) — IDs (HostID/PartnerID/UserID/SystemID), Berechtigungen/Signaturklassen, Subscriber-Zustände, Aggregate
+- [Schlüsselpaare & -repräsentation (A/E/X)](protocol/key-representation.md) — Schlüsselversionen (A00x/E002/X002), RSA-Container, Import/Export (PKCS#8/X.509/PEM/RSAKeyValue), Versions-Mapping
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---

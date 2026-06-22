@@ -34,6 +34,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0005](0005-connector-dispatch-ohne-mediatr.md) | Connector: eigener Dispatch statt MediatR | accepted |
 | [0006](0006-generierte-xsd-bindings-committen.md) | Generierte XSD-Bindings committen (Option B) | accepted |
 | [0007](0007-domaenen-value-objects-record-struct.md) | Domänen-Value-Objects als `readonly record struct` | accepted |
+| [0008](0008-krypto-bibliothek.md) | Krypto-Bibliothek: `System.Security.Cryptography` | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
@@ -45,6 +46,7 @@ Themen, die eine eigene ADR bekommen, sobald sie anstehen:
 - ~~**Serialisierungstechnik** der XSD-Bindings~~ — **entschieden**: generiert via
   XmlSchemaClassGenerator (XmlSerializer-Klassen), siehe
   [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md) und ADR-0006.
-- **Krypto-Bibliothek** (System.Security.Cryptography vs. BouncyCastle) — M2 (#17 ff.).
+- ~~**Krypto-Bibliothek** (System.Security.Cryptography vs. BouncyCastle)~~ — **entschieden**
+  in [ADR-0008](0008-krypto-bibliothek.md) (System.Security.Cryptography, kein BouncyCastle).
 - **Persistenz des Server-States** (In-Memory-Default, pluggable Store) — M3/M4.
 - **Returncode-Modellierung** (`EbicsResult<T>` vs. Exceptions, Katalog) — M4 (#36).
