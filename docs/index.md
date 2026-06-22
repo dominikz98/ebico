@@ -28,6 +28,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [XSD-Bindings](protocol/xsd-bindings.md) — generierte C#-Klassen je Version, Namespaces/Layout, Regenerierung, XmlSerializer-Hinweise
 - [Versions-Dispatch](protocol/version-dispatch.md) — `EbicsVersion`-Registry, Envelope-Schnittstellen, Versionserkennung (`EbicsVersionDetector`)
 - [XML-Serialisierung & C14N](protocol/serialization-c14n.md) — deterministische Serialisierung (Namespaces/Präfixe, stabile Ausgabe), Kanonisierung (inklusiv/exklusiv)
+- [Domänenmodell](protocol/domain-model.md) — IDs (HostID/PartnerID/UserID/SystemID), Berechtigungen/Signaturklassen, Subscriber-Zustände, Aggregate
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---

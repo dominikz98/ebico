@@ -33,6 +33,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0004](0004-multi-version-strategie.md) | Multi-Version-Strategie (H003/H004/H005) | accepted |
 | [0005](0005-connector-dispatch-ohne-mediatr.md) | Connector: eigener Dispatch statt MediatR | accepted |
 | [0006](0006-generierte-xsd-bindings-committen.md) | Generierte XSD-Bindings committen (Option B) | accepted |
+| [0007](0007-domaenen-value-objects-record-struct.md) | Domänen-Value-Objects als `readonly record struct` | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
