@@ -134,6 +134,7 @@ versionsunabhängigen Binding `XmlDsig.RsaKeyValueType`.
 
 ## Verwandtes
 
+- [Banktechnische Signatur A005/A006](bank-signature.md) — die erste Krypto-Operation, die auf dieser Schicht aufbaut (#19)
 - [ADR-0008 — Krypto-Bibliothek](../adr/0008-krypto-bibliothek.md)
 - [ADR-0007 — Domänen-Value-Objects als `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md) — Muster für `KeyVersion`
 - [Versions-Dispatch](version-dispatch.md) — die `EbicsVersion`-Registry, auf die `KeyVersions` Bezug nimmt
