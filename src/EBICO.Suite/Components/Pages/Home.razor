@@ -1,7 +1,46 @@
-﻿@page "/"
+@page "/"
+@inject IEmulatorStateProvider State
 
-<PageTitle>Home</PageTitle>
+<PageTitle>EBICO — Übersicht</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Übersicht</h1>
 
-Welcome to your new app.
+<p class="text-muted">Zustand des EBICS-Emulators auf einen Blick.</p>
+
+@if (_loading)
+{
+    <p><em>Lade Emulator-Zustand…</em></p>
+}
+else
+{
+    <div class="ebico-cards">
+        <div class="ebico-card">
+            <div class="ebico-card-value">@_bankCount</div>
+            <div class="ebico-card-label">Banken</div>
+        </div>
+        <div class="ebico-card">
+            <div class="ebico-card-value">@_partnerCount</div>
+            <div class="ebico-card-label">Partner</div>
+        </div>
+        <div class="ebico-card">
+            <div class="ebico-card-value">@_subscriberCount</div>
+            <div class="ebico-card-label">Teilnehmer</div>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private int _bankCount;
+    private int _partnerCount;
+    private int _subscriberCount;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _bankCount = (await State.GetBanksAsync()).Count;
+        _partnerCount = (await State.GetPartnersAsync()).Count;
+        _subscriberCount = (await State.GetSubscribersAsync()).Count;
+        _loading = false;
+    }
+}

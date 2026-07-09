@@ -24,6 +24,11 @@
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.9" />
   </ItemGroup>
 
+  <!-- Blazor-Komponententests der EBICO.Suite (framework-agnostisch, mit xUnit v3 genutzt). -->
+  <ItemGroup>
+    <PackageVersion Include="bunit" Version="2.7.2" />
+  </ItemGroup>
+
   <!-- EBICO.Connector: DI/Options/HttpClient-Integration (IHttpClientFactory). -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
