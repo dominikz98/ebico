@@ -4,9 +4,12 @@ using EBICO.Connector.Keys;
 using EBICO.Connector.Onboarding;
 using EBICO.Connector.Onboarding.Keys;
 using EBICO.Connector.Transport;
+using System.Text;
 using EBICO.Core;
 using EBICO.Core.Crypto;
+using EBICO.Core.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using H5 = EBICO.Core.Schema.H005;
 
 namespace EBICO.Tests.Connector.Onboarding;
 
@@ -61,6 +64,33 @@ public class HpbHandlerTests
         var storedEnc = (await fx.Keys.GetAsync(KeyOwner.Bank, KeyPurpose.Encryption, ct))!;
         storedAuth.Modulus.ToArray().Should().Equal(bankAuth.Modulus.ToArray());
         storedEnc.Modulus.ToArray().Should().Equal(bankEnc.Modulus.ToArray());
+    }
+
+    [Fact]
+    public async Task Hpb_Request_CarriesValidX002Signature()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        const EbicsVersion version = EbicsVersion.H005;
+        byte[] response = [];
+        var fx = await ArrangeAsync(version, () => new EbicsHttpResponse { StatusCode = 200, Payload = response }, ct);
+        using var provider = fx.Provider;
+
+        var encVersion = KeyVersions.Default(KeyPurpose.Encryption, version).Version;
+        var bankAuth = RsaKeyMaterial.Generate();
+        var bankEnc = RsaKeyMaterial.Generate();
+        response = OnboardingTestHarness.HpbResponse(
+            version, fx.SubscriberEncryption, encVersion, bankAuth, bankEnc, "X002", "E002", "HOST");
+
+        await provider.GetRequiredService<IEbicsClient>().Send(new HpbRequest(), ct);
+
+        // The transmitted request must carry an AuthSignature that verifies against the subscriber's X002 key.
+        var sentXml = Encoding.UTF8.GetString(fx.Transport.LastRequestPayload!);
+        var sentRequest = EbicsXmlSerializer.Deserialize<H5.EbicsNoPubKeyDigestsRequest>(sentXml);
+        var subscriberAuth = (await fx.Keys.GetAsync(KeyOwner.Subscriber, KeyPurpose.Authentication, ct))!;
+
+        sentRequest.AuthSignature.Should().NotBeNull();
+        AuthenticationSignature.Verify(sentXml, sentRequest.AuthSignature, subscriberAuth, KeyVersion.Create("X002"))
+            .Should().BeTrue();
     }
 
     [Fact]
