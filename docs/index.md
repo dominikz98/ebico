@@ -31,6 +31,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Domänenmodell](protocol/domain-model.md) — IDs (HostID/PartnerID/UserID/SystemID), Berechtigungen/Signaturklassen, Subscriber-Zustände, Aggregate
 - [Schlüsselpaare & -repräsentation (A/E/X)](protocol/key-representation.md) — Schlüsselversionen (A00x/E002/X002), RSA-Container, Import/Export (PKCS#8/X.509/PEM/RSAKeyValue), Versions-Mapping
 - [Banktechnische Signatur A005/A006](protocol/bank-signature.md) — Order-Hash (SHA-256), Signieren/Verifizieren A005 (PKCS1-v1.5) und A006 (PSS), registry-getriebenes Padding-Mapping
+- [Verschlüsselung E002 (RSA-OAEP + AES-128-CBC)](protocol/encryption-e002.md) — hybride Transportverschlüsselung: AES-128-CBC über die Auftragsdaten, RSAES-OAEP-SHA256 über den Transaktionsschlüssel, registry-getriebenes Padding-Mapping
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---
