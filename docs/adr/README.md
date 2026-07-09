@@ -35,6 +35,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0006](0006-generierte-xsd-bindings-committen.md) | Generierte XSD-Bindings committen (Option B) | accepted |
 | [0007](0007-domaenen-value-objects-record-struct.md) | Domänen-Value-Objects als `readonly record struct` | accepted |
 | [0008](0008-krypto-bibliothek.md) | Krypto-Bibliothek: `System.Security.Cryptography` | accepted |
+| [0009](0009-blazor-render-mode.md) | Blazor Render-Modus (Interactive Server) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
