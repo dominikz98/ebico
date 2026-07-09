@@ -36,6 +36,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Authentifikationssignatur X002](protocol/auth-signature-x002.md) — XML-DSig `AuthSignature` über die `authenticate="true"`-Knoten: Reference-Digest (SHA-256) + SignatureValue (RSA-PKCS1-v1.5), Dokumentkontext-C14N (inklusiv), registry-getriebenes Padding-Mapping
 - [Verschlüsselung E002 (RSA-OAEP + AES-128-CBC)](protocol/encryption-e002.md) — hybride Transportverschlüsselung: AES-128-CBC über die Auftragsdaten, RSAES-OAEP-SHA256 über den Transaktionsschlüssel, registry-getriebenes Padding-Mapping
 - [Public-Key-Fingerprints (HPB/INI/HIA)](protocol/public-key-fingerprint.md) — SHA-256-Hashwerte öffentlicher Schlüssel (Exponent/Modulus-Hash-Input), Darstellung für INI-Brief und HPB-Antwort, konstantzeitige Verifikation client-gesendeter Hashes
+- [Zertifikatsverifizierung (X.509)](protocol/certificate-verification-x509.md) — Kette/Vertrauensanker (konfigurierbar, Test-CA), Gültigkeit und Verwendungszweck (KeyUsage je Schlüsselrolle), optionales Key-Binding; reine-Schlüssel-Verfahren (H003/H004) als Policy (`CertificateRequirement`)
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---
