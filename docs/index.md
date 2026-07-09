@@ -13,6 +13,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Solution-Layout & Build-Konventionen](development/solution-layout.md) — Projektaufteilung, `Directory.Build.props`, zentrale Paketverwaltung
 - [CI-Pipeline (GitHub Actions)](development/ci.md) — Build/Test, Coverage-Artefakt, Doku-Link-Check
 - [Test-Harness & Fixtures](development/testing.md) — xUnit v3, AwesomeAssertions, `CanonicalXmlComparer`, Fixtures
+- [GitHub MCP-Server (Claude Code)](development/github-mcp.md) — MCP-Anbindung an GitHub, `.mcp.json`, PAT-Setup (`GITHUB_MCP_PAT`), benötigte Permissions
 
 ## Architektur-Entscheidungen
 
