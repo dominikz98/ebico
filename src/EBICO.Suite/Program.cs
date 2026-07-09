@@ -1,10 +1,15 @@
 using EBICO.Suite.Components;
+using EBICO.Suite.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+// Emulator state (read-model) for the UI. Placeholder sample data until the real
+// server store lands (M3/M4); see EBICO.Suite/Services/IEmulatorStateProvider.
+builder.Services.AddScoped<IEmulatorStateProvider, SampleEmulatorStateProvider>();
 
 var app = builder.Build();
 

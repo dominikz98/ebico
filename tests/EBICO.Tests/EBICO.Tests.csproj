@@ -15,12 +15,14 @@
     <PackageReference Include="AwesomeAssertions" />
     <PackageReference Include="System.Security.Cryptography.Xml" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="bunit" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EBICO.Core\EBICO.Core.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Connector\EBICO.Connector.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" />
+    <ProjectReference Include="..\..\src\EBICO.Suite\EBICO.Suite.csproj" />
   </ItemGroup>
 
   <!-- Fixtures (inkl. proprietärer, nicht eingecheckter Beispiel-XML) in den Output kopieren. -->
