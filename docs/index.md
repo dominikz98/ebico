@@ -23,6 +23,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 
 - [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Onboarding (INI/HIA/HPB), Transaktions-Skelett (Upload/Download), Designentscheidungen
 - [Client-Kern & Konfiguration](connector/client-core.md) — `IEbicsClient`/`Send`-Dispatch (kein MediatR), Options/DI (`AddEbicoConnector`), `ITransport`/`IKeyStore`, vorläufiges `EbicsResult<T>`
+- [Onboarding-Flows INI / HIA / HPB](connector/onboarding.md) — Schlüsselgenerierung, INI/HIA senden, HPB abrufen + Bankschlüssel-Hash-Abgleich, INI-Brief (Text/PDF), Versions-Dispatch (H003/H004/H005), `AddEbicoOnboarding`
 
 ## Suite (Blazor UI)
 

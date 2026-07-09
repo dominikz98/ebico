@@ -99,8 +99,15 @@ public static class TestCertificates
         X509Certificate2 issuer,
         string subjectName = "CN=EBICO Test Intermediate CA",
         int keySizeBits = DefaultKeySizeBits)
-        => Issue(issuer, subjectName, isCertificateAuthority: true,
-            X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign, notBefore: null, notAfter: null, keySizeBits);
+    {
+        // Wide window (-5y..+5y): strictly inside the root CA (-10y..+10y) yet comfortably wider than
+        // the leaf window (-5min..+1y), so a leaf issued a moment later never exceeds the intermediate's
+        // NotAfter (which the default -5min..+1y window did, straddling a one-second boundary — flaky).
+        var now = DateTimeOffset.UtcNow;
+        return Issue(issuer, subjectName, isCertificateAuthority: true,
+            X509KeyUsageFlags.KeyCertSign | X509KeyUsageFlags.CrlSign,
+            notBefore: now.AddYears(-5), notAfter: now.AddYears(5), keySizeBits);
+    }
 
     /// <summary>Issues an already-expired leaf (valid two years ago to one year ago).</summary>
     /// <param name="issuer">The signing CA certificate.</param>

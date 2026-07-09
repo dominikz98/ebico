@@ -1,4 +1,5 @@
 using EBICO.Connector;
+using EBICO.Connector.Transport;
 
 namespace EBICO.Tests.Connector;
 
@@ -69,4 +70,40 @@ public sealed class StubHttpMessageHandler : HttpMessageHandler
 
         return await _responder(request, cancellationToken);
     }
+}
+
+/// <summary>
+/// A test <see cref="ITransport"/> that records the request payload and returns a canned response,
+/// used to drive the onboarding handlers without a real HTTP round-trip.
+/// </summary>
+public sealed class FakeTransport : ITransport
+{
+    private readonly Func<EbicsHttpRequest, EbicsHttpResponse> _responder;
+
+    /// <summary>Creates a transport with the given responder.</summary>
+    /// <param name="responder">Produces the response for a given request.</param>
+    public FakeTransport(Func<EbicsHttpRequest, EbicsHttpResponse> responder) => _responder = responder;
+
+    /// <summary>The payload of the last request the transport was asked to send.</summary>
+    public byte[]? LastRequestPayload { get; private set; }
+
+    /// <inheritdoc />
+    public Task<EbicsHttpResponse> SendAsync(EbicsHttpRequest request, CancellationToken ct = default)
+    {
+        LastRequestPayload = request.Payload.ToArray();
+        return Task.FromResult(_responder(request));
+    }
+}
+
+/// <summary>A <see cref="TimeProvider"/> that always returns a fixed instant, for deterministic tests.</summary>
+public sealed class FixedTimeProvider : TimeProvider
+{
+    private readonly DateTimeOffset _now;
+
+    /// <summary>Creates a provider fixed at <paramref name="now"/>.</summary>
+    /// <param name="now">The instant to return from <see cref="GetUtcNow"/>.</param>
+    public FixedTimeProvider(DateTimeOffset now) => _now = now;
+
+    /// <inheritdoc />
+    public override DateTimeOffset GetUtcNow() => _now;
 }
