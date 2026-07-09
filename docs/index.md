@@ -22,6 +22,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 ## Connector
 
 - [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Onboarding (INI/HIA/HPB), Transaktions-Skelett (Upload/Download), Designentscheidungen
+- [Client-Kern & Konfiguration](connector/client-core.md) — `IEbicsClient`/`Send`-Dispatch (kein MediatR), Options/DI (`AddEbicoConnector`), `ITransport`/`IKeyStore`, vorläufiges `EbicsResult<T>`
 
 ## Protokoll & Schemas
 
@@ -34,6 +35,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Banktechnische Signatur A005/A006](protocol/bank-signature.md) — Order-Hash (SHA-256), Signieren/Verifizieren A005 (PKCS1-v1.5) und A006 (PSS), registry-getriebenes Padding-Mapping
 - [Authentifikationssignatur X002](protocol/auth-signature-x002.md) — XML-DSig `AuthSignature` über die `authenticate="true"`-Knoten: Reference-Digest (SHA-256) + SignatureValue (RSA-PKCS1-v1.5), Dokumentkontext-C14N (inklusiv), registry-getriebenes Padding-Mapping
 - [Verschlüsselung E002 (RSA-OAEP + AES-128-CBC)](protocol/encryption-e002.md) — hybride Transportverschlüsselung: AES-128-CBC über die Auftragsdaten, RSAES-OAEP-SHA256 über den Transaktionsschlüssel, registry-getriebenes Padding-Mapping
+- [Public-Key-Fingerprints (HPB/INI/HIA)](protocol/public-key-fingerprint.md) — SHA-256-Hashwerte öffentlicher Schlüssel (Exponent/Modulus-Hash-Input), Darstellung für INI-Brief und HPB-Antwort, konstantzeitige Verifikation client-gesendeter Hashes
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---
