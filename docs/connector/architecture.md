@@ -349,15 +349,18 @@ Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 | Connector-Kern (`IEbicsClient`, Dispatch, Handler, DI) | `Connector` (Client, Dispatch, DI) | ✅ #46 |
 | Key-Store (`IKeyStore`) | `Connector/Keys` (InMemory + File) | ✅ #46 |
 | 8. Returncode-Behandlung (`EbicsResult<T>`) | `Connector/EbicsResult<T>` (vorläufig) | 🟡 #46, Katalog #36 |
+| 3. Komprimierung | `Core/Serialization/EbicsCompression` (ZIP/zlib) | ✅ #47 |
+| 4. X002-Authentifikationssignatur | `Core/Crypto/AuthenticationSignature` (im HPB-Flow verdrahtet) | ✅ #47 (HPB) |
+| Onboarding-Handler (INI/HIA/HPB) | `Connector/Onboarding` (Requests/Handler/Builder, `AddEbicoOnboarding`) | ✅ #47 |
+| Schlüsselgenerierung + INI-/HIA-Brief | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
 | 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
-| 3. Komprimierung | — | ⬜ geplant |
-| 4. X002-Authentifikationssignatur | — | ⬜ geplant |
 | 9. Segmentierung | — | ⬜ geplant |
-| Onboarding-/Upload-/Download-Handler | — | ⬜ geplant (M6) |
+| Upload-/Download-Handler | — | ⬜ geplant (M6) |
 
 ## Verwandte Doku
 
 - [Client-Kern & Konfiguration](client-core.md) — #46: Abstraktionen, Options/DI, Dispatch, Transport, Key-Store
+- [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Schlüsselgenerierung, INI/HIA/HPB-Handler, Versions-Dispatch, INI-Brief (Text/PDF)
 - [ADR-0005 — Connector-Dispatch ohne MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
 - [ADR-0004 — Multi-Version-Strategie](../adr/0004-multi-version-strategie.md)
 - [Versions-Dispatch](../protocol/version-dispatch.md)

@@ -106,6 +106,36 @@ public static class EbicsXmlSerializer
         SerializeToStream(output, graph, EbicsVersions.Get(version));
     }
 
+    /// <summary>
+    /// Serializes a standalone EBICS <em>order-data</em> graph (e.g. the INI
+    /// <c>SignaturePubKeyOrderData</c> in the <c>S001</c>/<c>S002</c> namespace, or the HIA/HPB
+    /// order data in a protocol namespace) to deterministic UTF-8 octets. Unlike
+    /// <see cref="SerializeToUtf8Bytes(object, EbicsVersion)"/> this does <b>not</b> force a protocol
+    /// default namespace — the graph's own <c>XmlRoot</c> namespace drives the root, which is what
+    /// order-data payloads need (they are not enveloped). Only the XML-DSig <c>ds</c> prefix is fixed
+    /// (order data carries <c>ds:X509Data</c>/<c>ds:RSAKeyValue</c>), which also suppresses the stray
+    /// <c>xsi</c>/<c>xsd</c> declarations.
+    /// </summary>
+    /// <param name="graph">The order-data object graph to serialize.</param>
+    /// <returns>The serialized graph as UTF-8 bytes (no BOM), ready to compress and base64-encode.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="graph"/> is <see langword="null"/>.</exception>
+    public static byte[] SerializeOrderData(object graph)
+    {
+        ArgumentNullException.ThrowIfNull(graph);
+
+        var namespaces = new XmlSerializerNamespaces();
+        namespaces.Add("ds", XmlDsigNamespace);
+
+        using var buffer = new MemoryStream();
+        var serializer = GetSerializer(graph.GetType());
+        using (var writer = XmlWriter.Create(buffer, WriterSettings))
+        {
+            serializer.Serialize(writer, graph, namespaces);
+        }
+
+        return buffer.ToArray();
+    }
+
     // --- Deserialization ----------------------------------------------------
 
     /// <summary>Deserializes <paramref name="xml"/> into <typeparamref name="T"/> with XXE-hardened parsing.</summary>
