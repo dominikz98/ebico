@@ -13,15 +13,25 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="coverlet.collector" />
     <PackageReference Include="AwesomeAssertions" />
-    <PackageReference Include="System.Security.Cryptography.Xml" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="bunit" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+
+  <!--
+    WebApplicationFactory<Program> braucht das ASP.NET-Core-Shared-Framework im Testprojekt.
+    Es liefert zugleich System.Security.Cryptography.Xml und Microsoft.Extensions.DependencyInjection
+    (die daher nicht mehr als eigene PackageReference nötig sind — NU1510).
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\EBICO.Core\EBICO.Core.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Connector\EBICO.Connector.csproj" />
-    <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" />
+    <!-- 'EbicoServer'-Alias disambiguiert den globalen Program-Typ (EBICO.Server vs. EBICO.Suite)
+         in den WebApplicationFactory-Integrationstests; 'global' erhält den normalen Zugriff. -->
+    <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" Aliases="global,EbicoServer" />
     <ProjectReference Include="..\..\src\EBICO.Suite\EBICO.Suite.csproj" />
   </ItemGroup>
 

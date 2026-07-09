@@ -25,6 +25,10 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Client-Kern & Konfiguration](connector/client-core.md) — `IEbicsClient`/`Send`-Dispatch (kein MediatR), Options/DI (`AddEbicoConnector`), `ITransport`/`IKeyStore`, vorläufiges `EbicsResult<T>`
 - [Onboarding-Flows INI / HIA / HPB](connector/onboarding.md) — Schlüsselgenerierung, INI/HIA senden, HPB abrufen + Bankschlüssel-Hash-Abgleich, INI-Brief (Text/PDF), Versions-Dispatch (H003/H004/H005), `AddEbicoOnboarding`
 
+## Server (Emulator)
+
+- [Hostable Server-Grundgerüst (ASP.NET Core)](server/host.md) — EBICS-HTTP-Endpoint (POST, `text/xml`), Request-Pipeline (Parse → Version-Dispatch → Verify → Handle → Respond) mit Verify/Handle als Erweiterungspunkten, zentrale Fehlerabbildung auf EBICS-Returncodes, pluggbarer In-Memory-State-Store (`AddEbicoServer`)
+
 ## Suite (Blazor UI)
 
 - [UI-Grundgerüst & Navigation](suite/ui-shell.md) — Render-Modus (Interactive Server, ADR-0009), Navigation/Layout/Theming, Anbindung an den Emulator-Zustand (`IEmulatorStateProvider` + Stub)
