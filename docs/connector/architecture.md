@@ -242,7 +242,10 @@ In-Memory-Schlüssel, in Produktion Datei, HSM oder ein eigener Store. Das
 hält die Krypto-Schicht isoliert testbar. Der `IKeyStore` liefert die im
 [Onboarding](#onboarding-flows-ini--hia--hpb) ausgetauschten Teilnehmer- und
 Bankschlüssel; zur Schlüsselrepräsentation siehe
-[Schlüsselpaare & -repräsentation](../protocol/key-representation.md).
+[Schlüsselpaare & -repräsentation](../protocol/key-representation.md). Die
+Abstraktion `IKeyStore` sowie ein `InMemoryKeyStore` und ein einfacher
+`FileKeyStore` sind mit **#46** umgesetzt (siehe
+[Client-Kern & Konfiguration](client-core.md)).
 
 ## `EbicsResult<T>` — Ergebnis- und Returncode-Modell
 
@@ -263,10 +266,10 @@ public readonly record struct EbicsResult<T>
 
 Fachliche Beispiel-Codes: `000000` (OK), `011000` (Download-Nachbearbeitung
 erledigt) oder ein „keine Daten vorhanden"-Code — sie führen zu einem
-`EbicsResult`, **nicht** zu einer Exception. Der vollständige, gepflegte
-Returncode-Katalog und die zugehörige ADR werden separat in
-**#36 (Returncode-Modellierung, M4)** erarbeitet; dieses Dokument beschreibt nur
-die Architekturform.
+`EbicsResult`, **nicht** zu einer Exception. Eine **vorläufige** Form dieses Typs
+liegt seit **#46** in `EBICO.Connector` (mit `Success`/`Failure`-Factories); der
+vollständige, gepflegte Returncode-Katalog und die zugehörige ADR werden separat
+in **#36 (Returncode-Modellierung, M4)** erarbeitet und dann abgeglichen.
 
 ## Fehlerbehandlung, Abbruch und Resilienz
 
@@ -288,25 +291,36 @@ die Architekturform.
 ## Versionsabhängigkeit (H003/H004/H005)
 
 Der Connector arbeitet mehrversionsfähig. Die Zielversion kommt aus der
-Konfiguration (`o.Version`, siehe [DI-Registrierung](#di-registrierung-zielbild))
+Konfiguration (`o.Version`, siehe [DI-Registrierung](#di-registrierung))
 und beeinflusst Envelope-Namespaces, Header-Aufbau und teils Krypto-Defaults.
 Die Auswahl und Erkennung der Version stützt sich auf die Core-Bausteine
 (`EbicsVersion`-Registry, `EbicsVersionDetector`, Envelope-Bindings). Hintergrund
 und Strategie: [Versions-Dispatch](../protocol/version-dispatch.md) und
 [ADR-0004 (Multi-Version-Strategie)](../adr/0004-multi-version-strategie.md).
 
-## DI-Registrierung (Zielbild)
+## DI-Registrierung
+
+Umgesetzt in **#46** (siehe [Client-Kern & Konfiguration](client-core.md)).
+`AddEbicoConnector(...)` gibt den `IHttpClientBuilder` des Connector-eigenen
+Named Clients zurück, sodass Timeouts und Resilienz direkt am HttpClient
+konfiguriert werden können (Resilienz-Pakete bleiben caller-seitig):
 
 ```csharp
 services.AddEbicoConnector(o =>
 {
+    o.Url       = "https://bank.example/ebicsweb";
     o.HostId    = "...";
     o.PartnerId = "...";
     o.UserId    = "...";
     o.Version   = EbicsVersion.H005;
 })
-.AddHttpClient();   // eigener HttpClient, eigene Resilienz-Policy
+.ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
+.AddStandardResilienceHandler();   // optional, Paket beim Aufrufer
 ```
+
+> Verfeinerung ggü. der ursprünglichen Skizze (`.AddHttpClient()`): Rückgabe ist
+> ein `IHttpClientBuilder`, was Resilienz-/Timeout-Konfiguration am
+> Connector-Client erster Klasse macht.
 
 ## Testbarkeit (Bezug zur projektweiten Anforderung)
 
@@ -318,28 +332,32 @@ gestellt (keine echten Netz-/Dateizugriffe).
 
 ## Bausteine: vorhanden vs. geplant
 
-Der Connector-Code selbst ist noch nicht implementiert (M6). Die folgende
-Tabelle ordnet die [Send-Pipeline](#send-pipeline)-Stufen den heute in
-`EBICO.Core` vorhandenen Primitiven zu — so ist der Reifegrad transparent und es
-entsteht kein „fertig"-Fehleindruck.
+Der Connector-**Kern** (Client, Dispatch, Konfiguration, Transport, Key-Store)
+ist mit **#46** angelegt; Onboarding (INI/HIA/HPB), Upload, Download und
+Segmentierung folgen in weiteren M6-Issues. Die folgende Tabelle ordnet die
+[Send-Pipeline](#send-pipeline)-Stufen den vorhandenen Bausteinen zu — so ist der
+Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 
-| Pipeline-Stufe | Baustein in `EBICO.Core` | Status |
+| Pipeline-Stufe | Baustein | Status |
 | --- | --- | --- |
-| 2. Serialisieren / 10. Deserialisieren | `Serialization/EbicsXmlSerializer` | ✅ vorhanden |
-| (Kanonisierung für Signaturen) | `Serialization/XmlCanonicalizer` (C14N) | ✅ vorhanden |
-| 3. E002-Verschlüsselung / 7. Entschlüsseln | `Crypto/EncryptionE002` | ✅ vorhanden |
-| 3. A00x-Signatur / 7. Verify | `Crypto/BankSignature` (A005/A006) | ✅ vorhanden |
-| (Schlüsselmaterial) | `Crypto/RsaKeyMaterial`, `KeyVersions` | ✅ vorhanden |
+| 2. Serialisieren / 10. Deserialisieren | `Core/Serialization/EbicsXmlSerializer` | ✅ vorhanden |
+| (Kanonisierung für Signaturen) | `Core/Serialization/XmlCanonicalizer` (C14N) | ✅ vorhanden |
+| 3. E002-Verschlüsselung / 7. Entschlüsseln | `Core/Crypto/EncryptionE002` | ✅ vorhanden |
+| 3. A00x-Signatur / 7. Verify | `Core/Crypto/BankSignature` (A005/A006) | ✅ vorhanden |
+| (Schlüsselmaterial) | `Core/Crypto/RsaKeyMaterial`, `KeyVersions` | ✅ vorhanden |
+| 5. Transport (`ITransport`/HttpClient) | `Connector/Transport/HttpClientTransport` | ✅ #46 |
+| Connector-Kern (`IEbicsClient`, Dispatch, Handler, DI) | `Connector` (Client, Dispatch, DI) | ✅ #46 |
+| Key-Store (`IKeyStore`) | `Connector/Keys` (InMemory + File) | ✅ #46 |
+| 8. Returncode-Behandlung (`EbicsResult<T>`) | `Connector/EbicsResult<T>` (vorläufig) | 🟡 #46, Katalog #36 |
 | 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
 | 3. Komprimierung | — | ⬜ geplant |
 | 4. X002-Authentifikationssignatur | — | ⬜ geplant |
-| 5. Transport (`ITransport`/HttpClient) | — | ⬜ geplant |
-| 8. Returncode-Behandlung | — | ⬜ geplant (#36) |
 | 9. Segmentierung | — | ⬜ geplant |
-| Connector-Kern (`IEbicsClient`, Dispatch, Handler, DI) | — | ⬜ geplant (#46 ff.) |
+| Onboarding-/Upload-/Download-Handler | — | ⬜ geplant (M6) |
 
 ## Verwandte Doku
 
+- [Client-Kern & Konfiguration](client-core.md) — #46: Abstraktionen, Options/DI, Dispatch, Transport, Key-Store
 - [ADR-0005 — Connector-Dispatch ohne MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
 - [ADR-0004 — Multi-Version-Strategie](../adr/0004-multi-version-strategie.md)
 - [Versions-Dispatch](../protocol/version-dispatch.md)
