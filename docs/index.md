@@ -24,6 +24,10 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Onboarding (INI/HIA/HPB), Transaktions-Skelett (Upload/Download), Designentscheidungen
 - [Client-Kern & Konfiguration](connector/client-core.md) — `IEbicsClient`/`Send`-Dispatch (kein MediatR), Options/DI (`AddEbicoConnector`), `ITransport`/`IKeyStore`, vorläufiges `EbicsResult<T>`
 
+## Server (Emulator)
+
+- [Hostable Server-Grundgerüst (ASP.NET Core)](server/host.md) — EBICS-HTTP-Endpoint (POST, `text/xml`), Request-Pipeline (Parse → Version-Dispatch → Verify → Handle → Respond) mit Verify/Handle als Erweiterungspunkten, zentrale Fehlerabbildung auf EBICS-Returncodes, pluggbarer In-Memory-State-Store (`AddEbicoServer`)
+
 ## Suite (Blazor UI)
 
 - [UI-Grundgerüst & Navigation](suite/ui-shell.md) — Render-Modus (Interactive Server, ADR-0009), Navigation/Layout/Theming, Anbindung an den Emulator-Zustand (`IEmulatorStateProvider` + Stub)
