@@ -21,7 +21,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 
 ## Connector
 
-- [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Designentscheidungen
+- [Connector-Architektur](connector/architecture.md) — Mediator-Muster, Send-Pipeline, Onboarding (INI/HIA/HPB), Transaktions-Skelett (Upload/Download), Designentscheidungen
 
 ## Protokoll & Schemas
 

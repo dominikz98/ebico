@@ -5,6 +5,13 @@ EBICS-Server (den Emulator `EBICO.Server` oder eine echte Bank). Sie ist
 fluent, testbar und DI-freundlich. Dieses Dokument beschreibt die tragende
 Architektur und die wichtigsten Designentscheidungen samt Trade-offs.
 
+> **Status:** Dieses Dokument beschreibt einen *begründeten Architektur-Vorschlag*
+> für den noch nicht implementierten `EBICO.Connector` (Milestone M6). Ablaufdetails
+> — etwa die Reihenfolge E002/A00x/X002 oder die Segmentschleife je Version — sind
+> gegen die offiziellen EBICS-XSDs/Annexe zu verifizieren, sobald die Schemas
+> vorliegen. Welche Bausteine bereits in `EBICO.Core` existieren und welche noch
+> offen sind, steht im Abschnitt **„Bausteine: vorhanden vs. geplant"** weiter unten.
+
 ## Leitidee: Mediator-Muster
 
 Der Aufrufer kennt nur **eine** Methode — `IEbicsClient.Send(request)`. Er
@@ -23,7 +30,8 @@ unterscheidet sich nur in OrderType/BTF, Richtung und Payload-Behandlung. Ein
 generischer Handler pro Richtung deckt damit den Großteil ab; Sonderfälle
 (HPB, INI/HIA) bekommen eigene Handler. Das ist dasselbe Muster, das MediatR
 populär gemacht hat — hier aber bewusst ohne diese Library (siehe
-Designentscheidungen).
+[Designentscheidungen](#designentscheidungen) und
+[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)).
 
 ## Schichtenmodell
 
@@ -74,7 +82,11 @@ flowchart TD
 
 Jede Stufe ist eine eigene, isoliert unit-testbare Komponente. Die
 Segmentschleife (9) ruft intern weiter, bis alle Segmente eines Downloads
-vorliegen, und gibt erst dann das vollständige `TResult` zurück.
+vorliegen, und gibt erst dann das vollständige `TResult` zurück. Die konkrete
+Ausprägung der Krypto-Stufen ist in eigenen Doku-Seiten beschrieben:
+[XML-Serialisierung & C14N](../protocol/serialization-c14n.md),
+[Verschlüsselung E002](../protocol/encryption-e002.md) und
+[Banktechnische Signatur A005/A006](../protocol/bank-signature.md).
 
 ## Kern-Abstraktionen
 
@@ -111,6 +123,87 @@ Der Aufruf in der App bleibt dadurch trivial:
 var result = await client.Send(new CddUploadRequest { Pain008 = bytes });
 ```
 
+> **Abgrenzung zu Core:** `IEbicsRequest<TResult>` ist die *app-seitige* Request-
+> Abstraktion des Connectors. Sie ist bewusst von den protokollnahen
+> Envelope-Schnittstellen in `EBICO.Core`
+> (`IEbicsRequestEnvelope`/`IEbicsResponseEnvelope`, siehe
+> [Versions-Dispatch](../protocol/version-dispatch.md)) getrennt — beide leben
+> auf unterschiedlichen Schichten.
+
+## Onboarding-Flows: INI / HIA / HPB
+
+Bevor ein Teilnehmer fachliche Aufträge senden kann, muss der Schlüsselaustausch
+abgeschlossen sein. Der Connector kapselt das in drei Sonderfall-Handlern; die
+Schlüssel selbst kommen aus dem [`IKeyStore`](#key-store-als-abstraktion-ikeystore).
+
+```mermaid
+sequenceDiagram
+    participant C as Teilnehmer (Connector)
+    participant S as EBICS-Server (Bank)
+    C->>S: INI — öffentlicher A00x-Signaturschlüssel
+    S-->>C: Returncode
+    C->>S: HIA — öffentliche X002- und E002-Schlüssel
+    S-->>C: Returncode
+    Note over C,S: INI-/HIA-Brief mit Schlüssel-Hashes wird manuell zur Bank<br/>übermittelt. Die Bank aktiviert daraufhin den Teilnehmer.
+    C->>S: HPB — Abruf der Bankschlüssel
+    S-->>C: X002-/E002-Schlüssel der Bank (verschlüsselt)
+    Note over C: Bank-Schlüssel-Hashes gegen den Bankbrief verifizieren,<br/>dann im IKeyStore ablegen.
+```
+
+- **INI** überträgt den öffentlichen **A00x**-Signaturschlüssel des Teilnehmers
+  (banktechnische Signatur, siehe [A005/A006](../protocol/bank-signature.md)).
+- **HIA** überträgt den öffentlichen **X002**-Authentifikations- und den
+  **E002**-Verschlüsselungsschlüssel des Teilnehmers.
+- **HPB** ist ein *Download*: Der Teilnehmer holt die öffentlichen Bankschlüssel
+  (X002/E002) und verifiziert deren Hash gegen den Bankbrief.
+
+Erst nach INI + HIA + HPB und der Aktivierung durch die Bank sind Uploads (z. B.
+CCT/CDD) und Downloads (z. B. STA/C53) möglich — das entspricht dem
+Akzeptanzkriterium des Connector-Epics. Zu Schlüsselversionen und
+-repräsentation siehe [Schlüsselpaare & -repräsentation](../protocol/key-representation.md).
+
+## Transaktions-Skelett: Upload und Download
+
+Alle fachlichen Aufträge teilen sich ein gemeinsames Transaktions-Skelett, das
+die Transaktionsmaschine kapselt. Genau diese Gemeinsamkeit macht je einen
+generischen Handler pro Richtung möglich.
+
+### Upload (Initialisation → Transfer)
+
+```mermaid
+sequenceDiagram
+    participant C as Connector
+    participant S as EBICS-Server
+    Note over C: Payload komprimieren, E002-verschlüsseln,<br/>A00x-signieren, X002-Authentifikationssignatur
+    C->>S: ebicsRequest — Initialisation (Auftragsdaten, Signaturen)
+    S-->>C: Transaction-ID + Returncode
+    loop je weiterem Segment
+        C->>S: ebicsRequest — Transfer (Segment n)
+        S-->>C: Returncode
+    end
+```
+
+### Download (Initialisation → Transfer → Receipt)
+
+```mermaid
+sequenceDiagram
+    participant C as Connector
+    participant S as EBICS-Server
+    C->>S: ebicsRequest — Initialisation (Download-BTF)
+    S-->>C: Anzahl Segmente + Segment 1 (verschlüsselt) + Transaction-ID
+    loop restliche Segmente
+        C->>S: ebicsRequest — Transfer (Segment n anfordern)
+        S-->>C: Segment n
+    end
+    C->>S: ebicsRequest — Receipt (Empfang quittieren)
+    S-->>C: Abschluss-Returncode
+```
+
+Der Upload endet nach der Transfer-Phase; der Download quittiert zusätzlich mit
+einer **Receipt**-Phase, ob die Daten vollständig und verwertbar empfangen
+wurden. Die Download-Segmentschleife entspricht Stufe 9 der
+[Send-Pipeline](#send-pipeline).
+
 ## Designentscheidungen
 
 ### Eigener Dispatch statt MediatR-Library
@@ -122,7 +215,8 @@ NuGet-Paket — eine schlanke Abhängigkeitsliste ist bei einem öffentlichen
 Connector ein echtes Verkaufsargument.
 
 *Trade-off:* MediatR würde Dispatch-Boilerplate sparen, bringt aber Kopplung
-an die Library und weniger Kontrolle über die Pipeline.
+an die Library und weniger Kontrolle über die Pipeline. Ausführliche Begründung:
+[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md).
 
 ### `EbicsResult<T>` statt Exceptions für fachliche Returncodes
 
@@ -130,7 +224,8 @@ EBICS liefert viele *fachliche* Returncodes (z. B. „noch keine Daten
 vorhanden"), die keine Programmfehler sind. Diese als Result-Typ
 zurückzugeben ist sauberer und zwingt den Aufrufer nicht in `try/catch` für
 Normalfälle. Echte Transport- oder Krypto-Fehler dürfen weiterhin Exceptions
-werfen.
+werfen. Die Form des Result-Typs beschreibt der Abschnitt
+[Ergebnis- und Returncode-Modell](#ebicsresultt--ergebnis--und-returncode-modell).
 
 ### HttpClient hinter schmalem `ITransport`
 
@@ -144,7 +239,61 @@ abhängt. Das hält die Kernlogik transport-agnostisch und testbar.
 
 Der Schlüsselspeicher ist nicht fest auf Dateien verdrahtet: im Test
 In-Memory-Schlüssel, in Produktion Datei, HSM oder ein eigener Store. Das
-hält die Krypto-Schicht isoliert testbar.
+hält die Krypto-Schicht isoliert testbar. Der `IKeyStore` liefert die im
+[Onboarding](#onboarding-flows-ini--hia--hpb) ausgetauschten Teilnehmer- und
+Bankschlüssel; zur Schlüsselrepräsentation siehe
+[Schlüsselpaare & -repräsentation](../protocol/key-representation.md).
+
+## `EbicsResult<T>` — Ergebnis- und Returncode-Modell
+
+`EbicsResult<T>` trennt drei Fälle sauber: technischer Erfolg mit Wert,
+fachlicher Returncode (kein Fehler) und — davon abgegrenzt — echte technische
+Fehler, die als Exception geworfen werden.
+
+```csharp
+// Skizze; die endgültige Form inkl. Returncode-Katalog folgt in #36 (M4).
+public readonly record struct EbicsResult<T>
+{
+    public bool IsSuccess { get; init; }        // Auftrag fachlich erfolgreich?
+    public T? Value { get; init; }              // nur bei Erfolg gesetzt
+    public string ReturnCode { get; init; }     // EBICS-Returncode, z. B. "000000"
+    public string? ReturnText { get; init; }    // menschenlesbarer Text
+}
+```
+
+Fachliche Beispiel-Codes: `000000` (OK), `011000` (Download-Nachbearbeitung
+erledigt) oder ein „keine Daten vorhanden"-Code — sie führen zu einem
+`EbicsResult`, **nicht** zu einer Exception. Der vollständige, gepflegte
+Returncode-Katalog und die zugehörige ADR werden separat in
+**#36 (Returncode-Modellierung, M4)** erarbeitet; dieses Dokument beschreibt nur
+die Architekturform.
+
+## Fehlerbehandlung, Abbruch und Resilienz
+
+- **Grenze fachlich ↔ technisch:** Fachliche Returncodes → `EbicsResult<T>`
+  (kein Wurf). Technische Fehler (Netzwerk-/HTTP-Fehler, fehlgeschlagene
+  Signatur-Verifikation, nicht deserialisierbares XML) → Exception. So bleibt
+  der Normalpfad `try/catch`-frei.
+- **Abbruch:** Der `CancellationToken` aus `Send(...)` wird durch alle
+  async-Stufen bis in den `ITransport`/`HttpClient` durchgereicht.
+- **Resilienz gehört an den HttpClient, nicht in den Kern:** Timeouts, Retries
+  und Circuit-Breaker werden über `IHttpClientFactory`/Polly am injizierten
+  `HttpClient` konfiguriert (Named Client). Der Connector-Kern bleibt frei von
+  Retry-Logik.
+- **Idempotenz-Hinweis:** EBICS-Transaktionen sind zustandsbehaftet
+  (Transaction-ID über mehrere Segmente). Ein blindes Wiederholen einzelner
+  Transfer-Segmente ist heikel; Retries zielen auf die Verbindungs-/
+  Initialisierungs­ebene, nicht auf halb abgeschlossene Transaktionen.
+
+## Versionsabhängigkeit (H003/H004/H005)
+
+Der Connector arbeitet mehrversionsfähig. Die Zielversion kommt aus der
+Konfiguration (`o.Version`, siehe [DI-Registrierung](#di-registrierung-zielbild))
+und beeinflusst Envelope-Namespaces, Header-Aufbau und teils Krypto-Defaults.
+Die Auswahl und Erkennung der Version stützt sich auf die Core-Bausteine
+(`EbicsVersion`-Registry, `EbicsVersionDetector`, Envelope-Bindings). Hintergrund
+und Strategie: [Versions-Dispatch](../protocol/version-dispatch.md) und
+[ADR-0004 (Multi-Version-Strategie)](../adr/0004-multi-version-strategie.md).
 
 ## DI-Registrierung (Zielbild)
 
@@ -167,8 +316,41 @@ Deserialisierung lassen sich je einzeln testen. Über `ITransport` und
 `IKeyStore` werden Server-Antworten und Schlüssel im Test deterministisch
 gestellt (keine echten Netz-/Dateizugriffe).
 
+## Bausteine: vorhanden vs. geplant
+
+Der Connector-Code selbst ist noch nicht implementiert (M6). Die folgende
+Tabelle ordnet die [Send-Pipeline](#send-pipeline)-Stufen den heute in
+`EBICO.Core` vorhandenen Primitiven zu — so ist der Reifegrad transparent und es
+entsteht kein „fertig"-Fehleindruck.
+
+| Pipeline-Stufe | Baustein in `EBICO.Core` | Status |
+| --- | --- | --- |
+| 2. Serialisieren / 10. Deserialisieren | `Serialization/EbicsXmlSerializer` | ✅ vorhanden |
+| (Kanonisierung für Signaturen) | `Serialization/XmlCanonicalizer` (C14N) | ✅ vorhanden |
+| 3. E002-Verschlüsselung / 7. Entschlüsseln | `Crypto/EncryptionE002` | ✅ vorhanden |
+| 3. A00x-Signatur / 7. Verify | `Crypto/BankSignature` (A005/A006) | ✅ vorhanden |
+| (Schlüsselmaterial) | `Crypto/RsaKeyMaterial`, `KeyVersions` | ✅ vorhanden |
+| 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
+| 3. Komprimierung | — | ⬜ geplant |
+| 4. X002-Authentifikationssignatur | — | ⬜ geplant |
+| 5. Transport (`ITransport`/HttpClient) | — | ⬜ geplant |
+| 8. Returncode-Behandlung | — | ⬜ geplant (#36) |
+| 9. Segmentierung | — | ⬜ geplant |
+| Connector-Kern (`IEbicsClient`, Dispatch, Handler, DI) | — | ⬜ geplant (#46 ff.) |
+
+## Verwandte Doku
+
+- [ADR-0005 — Connector-Dispatch ohne MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
+- [ADR-0004 — Multi-Version-Strategie](../adr/0004-multi-version-strategie.md)
+- [Versions-Dispatch](../protocol/version-dispatch.md)
+- [XML-Serialisierung & C14N](../protocol/serialization-c14n.md)
+- [Verschlüsselung E002](../protocol/encryption-e002.md)
+- [Banktechnische Signatur A005/A006](../protocol/bank-signature.md)
+- [Schlüsselpaare & -repräsentation (A/E/X)](../protocol/key-representation.md)
+
 ---
 
 > Diese Seite ist die gepflegte Referenz. Bei Architekturänderungen hier (und
 > ggf. in einer ADR) nachziehen; der Connector-Epic im Issue-Tracker verweist
-> auf dieses Dokument.
+> auf dieses Dokument. Änderungen am Returncode-Modell werden mit #36 (M4)
+> abgeglichen, Dispatch-Entscheidungen mit ADR-0005.

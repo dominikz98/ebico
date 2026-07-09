@@ -26,7 +26,9 @@ Voraussetzung: .NET SDK gemäß [`global.json`](global.json).
 ## Dokumentation
 
 Die gesamte Doku liegt unter [`docs/`](docs/index.md) (Docs-as-Code). Einstieg:
-**[docs/index.md](docs/index.md)**.
+**[docs/index.md](docs/index.md)**. Architektur des Client-Pakets (Mediator-Muster,
+Send-Pipeline, Onboarding, Designentscheidungen):
+[docs/connector/architecture.md](docs/connector/architecture.md).
 
 ## Mitarbeit
 
