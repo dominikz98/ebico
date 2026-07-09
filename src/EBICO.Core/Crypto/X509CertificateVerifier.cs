@@ -207,7 +207,7 @@ public static class X509CertificateVerifier
             return;
         }
 
-        var (allOf, anyOf) = ExpectedKeyUsage(purpose);
+        var (allOf, anyOf) = EbicsCertificateProfile.RequiredKeyUsage(purpose);
 
         X509KeyUsageExtension? extension = null;
         foreach (var ext in certificate.Extensions)
@@ -222,7 +222,7 @@ public static class X509CertificateVerifier
         if (extension is null)
         {
             // Strict: EBICS certificates are expected to carry a KeyUsage extension. Gated by the
-            // Spec-Vorbehalt on ExpectedKeyUsage.
+            // Spec-Vorbehalt on EBICO.Core.Crypto.EbicsCertificateProfile.
             errors |= CertificateVerificationError.InvalidKeyUsage;
             diagnostics.Add($"Certificate has no KeyUsage extension (expected for {purpose}).");
             return;
@@ -267,25 +267,4 @@ public static class X509CertificateVerifier
         }
     }
 
-    /// <summary>
-    /// Maps an EBICS <see cref="KeyPurpose"/> to the <see cref="X509KeyUsageFlags"/> its certificate
-    /// is expected to assert: <c>AllOf</c> bits must all be present, and — when <c>AnyOf</c> is not
-    /// <see cref="X509KeyUsageFlags.None"/> — at least one <c>AnyOf</c> bit must be present.
-    /// </summary>
-    /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> the EBICS X.509 key-usage profile per purpose is not yet verified
-    /// against the official EBICS Annex (see <c>CLAUDE.md</c>). This is the one place to adjust it.
-    /// Signature and authentication certificates are required to assert <c>DigitalSignature</c>;
-    /// <c>NonRepudiation</c> is permitted but not required for signature (tighten by moving it into
-    /// <c>AllOf</c> here). Encryption certificates must assert <c>KeyEncipherment</c> or
-    /// <c>DataEncipherment</c>. Extended Key Usage is deliberately not checked (EBICS defines no
-    /// standard EKU OIDs for A/E/X keys).
-    /// </remarks>
-    private static (X509KeyUsageFlags AllOf, X509KeyUsageFlags AnyOf) ExpectedKeyUsage(KeyPurpose purpose) => purpose switch
-    {
-        KeyPurpose.Signature => (X509KeyUsageFlags.DigitalSignature, X509KeyUsageFlags.None),
-        KeyPurpose.Authentication => (X509KeyUsageFlags.DigitalSignature, X509KeyUsageFlags.None),
-        KeyPurpose.Encryption => (X509KeyUsageFlags.None, X509KeyUsageFlags.KeyEncipherment | X509KeyUsageFlags.DataEncipherment),
-        _ => throw new ArgumentOutOfRangeException(nameof(purpose), purpose, "Unknown key purpose."),
-    };
 }

@@ -36,6 +36,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0007](0007-domaenen-value-objects-record-struct.md) | Domänen-Value-Objects als `readonly record struct` | accepted |
 | [0008](0008-krypto-bibliothek.md) | Krypto-Bibliothek: `System.Security.Cryptography` | accepted |
 | [0009](0009-blazor-render-mode.md) | Blazor Render-Modus (Interactive Server) | accepted |
+| [0010](0010-pdf-bibliothek.md) | PDF-Bibliothek für den INI-/HIA-Brief: QuestPDF (Community) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

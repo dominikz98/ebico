@@ -116,6 +116,29 @@ public sealed class RsaKeyMaterial
     }
 
     /// <summary>
+    /// Generates a fresh RSA key pair of the given size and captures it as full key material
+    /// (public + private). This is the client-side key generation used by EBICS onboarding to
+    /// create the subscriber's signature (<c>A00x</c>), encryption (<c>E002</c>) and
+    /// authentication (<c>X002</c>) keys.
+    /// </summary>
+    /// <param name="keySizeBits">The RSA key size in bits; defaults to <see cref="MinKeySizeBits"/>.</param>
+    /// <returns>A <see cref="RsaKeyMaterial"/> with <see cref="HasPrivateKey"/> set.</returns>
+    /// <exception cref="KeyMaterialException"><paramref name="keySizeBits"/> is below <see cref="MinKeySizeBits"/>.</exception>
+    public static RsaKeyMaterial Generate(int keySizeBits = MinKeySizeBits)
+    {
+        // Validate before generating: RSA.Create would happily produce an undersized key, and we
+        // want a clear KeyMaterialException rather than the cost of generating a key we then reject.
+        if (keySizeBits < MinKeySizeBits)
+        {
+            throw new KeyMaterialException(
+                $"RSA key size {keySizeBits} bits is below the minimum of {MinKeySizeBits} bits.");
+        }
+
+        using var rsa = RSA.Create(keySizeBits);
+        return FromKeyPair(rsa);
+    }
+
+    /// <summary>
     /// Creates a fresh <see cref="RSA"/> instance carrying this material. The caller owns and
     /// must dispose the returned instance.
     /// </summary>
