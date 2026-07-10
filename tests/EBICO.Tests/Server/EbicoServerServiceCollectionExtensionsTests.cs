@@ -33,7 +33,7 @@ public class EbicoServerServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddEbicoServer_RegistersIniOrderHandlerPerVersion()
+    public void AddEbicoServer_RegistersKeyManagementOrderHandlersPerVersion()
     {
         var services = new ServiceCollection();
         services.AddEbicoServer();
@@ -41,9 +41,11 @@ public class EbicoServerServiceCollectionExtensionsTests
 
         var handlers = provider.GetServices<IEbicsOrderHandler>().ToArray();
 
-        // One INI handler per protocol version, all serving order type "INI".
-        handlers.Should().OnlyContain(h => h.OrderType == "INI");
-        handlers.Select(h => h.Version).Should().BeEquivalentTo(
+        // One INI and one HIA handler per protocol version.
+        handlers.Should().OnlyContain(h => h.OrderType == "INI" || h.OrderType == "HIA");
+        handlers.Where(h => h.OrderType == "INI").Select(h => h.Version).Should().BeEquivalentTo(
+            [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
+        handlers.Where(h => h.OrderType == "HIA").Select(h => h.Version).Should().BeEquivalentTo(
             [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
     }
 

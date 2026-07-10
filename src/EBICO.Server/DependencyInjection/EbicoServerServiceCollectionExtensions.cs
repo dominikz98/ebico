@@ -44,13 +44,16 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
-        // INI key-management handlers, one per protocol version (the resolver matches by
+        // INI/HIA key-management handlers, one per protocol version (the resolver matches by
         // (Version, OrderType)). AddSingleton (not TryAdd): the resolver consumes the whole
         // IEnumerable<IEbicsOrderHandler>, so several handlers coexist. Further key-management
-        // handlers (HIA/HPB) are added by their own issues.
+        // handlers (HPB, …) are added by their own issues.
         services.AddSingleton<IEbicsOrderHandler, H003IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H004IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H005IniOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H003HiaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004HiaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005HiaOrderHandler>();
 
         return services;
     }

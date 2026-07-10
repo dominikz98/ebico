@@ -13,8 +13,8 @@ using S002 = EBICO.Core.Schema.Signature.S002;
 namespace EBICO.Tests.Server;
 
 /// <summary>
-/// Shared helpers for the EBICO.Server tests (issues #25/#26): builds well-formed request XML from the
-/// committed Core bindings (no proprietary fixtures) and reads the return codes out of a response.
+/// Shared helpers for the EBICO.Server tests (issues #25/#26/#27): builds well-formed request XML from
+/// the committed Core bindings (no proprietary fixtures) and reads the return codes out of a response.
 /// </summary>
 internal static class ServerTestHelpers
 {
@@ -75,22 +75,23 @@ internal static class ServerTestHelpers
             ? SerializeS002OrderData(signatureVersion, partnerId, userId, certificate!)
             : SerializeS001OrderData(signatureVersion, partnerId, userId, rsaKey!);
 
-        return BuildUnsecuredIniRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData));
+        return BuildUnsecuredRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "INI");
     }
 
     /// <summary>
-    /// Builds an INI <c>ebicsUnsecuredRequest</c> for <paramref name="version"/> carrying
-    /// <paramref name="compressedOrderData"/> verbatim as its <c>OrderData</c> (for negative tests with
-    /// malformed/empty order data).
+    /// Builds an <c>ebicsUnsecuredRequest</c> for <paramref name="version"/> and
+    /// <paramref name="orderType"/> (<c>"INI"</c>/<c>"HIA"</c>) carrying <paramref name="compressedOrderData"/>
+    /// verbatim as its <c>OrderData</c> (also used by negative tests with malformed/empty order data).
     /// </summary>
     /// <param name="version">The protocol version.</param>
     /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
     /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
     /// <param name="userId">The <c>UserID</c> to place in the header.</param>
     /// <param name="compressedOrderData">The raw <c>OrderData</c> bytes (need not be valid).</param>
+    /// <param name="orderType">The unsecured order type (<c>OrderType</c> for H003/H004, <c>AdminOrderType</c> for H005).</param>
     /// <returns>The serialized unsecured request XML.</returns>
-    public static string BuildUnsecuredIniRequestWithOrderData(
-        EbicsVersion version, string hostId, string partnerId, string userId, byte[] compressedOrderData)
+    public static string BuildUnsecuredRequestWithOrderData(
+        EbicsVersion version, string hostId, string partnerId, string userId, byte[] compressedOrderData, string orderType = "INI")
         => version switch
         {
             EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsUnsecuredRequest
@@ -103,7 +104,7 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H003.UnsecuredReqOrderDetailsType { OrderType = "INI", OrderAttribute = "DZNNN" },
+                        OrderDetails = new H003.UnsecuredReqOrderDetailsType { OrderType = orderType, OrderAttribute = "DZNNN" },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H003.EmptyMutableHeaderType(),
@@ -126,7 +127,7 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H004.UnsecuredReqOrderDetailsType { OrderType = "INI", OrderAttribute = "DZNNN" },
+                        OrderDetails = new H004.UnsecuredReqOrderDetailsType { OrderType = orderType, OrderAttribute = "DZNNN" },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H004.EmptyMutableHeaderType(),
@@ -149,7 +150,7 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H005.UnsecuredReqOrderDetailsType { AdminOrderType = "INI" },
+                        OrderDetails = new H005.UnsecuredReqOrderDetailsType { AdminOrderType = orderType },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H005.EmptyMutableHeaderType(),
@@ -164,6 +165,47 @@ internal static class ServerTestHelpers
             }),
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
+
+    /// <summary>
+    /// Builds a well-formed HIA <c>ebicsUnsecuredRequest</c> for <paramref name="version"/> whose order
+    /// data carries the authentication (X00x) and encryption (E00x) keys: as <c>RSAKeyValue</c> elements
+    /// (H003/H004) or as <c>X509Data</c> certificates (H005, one per key). Pass <paramref name="rsaAuthKey"/>/
+    /// <paramref name="rsaEncKey"/> for H003/H004 and <paramref name="authCertificate"/>/
+    /// <paramref name="encCertificate"/> for H005.
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="partnerId">The <c>PartnerID</c> to place in the header and order data.</param>
+    /// <param name="userId">The <c>UserID</c> to place in the header and order data.</param>
+    /// <param name="authenticationVersion">The <c>AuthenticationVersion</c> code (e.g. <c>"X002"</c>).</param>
+    /// <param name="encryptionVersion">The <c>EncryptionVersion</c> code (e.g. <c>"E002"</c>).</param>
+    /// <param name="rsaAuthKey">The authentication key for H003/H004 (ignored for H005).</param>
+    /// <param name="rsaEncKey">The encryption key for H003/H004 (ignored for H005).</param>
+    /// <param name="authCertificate">The authentication certificate for H005 (ignored for H003/H004).</param>
+    /// <param name="encCertificate">The encryption certificate for H005 (ignored for H003/H004).</param>
+    /// <returns>The serialized unsecured request XML.</returns>
+    public static string BuildUnsecuredHiaRequest(
+        EbicsVersion version,
+        string hostId,
+        string partnerId,
+        string userId,
+        string authenticationVersion = "X002",
+        string encryptionVersion = "E002",
+        RsaKeyMaterial? rsaAuthKey = null,
+        RsaKeyMaterial? rsaEncKey = null,
+        X509Certificate2? authCertificate = null,
+        X509Certificate2? encCertificate = null)
+    {
+        var orderData = version switch
+        {
+            EbicsVersion.H003 => SerializeH003HiaOrderData(authenticationVersion, encryptionVersion, partnerId, userId, rsaAuthKey!, rsaEncKey!),
+            EbicsVersion.H004 => SerializeH004HiaOrderData(authenticationVersion, encryptionVersion, partnerId, userId, rsaAuthKey!, rsaEncKey!),
+            EbicsVersion.H005 => SerializeH005HiaOrderData(authenticationVersion, encryptionVersion, partnerId, userId, authCertificate!, encCertificate!),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+        return BuildUnsecuredRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HIA");
+    }
 
     /// <summary>Reads the header (technical) and body (business) return codes of a response envelope.</summary>
     /// <param name="envelope">The response envelope (<c>ebicsResponse</c> or <c>ebicsKeyManagementResponse</c>).</param>
@@ -210,6 +252,93 @@ internal static class ServerTestHelpers
             {
                 SignatureVersion = signatureVersion,
                 X509Data = x509Data,
+            },
+            PartnerId = partnerId,
+            UserId = userId,
+        };
+
+        return EbicsXmlSerializer.SerializeOrderData(orderData);
+    }
+
+    private static byte[] SerializeH003HiaOrderData(
+        string authVersion, string encVersion, string partnerId, string userId, RsaKeyMaterial authKey, RsaKeyMaterial encKey)
+    {
+        var (authModulus, authExponent) = RsaKeyImportExport.ExportRsaKeyValue(authKey);
+        var (encModulus, encExponent) = RsaKeyImportExport.ExportRsaKeyValue(encKey);
+        var orderData = new H003.HiaRequestOrderDataType
+        {
+            AuthenticationPubKeyInfo = new H003.AuthenticationPubKeyInfoType
+            {
+                AuthenticationVersion = authVersion,
+                PubKeyValue = new H003.PubKeyValueType
+                {
+                    RsaKeyValue = new Ds.RsaKeyValueType { Modulus = authModulus, Exponent = authExponent },
+                },
+            },
+            EncryptionPubKeyInfo = new H003.EncryptionPubKeyInfoType
+            {
+                EncryptionVersion = encVersion,
+                PubKeyValue = new H003.PubKeyValueType
+                {
+                    RsaKeyValue = new Ds.RsaKeyValueType { Modulus = encModulus, Exponent = encExponent },
+                },
+            },
+            PartnerId = partnerId,
+            UserId = userId,
+        };
+
+        return EbicsXmlSerializer.SerializeOrderData(orderData);
+    }
+
+    private static byte[] SerializeH004HiaOrderData(
+        string authVersion, string encVersion, string partnerId, string userId, RsaKeyMaterial authKey, RsaKeyMaterial encKey)
+    {
+        var (authModulus, authExponent) = RsaKeyImportExport.ExportRsaKeyValue(authKey);
+        var (encModulus, encExponent) = RsaKeyImportExport.ExportRsaKeyValue(encKey);
+        var orderData = new H004.HiaRequestOrderDataType
+        {
+            AuthenticationPubKeyInfo = new H004.AuthenticationPubKeyInfoType
+            {
+                AuthenticationVersion = authVersion,
+                PubKeyValue = new H004.PubKeyValueType
+                {
+                    RsaKeyValue = new Ds.RsaKeyValueType { Modulus = authModulus, Exponent = authExponent },
+                },
+            },
+            EncryptionPubKeyInfo = new H004.EncryptionPubKeyInfoType
+            {
+                EncryptionVersion = encVersion,
+                PubKeyValue = new H004.PubKeyValueType
+                {
+                    RsaKeyValue = new Ds.RsaKeyValueType { Modulus = encModulus, Exponent = encExponent },
+                },
+            },
+            PartnerId = partnerId,
+            UserId = userId,
+        };
+
+        return EbicsXmlSerializer.SerializeOrderData(orderData);
+    }
+
+    private static byte[] SerializeH005HiaOrderData(
+        string authVersion, string encVersion, string partnerId, string userId, X509Certificate2 authCertificate, X509Certificate2 encCertificate)
+    {
+        var authX509 = new Ds.X509DataType();
+        authX509.X509Certificate.Add(authCertificate.RawData);
+        var encX509 = new Ds.X509DataType();
+        encX509.X509Certificate.Add(encCertificate.RawData);
+
+        var orderData = new H005.HiaRequestOrderDataType
+        {
+            AuthenticationPubKeyInfo = new H005.AuthenticationPubKeyInfoType
+            {
+                AuthenticationVersion = authVersion,
+                X509Data = authX509,
+            },
+            EncryptionPubKeyInfo = new H005.EncryptionPubKeyInfoType
+            {
+                EncryptionVersion = encVersion,
+                X509Data = encX509,
             },
             PartnerId = partnerId,
             UserId = userId,
