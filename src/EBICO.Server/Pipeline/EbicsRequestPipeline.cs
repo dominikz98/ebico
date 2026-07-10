@@ -62,6 +62,11 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         // Default response version; overwritten once the request's actual version is known.
         var responseVersion = _options.FallbackResponseVersion;
 
+        // Whether to answer with an ebicsKeyManagementResponse (INI/HIA/... unsecured requests) rather
+        // than a plain ebicsResponse. Only known once the request has parsed; the error paths (parse
+        // failure, non-request envelope) fall back to ebicsResponse.
+        var keyManagement = false;
+
         EbicsReturnCode returnCode;
         try
         {
@@ -77,6 +82,8 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
             }
             else
             {
+                keyManagement = IsKeyManagementRequest(request);
+
                 var context = new EbicsRequestContext(
                     requestXml,
                     EbicsVersions.Get(responseVersion),
@@ -98,8 +105,11 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
             returnCode = _errorMapper.Map(ex);
         }
 
-        // Stage 5: Respond.
-        var response = _responseFactory.BuildErrorResponse(responseVersion, returnCode);
+        // Stage 5: Respond. Unsecured key-management orders are answered with an
+        // ebicsKeyManagementResponse; everything else with an ebicsResponse.
+        var response = keyManagement
+            ? _responseFactory.BuildKeyManagementResponse(responseVersion, returnCode)
+            : _responseFactory.BuildErrorResponse(responseVersion, returnCode);
         var body = EbicsXmlSerializer.SerializeToUtf8Bytes(response);
         return new EbicsPipelineResult(body, responseVersion);
     }
@@ -126,14 +136,24 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         return result.ReturnCode;
     }
 
-    // Best-effort order-type extraction from the standard ebicsRequest header. The
-    // unsecured/unsigned/no-pub-key-digests requests (INI/HIA/HPB) carry the order type elsewhere;
-    // that extraction lands with the M3/M4 key-management issues.
+    // Order-type extraction. The standard ebicsRequest carries it in OrderDetails (H003/H004:
+    // OrderType, H005: AdminOrderType); the unsecured key-management requests (INI/HIA) carry it in
+    // the same OrderDetails element of their own header. The remaining request shapes (unsigned,
+    // no-pub-key-digests/HPB) are dispatched by later key-management issues.
     private static string? TryExtractOrderType(IEbicsRequestEnvelope request) => request switch
     {
         H003.EbicsRequest r => r.Header?.Static?.OrderDetails?.OrderType?.Value,
         H004.EbicsRequest r => r.Header?.Static?.OrderDetails?.OrderType?.Value,
         H005.EbicsRequest r => r.Header?.Static?.OrderDetails?.AdminOrderType?.Value,
+        H003.EbicsUnsecuredRequest r => r.Header?.Static?.OrderDetails?.OrderType,
+        H004.EbicsUnsecuredRequest r => r.Header?.Static?.OrderDetails?.OrderType,
+        H005.EbicsUnsecuredRequest r => r.Header?.Static?.OrderDetails?.AdminOrderType,
         _ => null,
     };
+
+    // Whether the request is an unsecured key-management request (INI/HIA), which is answered with an
+    // ebicsKeyManagementResponse rather than an ebicsResponse. HPB (ebicsNoPubKeyDigestsRequest) is
+    // added by its own issue.
+    private static bool IsKeyManagementRequest(IEbicsRequestEnvelope request) => request
+        is H003.EbicsUnsecuredRequest or H004.EbicsUnsecuredRequest or H005.EbicsUnsecuredRequest;
 }
