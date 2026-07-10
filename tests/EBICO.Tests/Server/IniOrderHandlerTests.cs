@@ -107,7 +107,7 @@ public class IniOrderHandlerTests
         var (pipeline, master, _) = BuildServer();
         await SeedSubscriberAsync(master, SubscriberState.New);
         // Not a valid zlib stream -> decompression fails.
-        var xml = ServerTestHelpers.BuildUnsecuredIniRequestWithOrderData(version, Host, Partner, User, [1, 2, 3, 4]);
+        var xml = ServerTestHelpers.BuildUnsecuredRequestWithOrderData(version, Host, Partner, User, [1, 2, 3, 4]);
 
         var result = await pipeline.ProcessAsync(xml, _ct);
 
