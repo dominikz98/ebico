@@ -27,8 +27,18 @@ public class SampleEmulatorStateProviderTests
     {
         var partners = await _sut.GetPartnersAsync(TestContext.Current.CancellationToken);
 
-        partners.Should().HaveCount(2);
+        partners.Should().HaveCount(3);
         partners.Select(p => p.PartnerId.Value).Should().Contain("PARTNER01").And.Contain("PARTNER02");
+    }
+
+    [Fact]
+    public async Task GetPartnersAsync_CoversSamePartnerIdAtTwoBanks()
+    {
+        var partners = await _sut.GetPartnersAsync(TestContext.Current.CancellationToken);
+
+        partners.Where(p => p.PartnerId.Value == "PARTNER02")
+            .Select(p => p.HostId.Value)
+            .Should().BeEquivalentTo(["EBICOHOST", "BANKB"], "the same partner id denotes distinct customers per bank");
     }
 
     [Fact]
@@ -43,12 +53,13 @@ public class SampleEmulatorStateProviderTests
     [Fact]
     public async Task Subscribers_OnlyReferenceKnownPartners()
     {
-        var partnerIds = (await _sut.GetPartnersAsync(TestContext.Current.CancellationToken))
-            .Select(p => p.PartnerId).ToHashSet();
+        var partners = (await _sut.GetPartnersAsync(TestContext.Current.CancellationToken))
+            .Select(p => (p.HostId, p.PartnerId)).ToHashSet();
 
         var subscribers = await _sut.GetSubscribersAsync(TestContext.Current.CancellationToken);
 
-        subscribers.Select(s => s.PartnerId).Should().OnlyContain(id => partnerIds.Contains(id));
+        subscribers.Select(s => (s.HostId, s.PartnerId))
+            .Should().OnlyContain(pair => partners.Contains(pair), "each subscriber belongs to a known (bank, partner)");
     }
 
     [Fact]

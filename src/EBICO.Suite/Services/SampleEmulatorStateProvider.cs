@@ -24,8 +24,10 @@ public sealed class SampleEmulatorStateProvider : IEmulatorStateProvider
 
     private static readonly IReadOnlyList<Partner> Partners =
     [
-        new Partner(PartnerId.Create("PARTNER01"), "Muster GmbH"),
-        new Partner(PartnerId.Create("PARTNER02"), "Beispiel AG"),
+        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER01"), "Muster GmbH"),
+        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER02"), "Beispiel AG"),
+        // Same PartnerID at a different bank — a distinct customer (Mehr-Mandanten-Fähigkeit).
+        new Partner(HostId.Create("BANKB"), PartnerId.Create("PARTNER02"), "Zweitbank-Kunde"),
     ];
 
     private static readonly IReadOnlyList<Subscriber> Subscribers =

@@ -1,5 +1,6 @@
 using EBICO.Server;
 using EBICO.Server.Http;
+using EBICO.Server.Http.Admin;
 using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -14,6 +15,11 @@ var options = app.Services.GetRequiredService<IOptions<EbicoServerOptions>>().Va
 
 // EBICS HTTP endpoint (POST, text/xml) at the configured path (default "/ebics").
 app.MapEbicsEndpoint(options.EndpointPath);
+
+// Master-data admin API (banks/partners/subscribers CRUD) at the configured prefix (default
+// "/admin"). NOTE: this API is unauthenticated by design — it is meant for local/emulator use
+// only (like Azurite); do not expose it on an untrusted network.
+app.MapEbicoAdminApi(options.AdminApiPath);
 
 app.Run();
 

@@ -36,9 +36,20 @@ public class BankPartnerTests
     [Fact]
     public void Partner_HoldsIdentityAndOptionalName()
     {
-        var partner = new Partner(PartnerId.Create("PARTNER01"), "ACME");
+        var partner = new Partner(HostId.Create("BANKDE01"), PartnerId.Create("PARTNER01"), "ACME");
 
+        partner.HostId.Value.Should().Be("BANKDE01");
         partner.PartnerId.Value.Should().Be("PARTNER01");
         partner.Name.Should().Be("ACME");
+    }
+
+    [Fact]
+    public void Partner_SamePartnerIdAtDifferentBanks_AreDistinct()
+    {
+        var atBankA = new Partner(HostId.Create("BANKA"), PartnerId.Create("CUST01"), "Kunde A");
+        var atBankB = new Partner(HostId.Create("BANKB"), PartnerId.Create("CUST01"), "Kunde B");
+
+        atBankA.PartnerId.Should().Be(atBankB.PartnerId, "the partner id string is the same");
+        atBankA.HostId.Should().NotBe(atBankB.HostId, "but they belong to different banks");
     }
 }

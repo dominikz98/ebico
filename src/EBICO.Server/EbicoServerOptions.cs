@@ -11,6 +11,12 @@ public sealed class EbicoServerOptions
     public string EndpointPath { get; set; } = "/ebics";
 
     /// <summary>
+    /// The route prefix the master-data admin API is mounted at. Defaults to <c>/admin</c>. The
+    /// admin API is unauthenticated and intended for local/emulator use only.
+    /// </summary>
+    public string AdminApiPath { get; set; } = "/admin";
+
+    /// <summary>
     /// The version used to produce an error response when the request version cannot be detected
     /// (e.g. malformed XML). Defaults to <see cref="EbicsVersion.H005"/>.
     /// </summary>
