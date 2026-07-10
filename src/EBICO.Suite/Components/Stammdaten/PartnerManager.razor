@@ -1,0 +1,187 @@
+@inject IEmulatorStateProvider State
+@inject IMasterDataManager Manager
+
+@* Interactive island (issue #53): manage partners (Kunden). A partner is scoped to a bank, so its
+   identity is the (HostID, PartnerID) pair (multi-tenant). *@
+
+<section class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 id="partners-heading">Partner</h2>
+        <button class="btn btn-primary btn-sm" id="partner-new" @onclick="BeginCreate" disabled="@(_banks.Count == 0)">Neuer Partner</button>
+    </div>
+
+    @if (_banks.Count == 0)
+    {
+        <p class="text-muted"><em>Zuerst eine Bank anlegen — Partner gehören zu einer Bank.</em></p>
+    }
+
+    @if (_alert is { } alert)
+    {
+        <div class="alert @alert.Css" role="alert">@alert.Text</div>
+    }
+
+    <table class="table">
+        <thead>
+            <tr><th>HostID</th><th>PartnerID</th><th>Name</th><th class="text-end">Aktionen</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var partner in _partners)
+            {
+                <tr>
+                    <td>@partner.HostId.Value</td>
+                    <td>@partner.PartnerId.Value</td>
+                    <td>@(partner.Name ?? "—")</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => BeginEdit(partner)">Bearbeiten</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(partner)">Löschen</button>
+                    </td>
+                </tr>
+                @if (IsDeleteTarget(partner))
+                {
+                    <tr class="table-warning">
+                        <td colspan="4">
+                            Partner <strong>@partner.PartnerId.Value</strong> (@partner.HostId.Value) löschen?
+                            Dies entfernt <em>kaskadierend</em> alle zugehörigen Teilnehmer.
+                            <button class="btn btn-sm btn-danger ms-2" id="partner-delete-confirm" @onclick="ConfirmDeleteAsync">Endgültig löschen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Abbrechen</button>
+                        </td>
+                    </tr>
+                }
+            }
+            @if (_partners.Count == 0)
+            {
+                <tr><td colspan="4"><em>Keine Partner registriert.</em></td></tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_mode is not FormMode.None)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h3 class="h5">@(_mode == FormMode.Create ? "Neuen Partner anlegen" : $"Partner {_partnerId} bearbeiten")</h3>
+
+                @if (_formError is { } err)
+                {
+                    <div class="alert alert-warning" role="alert">@err</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label" for="partner-host">Bank (HostID)</label>
+                    <select class="form-select" id="partner-host" @bind="_hostId" disabled="@(_mode == FormMode.Edit)">
+                        @foreach (var bank in _banks)
+                        {
+                            <option value="@bank.HostId.Value">@bank.HostId.Value</option>
+                        }
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="partner-id">PartnerID</label>
+                    <input class="form-control" id="partner-id" @bind="_partnerId" disabled="@(_mode == FormMode.Edit)" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="partner-name">Name</label>
+                    <input class="form-control" id="partner-name" @bind="_name" />
+                </div>
+
+                <button class="btn btn-primary" id="partner-save" @onclick="SaveAsync">Speichern</button>
+                <button class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private IReadOnlyList<Bank> _banks = [];
+    private IReadOnlyList<Partner> _partners = [];
+    private FormMode _mode = FormMode.None;
+    private string _hostId = string.Empty;
+    private string _partnerId = string.Empty;
+    private string _name = string.Empty;
+    private (HostId Host, PartnerId Partner)? _deleteTarget;
+    private string? _formError;
+    private (string Text, string Css)? _alert;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync()
+    {
+        _banks = await State.GetBanksAsync();
+        _partners = await State.GetPartnersAsync();
+    }
+
+    private bool IsDeleteTarget(Partner partner)
+        => _deleteTarget is { } t && t.Host == partner.HostId && t.Partner == partner.PartnerId;
+
+    private void BeginCreate()
+    {
+        _mode = FormMode.Create;
+        _hostId = _banks.Count > 0 ? _banks[0].HostId.Value : string.Empty;
+        _partnerId = string.Empty;
+        _name = string.Empty;
+        _formError = null;
+        _deleteTarget = null;
+    }
+
+    private void BeginEdit(Partner partner)
+    {
+        _mode = FormMode.Edit;
+        _hostId = partner.HostId.Value;
+        _partnerId = partner.PartnerId.Value;
+        _name = partner.Name ?? string.Empty;
+        _formError = null;
+        _deleteTarget = null;
+    }
+
+    private void Cancel() => _mode = FormMode.None;
+
+    private void AskDelete(Partner partner)
+    {
+        _deleteTarget = (partner.HostId, partner.PartnerId);
+        _mode = FormMode.None;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_deleteTarget is { } t)
+        {
+            await Manager.DeletePartnerAsync(t.Host, t.Partner);
+            _alert = ($"Partner {t.Partner.Value} gelöscht.", "alert-success");
+            _deleteTarget = null;
+            await ReloadAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+
+        if (!HostId.TryCreate(_hostId, out var hostId))
+        {
+            _formError = "Bitte eine Bank auswählen.";
+            return;
+        }
+
+        if (!PartnerId.TryCreate(_partnerId, out var partnerId))
+        {
+            _formError = "Ungültige PartnerID (1–35 Zeichen, nur A–Z, a–z, 0–9, ',' oder '=').";
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(_name) ? null : _name.Trim();
+        try
+        {
+            await Manager.SavePartnerAsync(new Partner(hostId, partnerId, name));
+        }
+        catch (UnknownBankException)
+        {
+            _formError = $"Bank {hostId.Value} existiert nicht.";
+            return;
+        }
+
+        _alert = ($"Partner {partnerId.Value} gespeichert.", "alert-success");
+        _mode = FormMode.None;
+        await ReloadAsync();
+    }
+}

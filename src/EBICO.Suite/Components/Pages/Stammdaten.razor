@@ -1,87 +1,16 @@
 @page "/stammdaten"
-@inject IEmulatorStateProvider State
 
 <PageTitle>Stammdaten</PageTitle>
 
 <h1>Stammdaten</h1>
 
 <p class="text-muted">
-    Read-only Übersicht der registrierten Banken, Partner und Teilnehmer.
-    Verwaltung (Anlegen/Bearbeiten) folgt in Issue&nbsp;#53.
+    Verwaltung der registrierten Banken, Partner (Kunden) und Teilnehmer des Emulators:
+    Anlegen, Bearbeiten, Löschen sowie Teilnehmer-Status und Berechtigungen.
 </p>
 
-@if (_loading)
-{
-    <p><em>Lade Stammdaten…</em></p>
-}
-else
-{
-    <h2>Banken</h2>
-    <table class="table">
-        <thead>
-            <tr><th>HostID</th><th>Name</th><th>Unterstützte Versionen</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var bank in _banks)
-            {
-                <tr>
-                    <td>@bank.HostId.Value</td>
-                    <td>@(bank.Name ?? "—")</td>
-                    <td>@string.Join(", ", bank.SupportedVersions)</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    <h2>Partner</h2>
-    <table class="table">
-        <thead>
-            <tr><th>HostID</th><th>PartnerID</th><th>Name</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var partner in _partners)
-            {
-                <tr>
-                    <td>@partner.HostId.Value</td>
-                    <td>@partner.PartnerId.Value</td>
-                    <td>@(partner.Name ?? "—")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-
-    <h2>Teilnehmer</h2>
-    <table class="table">
-        <thead>
-            <tr><th>HostID</th><th>PartnerID</th><th>UserID</th><th>Status</th><th>Typ</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var subscriber in _subscribers)
-            {
-                <tr>
-                    <td>@subscriber.HostId.Value</td>
-                    <td>@subscriber.PartnerId.Value</td>
-                    <td>@subscriber.UserId.Value</td>
-                    <td>@subscriber.State</td>
-                    <td>@(subscriber.IsTechnicalSubscriber ? "Technisch" : "Standard")</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
-
-@code {
-    private bool _loading = true;
-    private IReadOnlyList<Bank> _banks = [];
-    private IReadOnlyList<Partner> _partners = [];
-    private IReadOnlyList<Subscriber> _subscribers = [];
-
-    /// <inheritdoc />
-    protected override async Task OnInitializedAsync()
-    {
-        _banks = await State.GetBanksAsync();
-        _partners = await State.GetPartnersAsync();
-        _subscribers = await State.GetSubscribersAsync();
-        _loading = false;
-    }
-}
+@* Static-SSR-Seite mit interaktiven Inseln je Aggregat (ADR-0009: Render-Modus am Einbettungsort).
+   Die Komponenten schreiben in-process über den IMasterDataManager (EBICO.Server). *@
+<BankManager @rendermode="InteractiveServer" />
+<PartnerManager @rendermode="InteractiveServer" />
+<SubscriberManager @rendermode="InteractiveServer" />

@@ -1,0 +1,175 @@
+@inject IEmulatorStateProvider State
+@inject IMasterDataManager Manager
+
+@* Interactive island (issue #53): manage the emulator's banks (Kreditinstitute / EBICS hosts). *@
+
+<section class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 id="banks-heading">Banken</h2>
+        <button class="btn btn-primary btn-sm" id="bank-new" @onclick="BeginCreate">Neue Bank</button>
+    </div>
+
+    @if (_alert is { } alert)
+    {
+        <div class="alert @alert.Css" role="alert">@alert.Text</div>
+    }
+
+    <table class="table">
+        <thead>
+            <tr><th>HostID</th><th>Name</th><th>Unterstützte Versionen</th><th class="text-end">Aktionen</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var bank in _banks)
+            {
+                <tr>
+                    <td>@bank.HostId.Value</td>
+                    <td>@(bank.Name ?? "—")</td>
+                    <td>@string.Join(", ", bank.SupportedVersions)</td>
+                    <td class="text-end">
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => BeginEdit(bank)">Bearbeiten</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(bank.HostId)">Löschen</button>
+                    </td>
+                </tr>
+                @if (_deleteTarget is { } target && target == bank.HostId)
+                {
+                    <tr class="table-warning">
+                        <td colspan="4">
+                            Bank <strong>@bank.HostId.Value</strong> löschen? Dies entfernt <em>kaskadierend</em>
+                            alle zugehörigen Partner und Teilnehmer.
+                            <button class="btn btn-sm btn-danger ms-2" id="bank-delete-confirm" @onclick="ConfirmDeleteAsync">Endgültig löschen</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Abbrechen</button>
+                        </td>
+                    </tr>
+                }
+            }
+            @if (_banks.Count == 0)
+            {
+                <tr><td colspan="4"><em>Keine Banken registriert.</em></td></tr>
+            }
+        </tbody>
+    </table>
+
+    @if (_mode is not FormMode.None)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h3 class="h5">@(_mode == FormMode.Create ? "Neue Bank anlegen" : $"Bank {_hostId} bearbeiten")</h3>
+
+                @if (_formError is { } err)
+                {
+                    <div class="alert alert-warning" role="alert">@err</div>
+                }
+
+                <div class="mb-3">
+                    <label class="form-label" for="bank-hostid">HostID</label>
+                    <input class="form-control" id="bank-hostid" @bind="_hostId" disabled="@(_mode == FormMode.Edit)" />
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="bank-name">Name</label>
+                    <input class="form-control" id="bank-name" @bind="_name" />
+                </div>
+                <div class="mb-3">
+                    <span class="form-label d-block">Unterstützte Versionen</span>
+                    @foreach (var version in Versions)
+                    {
+                        <div class="form-check form-check-inline">
+                            <input class="form-check-input" type="checkbox" id="bank-version-@version"
+                                   @bind="_versionSelected[version]" />
+                            <label class="form-check-label" for="bank-version-@version">@version</label>
+                        </div>
+                    }
+                </div>
+
+                <button class="btn btn-primary" id="bank-save" @onclick="SaveAsync">Speichern</button>
+                <button class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private static readonly EbicsVersion[] Versions = Enum.GetValues<EbicsVersion>();
+
+    private IReadOnlyList<Bank> _banks = [];
+    private FormMode _mode = FormMode.None;
+    private string _hostId = string.Empty;
+    private string _name = string.Empty;
+    private readonly Dictionary<EbicsVersion, bool> _versionSelected = Versions.ToDictionary(v => v, _ => true);
+    private HostId? _deleteTarget;
+    private string? _formError;
+    private (string Text, string Css)? _alert;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync() => await ReloadAsync();
+
+    private async Task ReloadAsync() => _banks = await State.GetBanksAsync();
+
+    private void BeginCreate()
+    {
+        _mode = FormMode.Create;
+        _hostId = string.Empty;
+        _name = string.Empty;
+        foreach (var version in Versions)
+        {
+            _versionSelected[version] = true;
+        }
+        _formError = null;
+        _deleteTarget = null;
+    }
+
+    private void BeginEdit(Bank bank)
+    {
+        _mode = FormMode.Edit;
+        _hostId = bank.HostId.Value;
+        _name = bank.Name ?? string.Empty;
+        foreach (var version in Versions)
+        {
+            _versionSelected[version] = bank.SupportedVersions.Contains(version);
+        }
+        _formError = null;
+        _deleteTarget = null;
+    }
+
+    private void Cancel() => _mode = FormMode.None;
+
+    private void AskDelete(HostId hostId)
+    {
+        _deleteTarget = hostId;
+        _mode = FormMode.None;
+    }
+
+    private async Task ConfirmDeleteAsync()
+    {
+        if (_deleteTarget is { } hostId)
+        {
+            await Manager.DeleteBankAsync(hostId);
+            _deleteTarget = null;
+            _alert = ($"Bank {hostId.Value} gelöscht.", "alert-success");
+            await ReloadAsync();
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _formError = null;
+
+        if (!HostId.TryCreate(_hostId, out var hostId))
+        {
+            _formError = "Ungültige HostID (1–35 Zeichen, nur A–Z, a–z, 0–9, ',' oder '=').";
+            return;
+        }
+
+        var selected = Versions.Where(v => _versionSelected[v]).ToArray();
+        if (selected.Length == 0)
+        {
+            _formError = "Mindestens eine EBICS-Version muss ausgewählt sein.";
+            return;
+        }
+
+        var name = string.IsNullOrWhiteSpace(_name) ? null : _name.Trim();
+        await Manager.SaveBankAsync(new Bank(hostId, name, selected));
+        _alert = ($"Bank {hostId.Value} gespeichert.", "alert-success");
+        _mode = FormMode.None;
+        await ReloadAsync();
+    }
+}
