@@ -24,6 +24,7 @@ public class EbicoServerServiceCollectionExtensionsTests
 
         provider.GetRequiredService<IEbicsRequestPipeline>().Should().BeOfType<EbicsRequestPipeline>();
         provider.GetRequiredService<IEbicsStateStore>().Should().BeOfType<InMemoryEbicsStateStore>();
+        provider.GetRequiredService<IServerKeyStore>().Should().BeOfType<InMemoryServerKeyStore>();
         provider.GetRequiredService<IMasterDataManager>().Should().BeOfType<MasterDataManager>();
         provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<NoOpEbicsRequestVerifier>();
         provider.GetRequiredService<IEbicsErrorMapper>().Should().BeOfType<EbicsErrorMapper>();
@@ -32,13 +33,18 @@ public class EbicoServerServiceCollectionExtensionsTests
     }
 
     [Fact]
-    public void AddEbicoServer_RegistersNoOrderHandlers()
+    public void AddEbicoServer_RegistersIniOrderHandlerPerVersion()
     {
         var services = new ServiceCollection();
         services.AddEbicoServer();
         using var provider = services.BuildServiceProvider();
 
-        provider.GetServices<IEbicsOrderHandler>().Should().BeEmpty();
+        var handlers = provider.GetServices<IEbicsOrderHandler>().ToArray();
+
+        // One INI handler per protocol version, all serving order type "INI".
+        handlers.Should().OnlyContain(h => h.OrderType == "INI");
+        handlers.Select(h => h.Version).Should().BeEquivalentTo(
+            [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
     }
 
     [Fact]

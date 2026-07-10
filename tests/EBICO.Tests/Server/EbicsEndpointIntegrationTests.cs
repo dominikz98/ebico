@@ -3,8 +3,11 @@ using System.Net;
 using System.Text;
 using AwesomeAssertions;
 using EBICO.Core;
+using EBICO.Core.Crypto;
+using EBICO.Core.Domain;
 using EBICO.Core.Serialization;
 using EBICO.Server;
+using EBICO.Server.State;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
@@ -78,6 +81,38 @@ public class EbicsEndpointIntegrationTests : IClassFixture<WebApplicationFactory
         var envelope = EbicsXmlSerializer.DeserializeEnvelope(await response.Content.ReadAsStringAsync(_ct));
         envelope.ProtocolVersion.Should().Be(EbicsVersion.H005);
         ServerTestHelpers.ReadReturnCodes(envelope).HeaderCode.Should().Be("061002");
+    }
+
+    [Fact]
+    public async Task PostEbics_Ini_Returns200_StoresKey_AndInitializesSubscriber()
+    {
+        // Isolated host so seeding this subscriber cannot leak into the other tests' shared factory.
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var host = HostId.Create("INIHOST");
+        var partner = PartnerId.Create("INIPART");
+        var user = UserId.Create("INIUSER");
+
+        var master = factory.Services.GetRequiredService<IMasterDataManager>();
+        await master.SaveBankAsync(new Bank(host), _ct);
+        await master.SavePartnerAsync(new Partner(host, partner), _ct);
+        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+
+        var key = RsaKeyMaterial.Generate();
+        var xml = ServerTestHelpers.BuildUnsecuredIniRequest(
+            EbicsVersion.H004, "INIHOST", "INIPART", "INIUSER", rsaKey: key);
+        var response = await factory.CreateClient().PostAsync("/ebics", new StringContent(xml, Encoding.UTF8, "text/xml"), _ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var envelope = EbicsXmlSerializer.DeserializeEnvelope(await response.Content.ReadAsStringAsync(_ct));
+        envelope.GetType().Name.Should().Be("EbicsKeyManagementResponse");
+        ServerTestHelpers.ReadReturnCodes(envelope).BodyCode.Should().Be("000000");
+
+        var subscriber = await master.GetSubscriberAsync(host, partner, user, _ct);
+        subscriber!.State.Should().Be(SubscriberState.Initialized);
+
+        var keys = factory.Services.GetRequiredService<IServerKeyStore>();
+        (await keys.ContainsAsync(new SubscriberKeyRef(host, partner, user), KeyPurpose.Signature, _ct))
+            .Should().BeTrue();
     }
 
     [Fact]

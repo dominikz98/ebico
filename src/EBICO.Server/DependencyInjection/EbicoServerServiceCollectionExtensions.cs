@@ -1,4 +1,5 @@
 using EBICO.Server;
+using EBICO.Server.Handlers;
 using EBICO.Server.Pipeline;
 using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
@@ -35,6 +36,7 @@ public static class EbicoServerServiceCollectionExtensions
         }
 
         services.TryAddSingleton<IEbicsStateStore, InMemoryEbicsStateStore>();
+        services.TryAddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
         services.TryAddSingleton<IMasterDataManager, MasterDataManager>();
         services.TryAddSingleton<IEbicsRequestVerifier, NoOpEbicsRequestVerifier>();
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
@@ -42,8 +44,14 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
-        // No default IEbicsOrderHandler registrations: the skeleton resolves no handler and
-        // answers recognized requests with EBICS_UNSUPPORTED_ORDER_TYPE. M3/M4 issues add handlers.
+        // INI key-management handlers, one per protocol version (the resolver matches by
+        // (Version, OrderType)). AddSingleton (not TryAdd): the resolver consumes the whole
+        // IEnumerable<IEbicsOrderHandler>, so several handlers coexist. Further key-management
+        // handlers (HIA/HPB) are added by their own issues.
+        services.AddSingleton<IEbicsOrderHandler, H003IniOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004IniOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005IniOrderHandler>();
+
         return services;
     }
 }

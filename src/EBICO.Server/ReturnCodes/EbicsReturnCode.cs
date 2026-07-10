@@ -35,6 +35,24 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     public static readonly EbicsReturnCode InternalError =
         new("061099", "EBICS_INTERNAL_ERROR", EbicsReturnCodeKind.Technical);
 
+    /// <summary>
+    /// The order data is not well-formed / does not conform to the expected format (<c>090004</c>).
+    /// For INI this covers order data that cannot be decompressed/deserialized, an unusable or
+    /// unpermitted signature key version, or key material that cannot be reconstructed.
+    /// </summary>
+    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> the exact code is to be verified against EBICS Annex 1 (full catalogue: #36/M4).</remarks>
+    public static readonly EbicsReturnCode InvalidOrderDataFormat =
+        new("090004", "EBICS_INVALID_ORDER_DATA_FORMAT", EbicsReturnCodeKind.Business);
+
+    /// <summary>
+    /// The subscriber is unknown or in a state that does not allow the request (<c>091002</c>).
+    /// For INI this is the "already initialized" case (the subscriber is no longer <c>New</c>) as
+    /// well as an unknown subscriber.
+    /// </summary>
+    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> the exact code is to be verified against EBICS Annex 1 (full catalogue: #36/M4).</remarks>
+    public static readonly EbicsReturnCode InvalidUserOrUserState =
+        new("091002", "EBICS_INVALID_USER_OR_USER_STATE", EbicsReturnCodeKind.Business);
+
     /// <summary>The requested order type is invalid / unknown (<c>091005</c>).</summary>
     public static readonly EbicsReturnCode InvalidOrderType =
         new("091005", "EBICS_INVALID_ORDER_TYPE", EbicsReturnCodeKind.Business);
