@@ -25,6 +25,7 @@ public class EbicoServerServiceCollectionExtensionsTests
         provider.GetRequiredService<IEbicsRequestPipeline>().Should().BeOfType<EbicsRequestPipeline>();
         provider.GetRequiredService<IEbicsStateStore>().Should().BeOfType<InMemoryEbicsStateStore>();
         provider.GetRequiredService<IServerKeyStore>().Should().BeOfType<InMemoryServerKeyStore>();
+        provider.GetRequiredService<IServerBankKeyStore>().Should().BeOfType<InMemoryServerBankKeyStore>();
         provider.GetRequiredService<IMasterDataManager>().Should().BeOfType<MasterDataManager>();
         provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<NoOpEbicsRequestVerifier>();
         provider.GetRequiredService<IEbicsErrorMapper>().Should().BeOfType<EbicsErrorMapper>();
@@ -41,12 +42,13 @@ public class EbicoServerServiceCollectionExtensionsTests
 
         var handlers = provider.GetServices<IEbicsOrderHandler>().ToArray();
 
-        // One INI and one HIA handler per protocol version.
-        handlers.Should().OnlyContain(h => h.OrderType == "INI" || h.OrderType == "HIA");
-        handlers.Where(h => h.OrderType == "INI").Select(h => h.Version).Should().BeEquivalentTo(
-            [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
-        handlers.Where(h => h.OrderType == "HIA").Select(h => h.Version).Should().BeEquivalentTo(
-            [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
+        // One INI, HIA and HPB handler per protocol version.
+        handlers.Should().OnlyContain(h => h.OrderType == "INI" || h.OrderType == "HIA" || h.OrderType == "HPB");
+        foreach (var orderType in new[] { "INI", "HIA", "HPB" })
+        {
+            handlers.Where(h => h.OrderType == orderType).Select(h => h.Version).Should().BeEquivalentTo(
+                [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
+        }
     }
 
     [Fact]
