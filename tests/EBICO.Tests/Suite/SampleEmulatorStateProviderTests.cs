@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
 using EBICO.Suite.Services;
 
@@ -66,6 +67,41 @@ public class SampleEmulatorStateProviderTests
     {
         var first = await _sut.GetBanksAsync(TestContext.Current.CancellationToken);
         var second = await _sut.GetBanksAsync(TestContext.Current.CancellationToken);
+
+        second.Should().BeSameAs(first);
+    }
+
+    // --- Keys (issue #55) ---
+
+    [Fact]
+    public async Task GetKeysAsync_ReturnsSeededSubscriberAndBankKeys()
+    {
+        var keys = await _sut.GetKeysAsync(TestContext.Current.CancellationToken);
+
+        keys.Should().HaveCount(5);
+        keys.Should().Contain(k => k.OwnerLabel.Contains("Teilnehmer"))
+            .And.Contain(k => k.OwnerLabel.Contains("Bank"));
+        keys.Select(k => k.KeyVersion).Should()
+            .Contain("A006").And.Contain("E002").And.Contain("X002");
+    }
+
+    [Fact]
+    public async Task GetKeysAsync_FingerprintTextMatchesCoreComputation()
+    {
+        var keys = await _sut.GetKeysAsync(TestContext.Current.CancellationToken);
+
+        foreach (var key in keys)
+        {
+            var expected = PublicKeyFingerprint.ToLetterFormat(PublicKeyFingerprint.Compute(key.PublicKey));
+            key.FingerprintText.Should().Be(expected);
+        }
+    }
+
+    [Fact]
+    public async Task GetKeysAsync_IsStableAcrossCalls()
+    {
+        var first = await _sut.GetKeysAsync(TestContext.Current.CancellationToken);
+        var second = await _sut.GetKeysAsync(TestContext.Current.CancellationToken);
 
         second.Should().BeSameAs(first);
     }

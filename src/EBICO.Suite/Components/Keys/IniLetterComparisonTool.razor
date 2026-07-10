@@ -1,0 +1,130 @@
+@inject IEmulatorStateProvider State
+
+@*
+    INI-Brief-Vergleich (issue #55): verifies a public-key fingerprint typed from an INI letter
+    against a known key or a pasted public key, using PublicKeyFingerprint.Verify (constant time).
+    Rendered as an interactive island; the render mode is applied at the embedding site.
+*@
+
+<p class="text-muted">
+    Prüft einen aus dem INI-Brief abgetippten Fingerprint gegen einen Schlüssel — genau der
+    manuelle Abgleich, den die Bank bei INI-Eingang durchführt.
+</p>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <label class="form-label" for="key-source">Schlüssel</label>
+        <select id="key-source" class="form-select" @bind="_selectedIndex">
+            @for (var i = 0; i < _keys.Count; i++)
+            {
+                var key = _keys[i];
+                <option value="@i">@key.OwnerLabel — @key.KeyVersion</option>
+            }
+            <option value="-1">Öffentlichen Schlüssel einfügen (PEM)…</option>
+        </select>
+
+        @if (_selectedIndex < 0)
+        {
+            <textarea id="pasted-key" class="form-control mt-2" rows="6"
+                      placeholder="-----BEGIN PUBLIC KEY-----" @bind="_pastedPem"></textarea>
+        }
+    </div>
+
+    <div class="col-md-6">
+        <label class="form-label" for="expected-fingerprint">Fingerprint aus INI-Brief</label>
+        <textarea id="expected-fingerprint" class="form-control fingerprint-input" rows="6"
+                  placeholder="z. B. 1A 2B 3C …" @bind="_expected"></textarea>
+    </div>
+</div>
+
+<button class="btn btn-primary mt-3" @onclick="Compare">Vergleichen</button>
+
+@switch (_result)
+{
+    case Outcome.Match:
+        <div class="alert alert-success mt-3" role="alert">Fingerprint stimmt überein.</div>
+        break;
+    case Outcome.Mismatch:
+        <div class="alert alert-danger mt-3" role="alert">
+            Fingerprint stimmt <strong>nicht</strong> überein.
+            @if (_actualFingerprint is not null)
+            {
+                <div class="mt-2">Tatsächlicher Fingerprint des Schlüssels:</div>
+                <pre class="mb-0 fingerprint-input">@_actualFingerprint</pre>
+            }
+        </div>
+        break;
+    case Outcome.InvalidKey:
+        <div class="alert alert-warning mt-3" role="alert">
+            Der eingefügte Schlüssel konnte nicht gelesen werden (PEM mit öffentlichem RSA-Schlüssel erwartet).
+        </div>
+        break;
+    case Outcome.InvalidFingerprint:
+        <div class="alert alert-warning mt-3" role="alert">
+            Der Fingerprint konnte nicht als Hexadezimalwert gelesen werden.
+        </div>
+        break;
+}
+
+@code {
+    private IReadOnlyList<KeyView> _keys = [];
+    private int _selectedIndex;
+    private string _pastedPem = string.Empty;
+    private string _expected = string.Empty;
+    private Outcome _result = Outcome.None;
+    private string? _actualFingerprint;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+        => _keys = await State.GetKeysAsync();
+
+    private void Compare()
+    {
+        _actualFingerprint = null;
+
+        if (!TryResolveKey(out var key))
+        {
+            _result = Outcome.InvalidKey;
+            return;
+        }
+
+        if (!FingerprintFormat.TryParseHex(_expected, out var expectedDigest))
+        {
+            _result = Outcome.InvalidFingerprint;
+            return;
+        }
+
+        var actualDigest = PublicKeyFingerprint.Compute(key);
+        _actualFingerprint = PublicKeyFingerprint.ToLetterFormat(actualDigest);
+        _result = PublicKeyFingerprint.Verify(key, expectedDigest) ? Outcome.Match : Outcome.Mismatch;
+    }
+
+    private bool TryResolveKey(out RsaKeyMaterial key)
+    {
+        if (_selectedIndex >= 0 && _selectedIndex < _keys.Count)
+        {
+            key = _keys[_selectedIndex].PublicKey;
+            return true;
+        }
+
+        try
+        {
+            key = RsaKeyImportExport.ImportFromPem(_pastedPem);
+            return true;
+        }
+        catch (KeyMaterialException)
+        {
+            key = null!;
+            return false;
+        }
+    }
+
+    private enum Outcome
+    {
+        None,
+        Match,
+        Mismatch,
+        InvalidKey,
+        InvalidFingerprint,
+    }
+}

@@ -29,4 +29,13 @@ public interface IEmulatorStateProvider
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The registered <see cref="Subscriber"/>s.</returns>
     Task<IReadOnlyList<Subscriber>> GetSubscribersAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the public keys (subscriber and bank signature/encryption/authentication keys)
+    /// known to the emulator, each with its precomputed SHA-256 fingerprint, for the key/certificate
+    /// view (issue #55).
+    /// </summary>
+    /// <param name="cancellationToken">Token to cancel the operation.</param>
+    /// <returns>The known <see cref="KeyView"/>s.</returns>
+    Task<IReadOnlyList<KeyView>> GetKeysAsync(CancellationToken cancellationToken = default);
 }
