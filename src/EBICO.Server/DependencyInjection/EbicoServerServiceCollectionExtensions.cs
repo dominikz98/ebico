@@ -37,6 +37,7 @@ public static class EbicoServerServiceCollectionExtensions
 
         services.TryAddSingleton<IEbicsStateStore, InMemoryEbicsStateStore>();
         services.TryAddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
+        services.TryAddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         services.TryAddSingleton<IMasterDataManager, MasterDataManager>();
         services.TryAddSingleton<IEbicsRequestVerifier, NoOpEbicsRequestVerifier>();
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
@@ -44,16 +45,23 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
-        // INI/HIA key-management handlers, one per protocol version (the resolver matches by
+        // The H005 HPB handler self-signs the bank's certificates and needs a clock for their validity
+        // window (M4 timestamps/nonces will reuse it).
+        services.TryAddSingleton(TimeProvider.System);
+
+        // INI/HIA/HPB key-management handlers, one per protocol version (the resolver matches by
         // (Version, OrderType)). AddSingleton (not TryAdd): the resolver consumes the whole
         // IEnumerable<IEbicsOrderHandler>, so several handlers coexist. Further key-management
-        // handlers (HPB, …) are added by their own issues.
+        // handlers (HSA/SPR/…) are added by their own issues.
         services.AddSingleton<IEbicsOrderHandler, H003IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H004IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H005IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H003HiaOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H004HiaOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H005HiaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H003HpbOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004HpbOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005HpbOrderHandler>();
 
         return services;
     }

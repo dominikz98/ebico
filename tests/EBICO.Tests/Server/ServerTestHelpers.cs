@@ -13,8 +13,8 @@ using S002 = EBICO.Core.Schema.Signature.S002;
 namespace EBICO.Tests.Server;
 
 /// <summary>
-/// Shared helpers for the EBICO.Server tests (issues #25/#26/#27): builds well-formed request XML from
-/// the committed Core bindings (no proprietary fixtures) and reads the return codes out of a response.
+/// Shared helpers for the EBICO.Server tests (issues #25/#26/#27/#28): builds well-formed request XML
+/// from the committed Core bindings (no proprietary fixtures) and reads the return codes out of a response.
 /// </summary>
 internal static class ServerTestHelpers
 {
@@ -206,6 +206,76 @@ internal static class ServerTestHelpers
 
         return BuildUnsecuredRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HIA");
     }
+
+    /// <summary>
+    /// Builds a well-formed HPB <c>ebicsNoPubKeyDigestsRequest</c> for <paramref name="version"/> carrying
+    /// the subscriber identifiers and order type in its static header (<c>OrderType</c> for H003/H004,
+    /// <c>AdminOrderType</c> for H005). The <c>AuthSignature</c> is omitted — the server does not verify
+    /// the request signature yet (M4).
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
+    /// <param name="userId">The <c>UserID</c> to place in the header.</param>
+    /// <param name="orderType">The order type (default <c>"HPB"</c>).</param>
+    /// <returns>The serialized no-pub-key-digests request XML.</returns>
+    public static string BuildNoPubKeyDigestsHpbRequest(
+        EbicsVersion version, string hostId, string partnerId, string userId, string orderType = "HPB")
+        => version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsNoPubKeyDigestsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsNoPubKeyDigestsRequestHeader
+                {
+                    Static = new H003.NoPubKeyDigestsRequestStaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H003.NoPubKeyDigestsReqOrderDetailsType { OrderType = orderType, OrderAttribute = "DZHNN" },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H003.EmptyMutableHeaderType(),
+                },
+                Body = new H003.EbicsNoPubKeyDigestsRequestBody(),
+            }),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsNoPubKeyDigestsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsNoPubKeyDigestsRequestHeader
+                {
+                    Static = new H004.NoPubKeyDigestsRequestStaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H004.NoPubKeyDigestsReqOrderDetailsType { OrderType = orderType, OrderAttribute = "DZHNN" },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H004.EmptyMutableHeaderType(),
+                },
+                Body = new H004.EbicsNoPubKeyDigestsRequestBody(),
+            }),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsNoPubKeyDigestsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsNoPubKeyDigestsRequestHeader
+                {
+                    Static = new H005.NoPubKeyDigestsRequestStaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H005.NoPubKeyDigestsReqOrderDetailsType { AdminOrderType = orderType },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H005.EmptyMutableHeaderType(),
+                },
+                Body = new H005.EbicsNoPubKeyDigestsRequestBody(),
+            }),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
 
     /// <summary>Reads the header (technical) and body (business) return codes of a response envelope.</summary>
     /// <param name="envelope">The response envelope (<c>ebicsResponse</c> or <c>ebicsKeyManagementResponse</c>).</param>

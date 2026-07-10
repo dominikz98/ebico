@@ -1,5 +1,7 @@
 using EBICO.Core;
+using EBICO.Core.Crypto;
 using EBICO.Core.Versioning;
+using EBICO.Server.Pipeline;
 using H003 = EBICO.Core.Schema.H003;
 using H004 = EBICO.Core.Schema.H004;
 using H005 = EBICO.Core.Schema.H005;
@@ -157,6 +159,120 @@ public sealed class EbicsResponseFactory
                 Body = new H005.EbicsKeyManagementResponseBody
                 {
                     ReturnCode = new H005.EbicsKeyManagementResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+    }
+
+    /// <summary>
+    /// Builds a successful <c>ebicsKeyManagementResponse</c> for <paramref name="version"/> that
+    /// carries an encrypted key-management <c>DataTransfer</c> (the <c>HPB</c> download response): the
+    /// bank's public keys as E002-encrypted, compressed order data. Header and body return codes are
+    /// <see cref="EbicsReturnCode.Ok"/>.
+    /// </summary>
+    /// <param name="version">The protocol version whose bindings/namespace to use.</param>
+    /// <param name="payload">The encrypted transaction key, encrypted order data and recipient key digest.</param>
+    /// <returns>The key-management response envelope with a populated <c>DataTransfer</c>, ready for serialization.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="payload"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is undefined.</exception>
+    public IEbicsResponseEnvelope BuildKeyManagementResponse(EbicsVersion version, EbicsKeyManagementPayload payload)
+    {
+        ArgumentNullException.ThrowIfNull(payload);
+
+        return version switch
+        {
+            EbicsVersion.H003 => new H003.EbicsKeyManagementResponse
+            {
+                Version = "H003",
+                Header = new H003.EbicsKeyManagementResponseHeader
+                {
+                    Static = new H003.EbicsKeyManagementResponseHeaderStatic(),
+                    Mutable = new H003.KeyMgmntResponseMutableHeaderType
+                    {
+                        ReturnCode = EbicsReturnCode.OkCode,
+                        ReportText = EbicsReturnCode.Ok.SymbolicName,
+                    },
+                },
+                Body = new H003.EbicsKeyManagementResponseBody
+                {
+                    ReturnCode = new H003.EbicsKeyManagementResponseBodyReturnCode { Value = EbicsReturnCode.OkCode },
+                    DataTransfer = new H003.EbicsKeyManagementResponseBodyDataTransfer
+                    {
+                        DataEncryptionInfo = new H003.EbicsKeyManagementResponseBodyDataTransferDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H003.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                            {
+                                Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                                Version = payload.EncryptionVersion.Value,
+                                Value = payload.EncryptionPubKeyDigest,
+                            },
+                            TransactionKey = payload.EncryptedTransactionKey,
+                        },
+                        OrderData = new H003.EbicsKeyManagementResponseBodyDataTransferOrderData { Value = payload.EncryptedOrderData },
+                    },
+                },
+            },
+            EbicsVersion.H004 => new H004.EbicsKeyManagementResponse
+            {
+                Version = "H004",
+                Header = new H004.EbicsKeyManagementResponseHeader
+                {
+                    Static = new H004.EbicsKeyManagementResponseHeaderStatic(),
+                    Mutable = new H004.KeyMgmntResponseMutableHeaderType
+                    {
+                        ReturnCode = EbicsReturnCode.OkCode,
+                        ReportText = EbicsReturnCode.Ok.SymbolicName,
+                    },
+                },
+                Body = new H004.EbicsKeyManagementResponseBody
+                {
+                    ReturnCode = new H004.EbicsKeyManagementResponseBodyReturnCode { Value = EbicsReturnCode.OkCode },
+                    DataTransfer = new H004.EbicsKeyManagementResponseBodyDataTransfer
+                    {
+                        DataEncryptionInfo = new H004.EbicsKeyManagementResponseBodyDataTransferDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H004.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                            {
+                                Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                                Version = payload.EncryptionVersion.Value,
+                                Value = payload.EncryptionPubKeyDigest,
+                            },
+                            TransactionKey = payload.EncryptedTransactionKey,
+                        },
+                        OrderData = new H004.EbicsKeyManagementResponseBodyDataTransferOrderData { Value = payload.EncryptedOrderData },
+                    },
+                },
+            },
+            EbicsVersion.H005 => new H005.EbicsKeyManagementResponse
+            {
+                Version = "H005",
+                Header = new H005.EbicsKeyManagementResponseHeader
+                {
+                    Static = new H005.EbicsKeyManagementResponseHeaderStatic(),
+                    Mutable = new H005.KeyMgmntResponseMutableHeaderType
+                    {
+                        ReturnCode = EbicsReturnCode.OkCode,
+                        ReportText = EbicsReturnCode.Ok.SymbolicName,
+                    },
+                },
+                Body = new H005.EbicsKeyManagementResponseBody
+                {
+                    ReturnCode = new H005.EbicsKeyManagementResponseBodyReturnCode { Value = EbicsReturnCode.OkCode },
+                    DataTransfer = new H005.EbicsKeyManagementResponseBodyDataTransfer
+                    {
+                        DataEncryptionInfo = new H005.EbicsKeyManagementResponseBodyDataTransferDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H005.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                            {
+                                Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                                Version = payload.EncryptionVersion.Value,
+                                Value = payload.EncryptionPubKeyDigest,
+                            },
+                            TransactionKey = payload.EncryptedTransactionKey,
+                        },
+                        OrderData = new H005.EbicsKeyManagementResponseBodyDataTransferOrderData { Value = payload.EncryptedOrderData },
+                    },
                 },
             },
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
