@@ -33,6 +33,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 ## Suite (Blazor UI)
 
 - [UI-Grundgerüst & Navigation](suite/ui-shell.md) — Render-Modus (Interactive Server, ADR-0009), Navigation/Layout/Theming, Anbindung an den Emulator-Zustand (`IEmulatorStateProvider` + Stub)
+- [Stammdaten-Verwaltung](suite/stammdaten.md) — CRUD für Banken/Partner/Teilnehmer über den `IMasterDataManager` (in-process, ADR-0009), Teilnehmer-Status & Berechtigungen, Seeding der Sample-Daten
 - [Schlüssel-/Zertifikats-Ansicht](suite/schluessel-ansicht.md) — Public-Key-Fingerprints anzeigen, INI-Brief-Vergleich (`PublicKeyFingerprint.Verify`), Test-CA/Schlüssel-Werkzeuge (RSA-Generierung, self-signed Zertifikat + X.509-Verify, PEM-Download)
 
 ## Protokoll & Schemas

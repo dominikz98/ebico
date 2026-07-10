@@ -19,9 +19,10 @@ Folge-Issues; hier steht die tragende Struktur.
 
 Die Suite läuft im Modus **Interactive Server** ([ADR-0009](../adr/0009-blazor-render-mode.md)).
 Interaktivität wird pro Komponente über `@rendermode InteractiveServer` aktiviert;
-reine Anzeige-Seiten (Dashboard, Stammdaten) bleiben Static SSR. So bleibt der
-Zugriff auf den serverseitigen Zustand ein In-Process-Aufruf über DI — kein
-separates WebAssembly-Client- oder Contracts-Projekt nötig.
+das Dashboard bleibt Static SSR, die Stammdaten-Seite ist Static SSR mit
+interaktiven Inseln ([#53](stammdaten.md)). So bleibt der Zugriff auf den
+serverseitigen Zustand ein In-Process-Aufruf über DI — kein separates
+WebAssembly-Client- oder Contracts-Projekt nötig.
 
 ## Navigation & Layout
 
@@ -31,7 +32,7 @@ die Blazor-Template-Demoseiten (Counter/Weather) wurden entfernt.
 | Eintrag | Route | Inhalt |
 | --- | --- | --- |
 | Dashboard | `/` | Kennzahlen des Emulator-Zustands (Anzahl Banken/Partner/Teilnehmer) |
-| Stammdaten | `/stammdaten` | Read-only Listen der Banken/Partner/Teilnehmer (Verwaltung: #53) |
+| Stammdaten | `/stammdaten` | Verwaltung der Banken/Partner/Teilnehmer ([#53](stammdaten.md)) |
 | Transaktionen | `/transaktionen` | Platzhalter — Transaktions-Inspektor (#54) |
 | Schlüssel | `/schluessel` | Fingerprints, INI-Brief-Vergleich, Test-CA/Schlüssel-Werkzeuge ([#55](schluessel-ansicht.md)) |
 
@@ -65,9 +66,14 @@ builder.Services.AddScoped<IEmulatorStateProvider, SampleEmulatorStateProvider>(
 ```
 
 Die Methoden sind **async** gehalten, damit ein späteres Backend (In-Process-Store
-oder HTTP-API) ohne Änderung an den Aufrufstellen eingehängt werden kann. Sobald
-der reale Store existiert (M3), wird lediglich die Implementierung ausgetauscht;
-Dashboard und Stammdaten bleiben unverändert.
+oder HTTP-API) ohne Änderung an den Aufrufstellen eingehängt werden kann.
+
+> **Update (#53):** Der reale Server-Store (M3, [#30](../server/master-data.md)) ist
+> inzwischen angebunden. Die registrierte Implementierung ist jetzt die Live-Brücke
+> `EmulatorStateProvider` über den in-process `IEbicsStateStore`/`IMasterDataManager`
+> (Suite → Server → Core); `SampleEmulatorStateProvider` dient nur noch als Seed- und
+> Schlüssel-Quelle. Dashboard und Schlüssel-Ansicht blieben dabei unverändert. Details:
+> [Stammdaten-Verwaltung](stammdaten.md).
 
 ## Tests
 

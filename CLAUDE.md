@@ -12,7 +12,8 @@ Server-Emulator plus ein Client-Package.
 - `src/EBICO.Suite` — Blazor-UI (Blazor Web App, Interactive Server) für den Server
 - `tests/EBICO.Tests` — Unit-/Integration-/Conformance-Tests (xUnit v3)
 
-Projektreferenzen: Connector→Core, Server→Core, Suite→Core, Tests→{Core, Connector, Server}.
+Projektreferenzen: Connector→Core, Server→Core, Suite→{Core, Server}, Tests→{Core, Connector, Server}.
+(Suite→Server seit #53: die Blazor-UI nutzt den `IMasterDataManager`/State-Store in-process, ADR-0009.)
 
 Unterstützte EBICS-Versionen: **H003, H004, H005**. Order-Abdeckung: möglichst
 vollständige BTF/Order-Palette.
