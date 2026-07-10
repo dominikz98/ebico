@@ -37,6 +37,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0008](0008-krypto-bibliothek.md) | Krypto-Bibliothek: `System.Security.Cryptography` | accepted |
 | [0009](0009-blazor-render-mode.md) | Blazor Render-Modus (Interactive Server) | accepted |
 | [0010](0010-pdf-bibliothek.md) | PDF-Bibliothek für den INI-/HIA-Brief: QuestPDF (Community) | accepted |
+| [0011](0011-server-stammdatenverwaltung.md) | Server-Stammdatenverwaltung (Manager über Store, Admin-API) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
@@ -50,5 +51,7 @@ Themen, die eine eigene ADR bekommen, sobald sie anstehen:
   [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md) und ADR-0006.
 - ~~**Krypto-Bibliothek** (System.Security.Cryptography vs. BouncyCastle)~~ — **entschieden**
   in [ADR-0008](0008-krypto-bibliothek.md) (System.Security.Cryptography, kein BouncyCastle).
-- **Persistenz des Server-States** (In-Memory-Default, pluggable Store) — M3/M4.
+- ~~**Persistenz des Server-States** (In-Memory-Default, pluggable Store)~~ — **entschieden** in
+  [ADR-0011](0011-server-stammdatenverwaltung.md) (In-Memory-Default, pluggbar via `TryAddSingleton`;
+  Stammdatenverwaltung als Manager über dem Store, #30). Ein konkreter persistenter Store bleibt bei Bedarf offen.
 - **Returncode-Modellierung** (`EbicsResult<T>` vs. Exceptions, Katalog) — M4 (#36).

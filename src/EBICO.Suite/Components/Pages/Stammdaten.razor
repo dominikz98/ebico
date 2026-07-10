@@ -36,12 +36,13 @@ else
     <h2>Partner</h2>
     <table class="table">
         <thead>
-            <tr><th>PartnerID</th><th>Name</th></tr>
+            <tr><th>HostID</th><th>PartnerID</th><th>Name</th></tr>
         </thead>
         <tbody>
             @foreach (var partner in _partners)
             {
                 <tr>
+                    <td>@partner.HostId.Value</td>
                     <td>@partner.PartnerId.Value</td>
                     <td>@(partner.Name ?? "—")</td>
                 </tr>

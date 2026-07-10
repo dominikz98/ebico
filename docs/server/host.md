@@ -158,6 +158,12 @@ Domänen-Aggregaten; die Zusammenführung (In-Process oder HTTP-API, siehe
 [ADR-0009](../adr/0009-blazor-render-mode.md)) erfolgt in **M4** — das Suite-Read-Model
 bleibt bis dahin am `SampleEmulatorStateProvider`.
 
+Auf diesem Store setzt in **#30** die vollständige **Stammdatenverwaltung** auf: der Store
+wurde um `Remove*` und bankscoped Abfragen erweitert (Partner nun per (`HostId`, `PartnerId`)),
+darüber liegt der `IMasterDataManager` (referentielle Integrität, kaskadierendes Löschen,
+Permission-/Lebenszyklus-Mutation) samt einer unauthentifizierten HTTP-Admin-API
+(`MapEbicoAdminApi`). Details: [Stammdatenverwaltung](master-data.md).
+
 ## Tests
 
 `tests/EBICO.Tests/Server/` deckt ab (xUnit v3 + AwesomeAssertions; Request-XML wird aus

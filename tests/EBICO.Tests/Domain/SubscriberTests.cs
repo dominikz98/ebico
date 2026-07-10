@@ -116,4 +116,85 @@ public class SubscriberTests
         subscriber.IsTransportOnlyFor("CCT").Should().BeFalse("CCT also carries a bank-technical B permission");
         subscriber.IsTransportOnlyFor("ZZZ").Should().BeFalse("there is no permission for ZZZ");
     }
+
+    [Fact]
+    public void WithPermission_AddsPermission_ReturningNewInstance()
+    {
+        var subscriber = NewSubscriber();
+
+        var updated = subscriber.WithPermission(new SubscriberPermission("CCT", SignatureClass.E));
+
+        updated.Should().NotBeSameAs(subscriber);
+        subscriber.Permissions.Should().BeEmpty("the aggregate is immutable");
+        updated.Permissions.Should().ContainSingle()
+            .Which.Should().Be(new SubscriberPermission("CCT", SignatureClass.E));
+    }
+
+    [Fact]
+    public void WithPermission_DuplicatePair_IsNotAddedTwice()
+    {
+        var subscriber = NewSubscriber(permissions: [new SubscriberPermission("CCT", SignatureClass.E)]);
+
+        var updated = subscriber.WithPermission(new SubscriberPermission("CCT", SignatureClass.E));
+
+        updated.Permissions.Should().ContainSingle();
+    }
+
+    [Fact]
+    public void WithPermission_SameOrderTypeDifferentClass_IsAdded()
+    {
+        var subscriber = NewSubscriber(permissions: [new SubscriberPermission("CCT", SignatureClass.T)]);
+
+        var updated = subscriber.WithPermission(new SubscriberPermission("CCT", SignatureClass.E));
+
+        updated.Permissions.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public void WithoutPermissionsFor_RemovesEveryPermissionOfTheOrderType()
+    {
+        var subscriber = NewSubscriber(permissions:
+        [
+            new SubscriberPermission("CCT", SignatureClass.T),
+            new SubscriberPermission("CCT", SignatureClass.E),
+            new SubscriberPermission("STA", SignatureClass.T),
+        ]);
+
+        var updated = subscriber.WithoutPermissionsFor("CCT");
+
+        updated.Permissions.Should().ContainSingle()
+            .Which.OrderType.Should().Be("STA");
+    }
+
+    [Fact]
+    public void WithoutPermissionsFor_UnknownOrderType_ReturnsSameInstance()
+    {
+        var subscriber = NewSubscriber(permissions: [new SubscriberPermission("STA", SignatureClass.T)]);
+
+        subscriber.WithoutPermissionsFor("CCT").Should().BeSameAs(subscriber);
+    }
+
+    [Fact]
+    public void WithPermissions_ReplacesSet_AndCollapsesDuplicates()
+    {
+        var subscriber = NewSubscriber(permissions: [new SubscriberPermission("OLD", SignatureClass.T)]);
+
+        var updated = subscriber.WithPermissions(
+        [
+            new SubscriberPermission("CCT", SignatureClass.E),
+            new SubscriberPermission("CCT", SignatureClass.E),
+            new SubscriberPermission("STA", SignatureClass.T),
+        ]);
+
+        updated.Permissions.Should().HaveCount(2);
+        updated.Permissions.Select(p => p.OrderType).Should().NotContain("OLD");
+    }
+
+    [Fact]
+    public void WithPermissions_Null_Throws()
+    {
+        var act = () => NewSubscriber().WithPermissions(null!);
+
+        act.Should().Throw<ArgumentNullException>();
+    }
 }

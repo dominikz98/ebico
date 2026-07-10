@@ -106,6 +106,57 @@ public sealed class Subscriber
         return matching.Length > 0 && Array.TrueForAll(matching, p => p.SignatureClass.IsTransportOnly());
     }
 
+    /// <summary>
+    /// Returns a copy of this subscriber that also holds <paramref name="permission"/>. The
+    /// permission set is kept free of duplicates: an identical (<see cref="SubscriberPermission.OrderType"/>,
+    /// <see cref="SubscriberPermission.SignatureClass"/>) pair is not added twice.
+    /// </summary>
+    /// <param name="permission">The permission to grant.</param>
+    /// <returns>A new <see cref="Subscriber"/> carrying <paramref name="permission"/>.</returns>
+    public Subscriber WithPermission(SubscriberPermission permission)
+    {
+        if (Array.Exists(_permissions, p => p == permission))
+        {
+            return this;
+        }
+
+        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, [.. _permissions, permission]);
+    }
+
+    /// <summary>
+    /// Returns a copy of this subscriber with every permission for <paramref name="orderType"/>
+    /// removed. When no permission matches, the same instance is returned unchanged.
+    /// </summary>
+    /// <param name="orderType">The order/BTF type whose permissions are revoked.</param>
+    /// <returns>A new <see cref="Subscriber"/> without any permission for the order type.</returns>
+    /// <exception cref="ArgumentException"><paramref name="orderType"/> is null, empty or whitespace.</exception>
+    public Subscriber WithoutPermissionsFor(string orderType)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(orderType);
+
+        var remaining = Array.FindAll(
+            _permissions,
+            p => !string.Equals(p.OrderType, orderType, StringComparison.Ordinal));
+
+        return remaining.Length == _permissions.Length
+            ? this
+            : new Subscriber(HostId, PartnerId, UserId, SystemId, State, remaining);
+    }
+
+    /// <summary>
+    /// Returns a copy of this subscriber whose permission set is replaced by
+    /// <paramref name="permissions"/>. Duplicate (order type, signature class) pairs are collapsed.
+    /// </summary>
+    /// <param name="permissions">The complete new set of permissions.</param>
+    /// <returns>A new <see cref="Subscriber"/> holding exactly <paramref name="permissions"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="permissions"/> is <see langword="null"/>.</exception>
+    public Subscriber WithPermissions(IEnumerable<SubscriberPermission> permissions)
+    {
+        ArgumentNullException.ThrowIfNull(permissions);
+
+        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, permissions.Distinct());
+    }
+
     private static bool IsAllowedTransition(SubscriberState from, SubscriberState to) => (from, to) switch
     {
         (SubscriberState.New, SubscriberState.Initialized) => true,

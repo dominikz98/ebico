@@ -24,6 +24,7 @@ public class EbicoServerServiceCollectionExtensionsTests
 
         provider.GetRequiredService<IEbicsRequestPipeline>().Should().BeOfType<EbicsRequestPipeline>();
         provider.GetRequiredService<IEbicsStateStore>().Should().BeOfType<InMemoryEbicsStateStore>();
+        provider.GetRequiredService<IMasterDataManager>().Should().BeOfType<MasterDataManager>();
         provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<NoOpEbicsRequestVerifier>();
         provider.GetRequiredService<IEbicsErrorMapper>().Should().BeOfType<EbicsErrorMapper>();
         provider.GetRequiredService<IEbicsOrderHandlerResolver>().Should().BeOfType<EbicsOrderHandlerResolver>();
@@ -50,6 +51,7 @@ public class EbicoServerServiceCollectionExtensionsTests
         var options = provider.GetRequiredService<IOptions<EbicoServerOptions>>().Value;
 
         options.EndpointPath.Should().Be("/ebics");
+        options.AdminApiPath.Should().Be("/admin");
         options.FallbackResponseVersion.Should().Be(EbicsVersion.H005);
     }
 

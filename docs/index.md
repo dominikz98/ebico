@@ -28,6 +28,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 ## Server (Emulator)
 
 - [Hostable Server-Grundgerüst (ASP.NET Core)](server/host.md) — EBICS-HTTP-Endpoint (POST, `text/xml`), Request-Pipeline (Parse → Version-Dispatch → Verify → Handle → Respond) mit Verify/Handle als Erweiterungspunkten, zentrale Fehlerabbildung auf EBICS-Returncodes, pluggbarer In-Memory-State-Store (`AddEbicoServer`)
+- [Stammdatenverwaltung (Banken/Partner/Teilnehmer)](server/master-data.md) — CRUD im Server-Zustand, referentielle Integrität & kaskadierendes Löschen, Berechtigungen pro OrderType/BTF, Mehr-Banken-/Mehr-Mandanten-Fähigkeit, unauthentifizierte HTTP-Admin-API (`MapEbicoAdminApi`)
 
 ## Suite (Blazor UI)
 

@@ -10,8 +10,10 @@ namespace EBICO.Server.State;
 public sealed class InMemoryEbicsStateStore : IEbicsStateStore
 {
     private readonly ConcurrentDictionary<HostId, Bank> _banks = new();
-    private readonly ConcurrentDictionary<PartnerId, Partner> _partners = new();
+    private readonly ConcurrentDictionary<(HostId Host, PartnerId Partner), Partner> _partners = new();
     private readonly ConcurrentDictionary<(HostId Host, PartnerId Partner, UserId User), Subscriber> _subscribers = new();
+
+    // --- Banks -----------------------------------------------------------------------------
 
     /// <inheritdoc />
     public Task<IReadOnlyList<Bank>> GetBanksAsync(CancellationToken ct = default)
@@ -33,13 +35,24 @@ public sealed class InMemoryEbicsStateStore : IEbicsStateStore
     }
 
     /// <inheritdoc />
+    public Task<bool> RemoveBankAsync(HostId hostId, CancellationToken ct = default)
+        => Task.FromResult(_banks.TryRemove(hostId, out _));
+
+    // --- Partners --------------------------------------------------------------------------
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<Partner>> GetPartnersAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Partner>>(_partners.Values.ToArray());
 
     /// <inheritdoc />
-    public Task<Partner?> GetPartnerAsync(PartnerId partnerId, CancellationToken ct = default)
+    public Task<IReadOnlyList<Partner>> GetPartnersForBankAsync(HostId hostId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Partner>>(
+            _partners.Values.Where(p => p.HostId == hostId).ToArray());
+
+    /// <inheritdoc />
+    public Task<Partner?> GetPartnerAsync(HostId hostId, PartnerId partnerId, CancellationToken ct = default)
     {
-        _partners.TryGetValue(partnerId, out var partner);
+        _partners.TryGetValue((hostId, partnerId), out var partner);
         return Task.FromResult(partner);
     }
 
@@ -47,13 +60,29 @@ public sealed class InMemoryEbicsStateStore : IEbicsStateStore
     public Task RegisterPartnerAsync(Partner partner, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(partner);
-        _partners[partner.PartnerId] = partner;
+        _partners[(partner.HostId, partner.PartnerId)] = partner;
         return Task.CompletedTask;
     }
 
     /// <inheritdoc />
+    public Task<bool> RemovePartnerAsync(HostId hostId, PartnerId partnerId, CancellationToken ct = default)
+        => Task.FromResult(_partners.TryRemove((hostId, partnerId), out _));
+
+    // --- Subscribers -----------------------------------------------------------------------
+
+    /// <inheritdoc />
     public Task<IReadOnlyList<Subscriber>> GetSubscribersAsync(CancellationToken ct = default)
         => Task.FromResult<IReadOnlyList<Subscriber>>(_subscribers.Values.ToArray());
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Subscriber>> GetSubscribersForBankAsync(HostId hostId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Subscriber>>(
+            _subscribers.Values.Where(s => s.HostId == hostId).ToArray());
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<Subscriber>> GetSubscribersForPartnerAsync(HostId hostId, PartnerId partnerId, CancellationToken ct = default)
+        => Task.FromResult<IReadOnlyList<Subscriber>>(
+            _subscribers.Values.Where(s => s.HostId == hostId && s.PartnerId == partnerId).ToArray());
 
     /// <inheritdoc />
     public Task<Subscriber?> GetSubscriberAsync(HostId hostId, PartnerId partnerId, UserId userId, CancellationToken ct = default)
@@ -69,4 +98,8 @@ public sealed class InMemoryEbicsStateStore : IEbicsStateStore
         _subscribers[(subscriber.HostId, subscriber.PartnerId, subscriber.UserId)] = subscriber;
         return Task.CompletedTask;
     }
+
+    /// <inheritdoc />
+    public Task<bool> RemoveSubscriberAsync(HostId hostId, PartnerId partnerId, UserId userId, CancellationToken ct = default)
+        => Task.FromResult(_subscribers.TryRemove((hostId, partnerId, userId), out _));
 }

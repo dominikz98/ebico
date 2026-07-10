@@ -121,10 +121,18 @@ Schlank und unveränderlich (`sealed class`, Get-only-Properties), analog zu
 `EbicsVersionInfo`:
 
 - `Bank` — Identität `HostId`, optionaler `Name`, unterstützte `EbicsVersion`s (Default: alle).
-- `Partner` — Identität `PartnerId`, optionaler `Name`; gruppiert Subscriber.
+- `Partner` — Identität (`HostId`, `PartnerId`), optionaler `Name`; gehört zu **genau einer**
+  Bank und gruppiert deren Subscriber. Das Scoping pro Bank ermöglicht die
+  Mehr-Mandanten-Fähigkeit (derselbe `PartnerId`-String bezeichnet an verschiedenen Banken
+  verschiedene Kunden) und wurde im Server-Layer (#30) ergänzt.
 - `Subscriber` — Identität über das Tripel (`HostId`, `PartnerId`, `UserId`), optionale
   `SystemId` (technischer Teilnehmer → `IsTechnicalSubscriber`), `SubscriberState` und
-  `SubscriberPermission`s.
+  `SubscriberPermission`s. Berechtigungen werden unveränderlich fortgeschrieben:
+  `WithPermission` / `WithoutPermissionsFor` / `WithPermissions` liefern (wie `Transition`)
+  jeweils eine neue Instanz.
+
+Die serverseitige CRUD-Verwaltung dieser Aggregate (inkl. referentieller Integrität und
+kaskadierendem Löschen) beschreibt die [Stammdatenverwaltung](../server/master-data.md) (#30).
 
 ## EBICS-Versionsbezug
 

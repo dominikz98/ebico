@@ -21,7 +21,7 @@ public class DashboardTests
 
         public Task<IReadOnlyList<Partner>> GetPartnersAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Partner>>(
-                [.. Enumerable.Range(0, partners).Select(i => new Partner(PartnerId.Create($"PART{i}")))]);
+                [.. Enumerable.Range(0, partners).Select(i => new Partner(HostId.Create($"HOST{i}"), PartnerId.Create($"PART{i}")))]);
 
         public Task<IReadOnlyList<Subscriber>> GetSubscribersAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<Subscriber>>(
