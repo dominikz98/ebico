@@ -1,10 +1,86 @@
 @page "/schluessel"
+@inject IEmulatorStateProvider State
 
 <PageTitle>Schlüssel</PageTitle>
 
 <h1>Schlüssel &amp; Zertifikate</h1>
 
-<div class="alert alert-secondary" role="alert">
-    Die Schlüssel-/Zertifikats-Ansicht wird in Issue&nbsp;#55 umgesetzt. Sie zeigt
-    künftig die Bank- und Teilnehmerschlüssel (A00x/E002/X002) samt Status.
-</div>
+<p class="text-muted">
+    Öffentliche Schlüssel der Bank und Teilnehmer (A00x/E002/X002) mit ihren
+    SHA-256-Fingerprints, ein INI-Brief-Vergleich und Werkzeuge zum Erzeugen von
+    Test-Schlüsseln und -Zertifikaten.
+</p>
+
+<h2>Bekannte Schlüssel &amp; Fingerprints</h2>
+@if (_loading)
+{
+    <p><em>Lade Schlüssel…</em></p>
+}
+else
+{
+    <table class="table align-middle">
+        <thead>
+            <tr><th>Inhaber</th><th>Zweck</th><th>Version</th><th>Fingerprint (SHA-256)</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var key in _keys)
+            {
+                <tr>
+                    <td>@key.OwnerLabel</td>
+                    <td>@PurposeLabel(key.Purpose)</td>
+                    <td>@key.KeyVersion</td>
+                    <td><pre class="mb-0 fingerprint">@key.FingerprintText</pre></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+<h2>Schlüsselversionen (Referenz)</h2>
+<p class="text-muted">
+    Welche EBICS-Schlüsselversion in welcher Protokollversion (H003/H004/H005) erlaubt ist
+    (Quelle: <code>EBICO.Core.Crypto.KeyVersions</code>).
+</p>
+<table class="table">
+    <thead>
+        <tr><th>Code</th><th>Zweck</th><th>Legacy</th><th>Padding</th><th>Erlaubt in</th></tr>
+    </thead>
+    <tbody>
+        @foreach (var info in KeyVersions.All)
+        {
+            <tr>
+                <td>@info.Code</td>
+                <td>@PurposeLabel(info.Purpose)</td>
+                <td>@(info.IsLegacy ? "ja" : "nein")</td>
+                <td>@info.PaddingIntent</td>
+                <td>@string.Join(", ", info.PermittedIn)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+<h2>INI-Brief-Vergleich</h2>
+<IniLetterComparisonTool @rendermode="InteractiveServer" />
+
+<h2>Test-CA &amp; Schlüssel-Werkzeuge</h2>
+<TestKeyTool @rendermode="InteractiveServer" />
+
+@code {
+    private bool _loading = true;
+    private IReadOnlyList<KeyView> _keys = [];
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _keys = await State.GetKeysAsync();
+        _loading = false;
+    }
+
+    private static string PurposeLabel(KeyPurpose purpose) => purpose switch
+    {
+        KeyPurpose.Signature => "Signatur (A)",
+        KeyPurpose.Encryption => "Verschlüsselung (E)",
+        KeyPurpose.Authentication => "Authentifikation (X)",
+        _ => purpose.ToString(),
+    };
+}

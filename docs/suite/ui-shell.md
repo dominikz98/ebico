@@ -33,7 +33,7 @@ die Blazor-Template-Demoseiten (Counter/Weather) wurden entfernt.
 | Dashboard | `/` | Kennzahlen des Emulator-Zustands (Anzahl Banken/Partner/Teilnehmer) |
 | Stammdaten | `/stammdaten` | Read-only Listen der Banken/Partner/Teilnehmer (Verwaltung: #53) |
 | Transaktionen | `/transaktionen` | Platzhalter — Transaktions-Inspektor (#54) |
-| Schlüssel | `/schluessel` | Platzhalter — Schlüssel-/Zertifikats-Ansicht (#55) |
+| Schlüssel | `/schluessel` | Fingerprints, INI-Brief-Vergleich, Test-CA/Schlüssel-Werkzeuge ([#55](schluessel-ansicht.md)) |
 
 Das `MainLayout` behält die Sidebar-Struktur des Templates (Sidebar + Content),
 zeigt in der Top-Row aber den EBICO-Titel statt des Template-„About"-Links.

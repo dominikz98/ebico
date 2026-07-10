@@ -1,0 +1,165 @@
+@using System.Security.Cryptography.X509Certificates
+@inject IJSRuntime JS
+
+@*
+    Test-CA & key tools (issue #55): generate an RSA key pair, derive its fingerprint, create a
+    self-signed EBICS (H005) test certificate and verify it, and download key/certificate as PEM.
+    Rendered as an interactive island; the render mode is applied at the embedding site.
+*@
+
+<p class="text-muted">
+    Erzeugt RSA-Test-Schlüssel und self-signed Test-Zertifikate (H005) zum Ausprobieren der
+    Onboarding-Flows. Nur für Tests — kein Produktivschlüsselmaterial.
+</p>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <label class="form-label" for="purpose">Zweck</label>
+        <select id="purpose" class="form-select" @bind="_purpose">
+            @foreach (var purpose in Enum.GetValues<KeyPurpose>())
+            {
+                <option value="@purpose">@PurposeLabel(purpose)</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-8">
+        <label class="form-label" for="subject">Zertifikats-Subject</label>
+        <input id="subject" class="form-control" @bind="_subject" />
+    </div>
+</div>
+
+<div class="mt-3">
+    <button id="generate-key" class="btn btn-primary" @onclick="GenerateKey">Schlüssel erzeugen</button>
+    <button id="create-cert" class="btn btn-outline-primary ms-2" @onclick="CreateCertificate">
+        Test-Zertifikat erzeugen
+    </button>
+</div>
+
+@if (_key is not null)
+{
+    <div class="mt-4">
+        <h3 class="h5">Erzeugter Schlüssel</h3>
+        <div>Fingerprint (SHA-256):</div>
+        <pre class="mb-2 keytext">@_keyFingerprint</pre>
+
+        <label class="form-label" for="public-pem">Öffentlicher Schlüssel (PEM)</label>
+        <textarea id="public-pem" class="form-control keytext" rows="6" readonly>@_publicKeyPem</textarea>
+        <div class="mt-2">
+            <button id="download-public" class="btn btn-sm btn-outline-secondary" @onclick="DownloadPublicKey">
+                Public Key herunterladen
+            </button>
+            <button id="download-private" class="btn btn-sm btn-outline-secondary ms-2" @onclick="DownloadPrivateKey">
+                Private Key herunterladen
+            </button>
+        </div>
+    </div>
+}
+
+@if (_cert is not null)
+{
+    <div class="mt-4">
+        <h3 class="h5">Test-Zertifikat</h3>
+        @if (_cert.IsValid)
+        {
+            <div class="alert alert-success" role="alert">Zertifikat ist gültig (self-signed, als eigener Vertrauensanker geprüft).</div>
+        }
+        else
+        {
+            <div class="alert alert-danger" role="alert">Zertifikat ungültig: @_cert.Errors</div>
+        }
+
+        <table class="table table-sm">
+            <tbody>
+                <tr><th scope="row">Subject</th><td>@_cert.Subject</td></tr>
+                <tr><th scope="row">Gültig ab</th><td>@_cert.NotBefore.ToString("u")</td></tr>
+                <tr><th scope="row">Gültig bis</th><td>@_cert.NotAfter.ToString("u")</td></tr>
+                <tr><th scope="row">Thumbprint</th><td><code>@_cert.Thumbprint</code></td></tr>
+            </tbody>
+        </table>
+
+        @if (_cert.Diagnostics.Count > 0)
+        {
+            <ul>
+                @foreach (var line in _cert.Diagnostics)
+                {
+                    <li>@line</li>
+                }
+            </ul>
+        }
+
+        <label class="form-label" for="cert-pem">Zertifikat (PEM)</label>
+        <textarea id="cert-pem" class="form-control keytext" rows="6" readonly>@_cert.Pem</textarea>
+        <div class="mt-2">
+            <button id="download-cert" class="btn btn-sm btn-outline-secondary" @onclick="DownloadCertificate">
+                Zertifikat herunterladen
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private KeyPurpose _purpose = KeyPurpose.Signature;
+    private string _subject = "CN=EBICO Test";
+    private RsaKeyMaterial? _key;
+    private string? _keyFingerprint;
+    private string? _publicKeyPem;
+    private string? _privateKeyPem;
+    private CertInfo? _cert;
+
+    private void GenerateKey()
+    {
+        _key = RsaKeyMaterial.Generate();
+        _keyFingerprint = PublicKeyFingerprint.ToLetterFormat(PublicKeyFingerprint.Compute(_key));
+        _publicKeyPem = RsaKeyImportExport.ExportPublicKeyPem(_key);
+        _privateKeyPem = RsaKeyImportExport.ExportPkcs8Pem(_key);
+        _cert = null;
+    }
+
+    private void CreateCertificate()
+    {
+        if (_key is null)
+        {
+            GenerateKey();
+        }
+
+        var now = DateTimeOffset.UtcNow;
+        using var certificate = SelfSignedCertificateFactory.Create(_key!, _purpose, _subject, now, now.AddYears(1));
+        var result = X509CertificateVerifier.Verify(certificate, new X509Certificate2Collection { certificate }, _purpose);
+        _cert = new CertInfo(
+            certificate.Subject,
+            certificate.NotBefore,
+            certificate.NotAfter,
+            certificate.Thumbprint,
+            result.IsValid,
+            result.Errors,
+            result.Diagnostics,
+            certificate.ExportCertificatePem());
+    }
+
+    private async Task DownloadPublicKey()
+        => await JS.InvokeVoidAsync("ebicoDownload", "ebico-test-public.pem", _publicKeyPem);
+
+    private async Task DownloadPrivateKey()
+        => await JS.InvokeVoidAsync("ebicoDownload", "ebico-test-private.pem", _privateKeyPem);
+
+    private async Task DownloadCertificate()
+        => await JS.InvokeVoidAsync("ebicoDownload", "ebico-test-cert.pem", _cert?.Pem);
+
+    private static string PurposeLabel(KeyPurpose purpose) => purpose switch
+    {
+        KeyPurpose.Signature => "Signatur (A)",
+        KeyPurpose.Encryption => "Verschlüsselung (E)",
+        KeyPurpose.Authentication => "Authentifikation (X)",
+        _ => purpose.ToString(),
+    };
+
+    private sealed record CertInfo(
+        string Subject,
+        DateTime NotBefore,
+        DateTime NotAfter,
+        string Thumbprint,
+        bool IsValid,
+        CertificateVerificationError Errors,
+        IReadOnlyList<string> Diagnostics,
+        string Pem);
+}

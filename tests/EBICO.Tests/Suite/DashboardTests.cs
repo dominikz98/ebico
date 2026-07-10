@@ -27,6 +27,9 @@ public class DashboardTests
             => Task.FromResult<IReadOnlyList<Subscriber>>(
                 [.. Enumerable.Range(0, subscribers).Select(i =>
                     new Subscriber(HostId.Create("HOST0"), PartnerId.Create("PART0"), UserId.Create($"USER{i}")))]);
+
+        public Task<IReadOnlyList<KeyView>> GetKeysAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<KeyView>>([]);
     }
 
     [Fact]
