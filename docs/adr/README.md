@@ -38,6 +38,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0009](0009-blazor-render-mode.md) | Blazor Render-Modus (Interactive Server) | accepted |
 | [0010](0010-pdf-bibliothek.md) | PDF-Bibliothek für den INI-/HIA-Brief: QuestPDF (Community) | accepted |
 | [0011](0011-server-stammdatenverwaltung.md) | Server-Stammdatenverwaltung (Manager über Store, Admin-API) | accepted |
+| [0012](0012-returncode-katalog.md) | EBICS-Returncode-Katalog (Modellierung & Verortung) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
@@ -54,4 +55,6 @@ Themen, die eine eigene ADR bekommen, sobald sie anstehen:
 - ~~**Persistenz des Server-States** (In-Memory-Default, pluggable Store)~~ — **entschieden** in
   [ADR-0011](0011-server-stammdatenverwaltung.md) (In-Memory-Default, pluggbar via `TryAddSingleton`;
   Stammdatenverwaltung als Manager über dem Store, #30). Ein konkreter persistenter Store bleibt bei Bedarf offen.
-- **Returncode-Modellierung** (`EbicsResult<T>` vs. Exceptions, Katalog) — M4 (#36).
+- ~~**Returncode-Modellierung** (`EbicsResult<T>` vs. Exceptions, Katalog)~~ — **entschieden** in
+  [ADR-0012](0012-returncode-katalog.md) (zentraler Katalog + Registry in `EBICO.Core.ReturnCodes`,
+  Mapping server-seitig, technisch/fachlich getrennt).

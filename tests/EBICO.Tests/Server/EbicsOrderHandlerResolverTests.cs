@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using EBICO.Core;
+using EBICO.Core.ReturnCodes;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 
 namespace EBICO.Tests.Server;
 

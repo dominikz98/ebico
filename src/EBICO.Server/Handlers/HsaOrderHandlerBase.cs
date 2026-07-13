@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
 using System.Text;
 using EBICO.Core;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 
 namespace EBICO.Server.Handlers;
@@ -68,31 +67,25 @@ public abstract class HsaOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        HsaKeyData data;
-        try
+        // Decode the order data; any decode/validation fault surfaces as EbicsOrderDataException and is
+        // mapped to InvalidOrderDataFormat by the pipeline's central error mapper.
+        var data = OrderDataFault.Wrap(() =>
         {
-            data = ExtractHsaOrderData(context);
+            var extracted = ExtractHsaOrderData(context);
 
             // The authentication key must carry an X00x version and the encryption key an E00x version;
             // reject a purpose-mismatched version smuggled into the wrong element, and reject a version
             // not permitted for this protocol version.
-            if (data.AuthVersion.Purpose != KeyPurpose.Authentication
-                || data.EncVersion.Purpose != KeyPurpose.Encryption)
+            if (extracted.AuthVersion.Purpose != KeyPurpose.Authentication
+                || extracted.EncVersion.Purpose != KeyPurpose.Encryption)
             {
-                return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
+                throw new EbicsOrderDataException("The HSA order carries a purpose-mismatched key version.");
             }
 
-            _ = KeyVersions.EnsurePermitted(data.AuthVersion, Version);
-            _ = KeyVersions.EnsurePermitted(data.EncVersion, Version);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException or KeyMaterialException
-            or KeyVersionNotPermittedException or InvalidKeyVersionException or CryptographicException
-            or ArgumentException or InvalidOperationException)
-        {
-            // The order data could not be decompressed/deserialized, the key material could not be
-            // reconstructed, or one of the key versions is unusable/unpermitted.
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+            _ = KeyVersions.EnsurePermitted(extracted.AuthVersion, Version);
+            _ = KeyVersions.EnsurePermitted(extracted.EncVersion, Version);
+            return extracted;
+        });
 
         if (!HostId.TryCreate(data.HostId, out var hostId)
             || !PartnerId.TryCreate(data.PartnerId, out var partnerId)
@@ -124,7 +117,7 @@ public abstract class HsaOrderHandlerBase : IEbicsOrderHandler
     /// </summary>
     /// <param name="context">The request context (its <see cref="EbicsRequestContext.Envelope"/> is the unsecured request).</param>
     /// <returns>The extracted identifiers, key material and key versions.</returns>
-    /// <remarks>Implementations may throw any of the exceptions caught by <see cref="HandleAsync"/>; those map to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>.</remarks>
+    /// <remarks>Implementations may throw the low-level order-data failures wrapped by <see cref="OrderDataFault"/> into <see cref="EbicsOrderDataException"/> (mapped to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>).</remarks>
     protected abstract HsaKeyData ExtractHsaOrderData(EbicsRequestContext context);
 
     /// <summary>Decompresses and deserializes the embedded order-data document to <typeparamref name="T"/>.</summary>

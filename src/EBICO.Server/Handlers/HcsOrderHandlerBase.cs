@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
 using System.Text;
 using EBICO.Core;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 
 namespace EBICO.Server.Handlers;
@@ -69,15 +68,8 @@ public abstract class HcsOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        HcsEnvelope envelope;
-        try
-        {
-            envelope = ExtractEnvelope(context);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException)
-        {
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+        // A non-conforming envelope surfaces as EbicsOrderDataException -> InvalidOrderDataFormat.
+        var envelope = OrderDataFault.Wrap(() => ExtractEnvelope(context));
 
         if (!HostId.TryCreate(envelope.HostId, out var hostId)
             || !PartnerId.TryCreate(envelope.PartnerId, out var partnerId)
@@ -88,28 +80,24 @@ public abstract class HcsOrderHandlerBase : IEbicsOrderHandler
 
         var bankKeys = await _bankKeyStore.GetOrCreateAsync(hostId, ct).ConfigureAwait(false);
 
-        HcsKeys keys;
-        try
+        // Decrypt and parse the order data; any decode/validation fault surfaces as
+        // EbicsOrderDataException -> InvalidOrderDataFormat.
+        var keys = OrderDataFault.Wrap(() =>
         {
-            keys = DecryptAndParse(envelope, bankKeys);
+            var parsed = DecryptAndParse(envelope, bankKeys);
 
-            if (keys.SigVersion.Purpose != KeyPurpose.Signature
-                || keys.AuthVersion.Purpose != KeyPurpose.Authentication
-                || keys.EncVersion.Purpose != KeyPurpose.Encryption)
+            if (parsed.SigVersion.Purpose != KeyPurpose.Signature
+                || parsed.AuthVersion.Purpose != KeyPurpose.Authentication
+                || parsed.EncVersion.Purpose != KeyPurpose.Encryption)
             {
-                return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
+                throw new EbicsOrderDataException("The HCS order carries a purpose-mismatched key version.");
             }
 
-            _ = KeyVersions.EnsurePermitted(keys.SigVersion, Version);
-            _ = KeyVersions.EnsurePermitted(keys.AuthVersion, Version);
-            _ = KeyVersions.EnsurePermitted(keys.EncVersion, Version);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException or KeyMaterialException
-            or KeyVersionNotPermittedException or InvalidKeyVersionException or CryptographicException
-            or ArgumentException or InvalidOperationException)
-        {
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+            _ = KeyVersions.EnsurePermitted(parsed.SigVersion, Version);
+            _ = KeyVersions.EnsurePermitted(parsed.AuthVersion, Version);
+            _ = KeyVersions.EnsurePermitted(parsed.EncVersion, Version);
+            return parsed;
+        });
 
         // HCS requires a fully onboarded subscriber (INI + HIA done). The key change keeps state Ready.
         var subscriber = await _masterData.GetSubscriberAsync(hostId, partnerId, userId, ct).ConfigureAwait(false);
@@ -142,7 +130,7 @@ public abstract class HcsOrderHandlerBase : IEbicsOrderHandler
     /// </summary>
     /// <param name="orderDataXml">The decrypted and decompressed order-data XML.</param>
     /// <returns>The extracted keys and their versions.</returns>
-    /// <remarks>Implementations may throw any of the exceptions caught by <see cref="HandleAsync"/>; those map to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>.</remarks>
+    /// <remarks>Implementations may throw the low-level order-data failures wrapped by <see cref="OrderDataFault"/> into <see cref="EbicsOrderDataException"/> (mapped to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>).</remarks>
     protected abstract HcsKeys ParseOrderData(string orderDataXml);
 
     private HcsKeys DecryptAndParse(HcsEnvelope envelope, BankKeyPair bankKeys)

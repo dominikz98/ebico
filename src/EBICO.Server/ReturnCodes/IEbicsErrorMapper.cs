@@ -1,9 +1,12 @@
+using EBICO.Core.ReturnCodes;
+
 namespace EBICO.Server.ReturnCodes;
 
 /// <summary>
 /// Central mapping from an exception raised while processing an EBICS request to the EBICS
-/// return code that should be reported to the client. Pluggable so a later, richer catalogue
-/// (issue #36 / M4) can replace it.
+/// return code that should be reported to the client. This is the single source of truth for
+/// exception → return-code mapping on the server; the return-code catalogue itself lives in
+/// <see cref="EBICO.Core.ReturnCodes.EbicsReturnCodes"/>.
 /// </summary>
 public interface IEbicsErrorMapper
 {

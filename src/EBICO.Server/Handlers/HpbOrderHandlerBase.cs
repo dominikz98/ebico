@@ -2,9 +2,9 @@ using System.Security.Cryptography;
 using EBICO.Core;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 using Dsig = EBICO.Core.Schema.XmlDsig;
 
@@ -72,17 +72,9 @@ public abstract class HpbOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        HpbRequestData request;
-        try
-        {
-            request = ExtractHpbRequest(context);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException)
-        {
-            // The envelope was not the expected no-pub-key-digests request (e.g. a signed ebicsRequest
-            // that happens to carry OrderType "HPB").
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+        // Read the request header; a non-conforming envelope (e.g. a signed ebicsRequest that happens to
+        // carry OrderType "HPB") surfaces as EbicsOrderDataException -> InvalidOrderDataFormat.
+        var request = OrderDataFault.Wrap(() => ExtractHpbRequest(context));
 
         if (!HostId.TryCreate(request.HostId, out var hostId)
             || !PartnerId.TryCreate(request.PartnerId, out var partnerId)

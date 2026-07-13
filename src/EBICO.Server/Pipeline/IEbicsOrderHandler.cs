@@ -1,6 +1,6 @@
 using EBICO.Core;
 using EBICO.Core.Crypto;
-using EBICO.Server.ReturnCodes;
+using EBICO.Core.ReturnCodes;
 
 namespace EBICO.Server.Pipeline;
 

@@ -1,4 +1,4 @@
-namespace EBICO.Server.ReturnCodes;
+namespace EBICO.Core.ReturnCodes;
 
 /// <summary>
 /// Where an <see cref="EbicsReturnCode"/> is reported inside an <c>ebicsResponse</c>: a

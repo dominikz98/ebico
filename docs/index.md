@@ -53,6 +53,7 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Verschlüsselung E002 (RSA-OAEP + AES-128-CBC)](protocol/encryption-e002.md) — hybride Transportverschlüsselung: AES-128-CBC über die Auftragsdaten, RSAES-OAEP-SHA256 über den Transaktionsschlüssel, registry-getriebenes Padding-Mapping
 - [Public-Key-Fingerprints (HPB/INI/HIA)](protocol/public-key-fingerprint.md) — SHA-256-Hashwerte öffentlicher Schlüssel (Exponent/Modulus-Hash-Input), Darstellung für INI-Brief und HPB-Antwort, konstantzeitige Verifikation client-gesendeter Hashes
 - [Zertifikatsverifizierung (X.509)](protocol/certificate-verification-x509.md) — Kette/Vertrauensanker (konfigurierbar, Test-CA), Gültigkeit und Verwendungszweck (KeyUsage je Schlüsselrolle), optionales Key-Binding; reine-Schlüssel-Verfahren (H003/H004) als Policy (`CertificateRequirement`)
+- [EBICS-Returncode-Katalog](protocol/return-codes.md) — zentrale technische/fachliche Returncodes als Konstanten (`EbicsReturnCode`) + Registry (`EbicsReturnCodes`) in `EBICO.Core`, Header- vs. Body-Ablage (`Kind`), Exception→Returncode-Mapping (`EbicsErrorMapper`), Spec-Vorbehalte gegen Annex 1
 - [Lizenz & Repo-Policy](legal/ebics-licensing.md) — proprietäre Schemas: keine Commits, fetch-on-demand; Bindings committet (ADR-0006)
 
 ---

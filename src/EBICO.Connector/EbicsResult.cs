@@ -1,3 +1,5 @@
+using EBICO.Core.ReturnCodes;
+
 namespace EBICO.Connector;
 
 /// <summary>
@@ -6,11 +8,11 @@ namespace EBICO.Connector;
 /// technical failure (which is thrown as an exception, not returned here).
 /// </summary>
 /// <remarks>
-/// <b>Preliminary form.</b> The final shape and the full EBICS return-code catalogue are
-/// defined in issue #36 (M4); this connector-local version exists so #46 is self-contained.
-/// Create instances via <see cref="Success"/> / <see cref="Failure"/> — the
-/// <see langword="default"/> value has a <see langword="null"/> <see cref="ReturnCode"/> and is
-/// not a meaningful result.
+/// The six-digit codes come from the central catalogue in
+/// <see cref="EBICO.Core.ReturnCodes.EbicsReturnCode"/> (issue #36); <see cref="OkReturnCode"/>
+/// mirrors <see cref="EBICO.Core.ReturnCodes.EbicsReturnCode.OkCode"/>. Create instances via
+/// <see cref="Success"/> / <see cref="Failure"/> — the <see langword="default"/> value has a
+/// <see langword="null"/> <see cref="ReturnCode"/> and is not a meaningful result.
 /// </remarks>
 /// <typeparam name="T">The value type produced on success.</typeparam>
 public readonly record struct EbicsResult<T>
@@ -28,7 +30,7 @@ public readonly record struct EbicsResult<T>
     public string? ReturnText { get; init; }
 
     /// <summary>The EBICS return code that denotes success (<c>"000000"</c>).</summary>
-    public const string OkReturnCode = "000000";
+    public const string OkReturnCode = EbicsReturnCode.OkCode;
 
     /// <summary>Creates a successful result carrying <paramref name="value"/>.</summary>
     /// <param name="value">The produced value.</param>

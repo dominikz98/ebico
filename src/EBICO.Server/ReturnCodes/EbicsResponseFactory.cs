@@ -1,5 +1,6 @@
 using EBICO.Core;
 using EBICO.Core.Crypto;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Versioning;
 using EBICO.Server.Pipeline;
 using H003 = EBICO.Core.Schema.H003;
