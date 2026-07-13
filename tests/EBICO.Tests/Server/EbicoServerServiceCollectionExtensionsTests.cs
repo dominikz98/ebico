@@ -42,13 +42,20 @@ public class EbicoServerServiceCollectionExtensionsTests
 
         var handlers = provider.GetServices<IEbicsOrderHandler>().ToArray();
 
-        // One INI, HIA and HPB handler per protocol version.
-        handlers.Should().OnlyContain(h => h.OrderType == "INI" || h.OrderType == "HIA" || h.OrderType == "HPB");
-        foreach (var orderType in new[] { "INI", "HIA", "HPB" })
+        // The key-management order types the server handles.
+        var expectedOrderTypes = new[] { "INI", "HIA", "HPB", "HCA", "HCS", "SPR", "HSA" };
+        handlers.Should().OnlyContain(h => expectedOrderTypes.Contains(h.OrderType));
+
+        // INI/HIA/HPB and the key-change/suspension orders HCA/HCS/SPR exist for every protocol version.
+        foreach (var orderType in new[] { "INI", "HIA", "HPB", "HCA", "HCS", "SPR" })
         {
             handlers.Where(h => h.OrderType == orderType).Select(h => h.Version).Should().BeEquivalentTo(
                 [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005]);
         }
+
+        // HSA was removed in H005, so it exists only for H003/H004.
+        handlers.Where(h => h.OrderType == "HSA").Select(h => h.Version).Should().BeEquivalentTo(
+            [EbicsVersion.H003, EbicsVersion.H004]);
     }
 
     [Fact]
