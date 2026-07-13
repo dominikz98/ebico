@@ -49,10 +49,9 @@ public static class EbicoServerServiceCollectionExtensions
         // window (M4 timestamps/nonces will reuse it).
         services.TryAddSingleton(TimeProvider.System);
 
-        // INI/HIA/HPB key-management handlers, one per protocol version (the resolver matches by
+        // Key-management handlers, one per protocol version (the resolver matches by
         // (Version, OrderType)). AddSingleton (not TryAdd): the resolver consumes the whole
-        // IEnumerable<IEbicsOrderHandler>, so several handlers coexist. Further key-management
-        // handlers (HSA/SPR/…) are added by their own issues.
+        // IEnumerable<IEbicsOrderHandler>, so several handlers coexist.
         services.AddSingleton<IEbicsOrderHandler, H003IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H004IniOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H005IniOrderHandler>();
@@ -62,6 +61,20 @@ public static class EbicoServerServiceCollectionExtensions
         services.AddSingleton<IEbicsOrderHandler, H003HpbOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H004HpbOrderHandler>();
         services.AddSingleton<IEbicsOrderHandler, H005HpbOrderHandler>();
+
+        // Key-change and suspension handlers (issue #29). HCA/HCS/SPR arrive as signed ebicsRequests;
+        // HSA is an ebicsUnsecuredRequest and exists only for H003/H004 (removed in H005).
+        services.AddSingleton<IEbicsOrderHandler, H003HcaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004HcaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005HcaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H003HcsOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004HcsOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005HcsOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H003SprOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004SprOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H005SprOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H003HsaOrderHandler>();
+        services.AddSingleton<IEbicsOrderHandler, H004HsaOrderHandler>();
 
         return services;
     }
