@@ -291,6 +291,28 @@ internal static class ServerTestHelpers
         _ => (null, null),
     };
 
+    /// <summary>Reads the transaction id from the static header of an <c>ebicsResponse</c>, or <see langword="null"/>.</summary>
+    /// <param name="envelope">The response envelope.</param>
+    /// <returns>The 16-byte transaction id, or <see langword="null"/> when absent.</returns>
+    public static byte[]? ReadTransactionId(IEbicsEnvelope envelope) => envelope switch
+    {
+        H003.EbicsResponse r => r.Header?.Static?.TransactionId,
+        H004.EbicsResponse r => r.Header?.Static?.TransactionId,
+        H005.EbicsResponse r => r.Header?.Static?.TransactionId,
+        _ => null,
+    };
+
+    /// <summary>Reads the transaction phase (as its enum name) from the mutable header of an <c>ebicsResponse</c>.</summary>
+    /// <param name="envelope">The response envelope.</param>
+    /// <returns>The phase name (<c>"Initialisation"</c>/<c>"Transfer"</c>/<c>"Receipt"</c>), or <see langword="null"/>.</returns>
+    public static string? ReadTransactionPhase(IEbicsEnvelope envelope) => envelope switch
+    {
+        H003.EbicsResponse r => r.Header?.Mutable?.TransactionPhase.ToString(),
+        H004.EbicsResponse r => r.Header?.Mutable?.TransactionPhase.ToString(),
+        H005.EbicsResponse r => r.Header?.Mutable?.TransactionPhase.ToString(),
+        _ => null,
+    };
+
     private static byte[] SerializeS001OrderData(string signatureVersion, string partnerId, string userId, RsaKeyMaterial key)
     {
         var (modulus, exponent) = RsaKeyImportExport.ExportRsaKeyValue(key);
@@ -756,6 +778,221 @@ internal static class ServerTestHelpers
                         SecurityMedium = "0000",
                     },
                     Mutable = new H005.MutableHeaderType(),
+                },
+            }, EbicsVersion.H005),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+    // --- Issue #32: upload transaction (Initialisation + Transfer) --------------------------
+
+    /// <summary>
+    /// The artefacts of an upload transaction the tests drive: the initialisation-phase request XML and
+    /// the ordered order-data segments to be delivered one per transfer-phase request.
+    /// </summary>
+    /// <param name="InitXml">The serialized initialisation-phase <c>ebicsRequest</c>.</param>
+    /// <param name="Segments">The ordered AES-ciphertext segments (one <c>OrderData</c> per transfer).</param>
+    public sealed record UploadRequest(string InitXml, IReadOnlyList<byte[]> Segments);
+
+    /// <summary>
+    /// Builds the initialisation-phase request for a generic upload (FUL for H003/H004, BTU for H005):
+    /// <paramref name="orderData"/> is compressed, E002-encrypted for the bank's public encryption key and
+    /// the ciphertext split into segments of at most <paramref name="segmentSizeBytes"/> bytes. The
+    /// initialisation carries the encrypted transaction key and <c>NumSegments</c> (no <c>OrderData</c>);
+    /// the returned segments feed <see cref="BuildUploadTransferRequest"/>.
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
+    /// <param name="userId">The <c>UserID</c> to place in the header.</param>
+    /// <param name="orderData">The plaintext order data to upload.</param>
+    /// <param name="bankEncKey">The bank's public encryption key the transaction key is encrypted for.</param>
+    /// <param name="bankEncVersion">The bank's encryption key version (e.g. <c>"E002"</c>).</param>
+    /// <param name="segmentSizeBytes">The maximum raw segment size; small values force several segments.</param>
+    /// <param name="signatureData">The optional raw order-signature (ES) blob to place in the initialisation.</param>
+    /// <returns>The initialisation XML and the ordered ciphertext segments.</returns>
+    public static UploadRequest BuildUploadInitRequest(
+        EbicsVersion version,
+        string hostId,
+        string partnerId,
+        string userId,
+        byte[] orderData,
+        RsaKeyMaterial bankEncKey,
+        KeyVersion bankEncVersion,
+        int segmentSizeBytes = 512 * 1024,
+        byte[]? signatureData = null)
+    {
+        var compressed = EbicsCompression.Compress(orderData);
+        var encrypted = EncryptionE002.Encrypt(compressed, bankEncKey, bankEncVersion);
+        var segments = EbicsSegmentation.Split(encrypted.EncryptedOrderDataBytes, segmentSizeBytes).Segments;
+        var numSegments = (ulong)segments.Count;
+        var orderType = version == EbicsVersion.H005 ? "BTU" : "FUL";
+        var digest = PublicKeyFingerprint.Compute(bankEncKey);
+
+        var xml = version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsRequestHeader
+                {
+                    Static = new H003.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H003.StaticHeaderOrderDetailsType { OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType } },
+                        SecurityMedium = "0000",
+                        NumSegments = numSegments,
+                    },
+                    Mutable = new H003.MutableHeaderType { TransactionPhase = H003.TransactionPhaseType.Initialisation },
+                },
+                Body = new H003.EbicsRequestBody
+                {
+                    DataTransfer = new H003.DataTransferRequestType
+                    {
+                        DataEncryptionInfo = new H003.DataTransferRequestTypeDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H003.DataEncryptionInfoTypeEncryptionPubKeyDigest { Algorithm = PublicKeyFingerprint.DigestAlgorithm, Version = bankEncVersion.Value, Value = digest },
+                            TransactionKey = encrypted.EncryptedTransactionKey,
+                        },
+                        SignatureData = signatureData is null ? null : new H003.DataTransferRequestTypeSignatureData { Value = signatureData },
+                    },
+                },
+            }, EbicsVersion.H003),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsRequestHeader
+                {
+                    Static = new H004.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H004.StaticHeaderOrderDetailsType { OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType } },
+                        SecurityMedium = "0000",
+                        NumSegments = numSegments,
+                    },
+                    Mutable = new H004.MutableHeaderType { TransactionPhase = H004.TransactionPhaseType.Initialisation },
+                },
+                Body = new H004.EbicsRequestBody
+                {
+                    DataTransfer = new H004.DataTransferRequestType
+                    {
+                        DataEncryptionInfo = new H004.DataTransferRequestTypeDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H004.DataEncryptionInfoTypeEncryptionPubKeyDigest { Algorithm = PublicKeyFingerprint.DigestAlgorithm, Version = bankEncVersion.Value, Value = digest },
+                            TransactionKey = encrypted.EncryptedTransactionKey,
+                        },
+                        SignatureData = signatureData is null ? null : new H004.DataTransferRequestTypeSignatureData { Value = signatureData },
+                    },
+                },
+            }, EbicsVersion.H004),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsRequestHeader
+                {
+                    Static = new H005.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H005.StaticHeaderOrderDetailsType { AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType } },
+                        SecurityMedium = "0000",
+                        NumSegments = numSegments,
+                    },
+                    Mutable = new H005.MutableHeaderType { TransactionPhase = H005.TransactionPhaseType.Initialisation },
+                },
+                Body = new H005.EbicsRequestBody
+                {
+                    DataTransfer = new H005.DataTransferRequestType
+                    {
+                        DataEncryptionInfo = new H005.DataTransferRequestTypeDataEncryptionInfo
+                        {
+                            EncryptionPubKeyDigest = new H005.DataEncryptionInfoTypeEncryptionPubKeyDigest { Algorithm = PublicKeyFingerprint.DigestAlgorithm, Version = bankEncVersion.Value, Value = digest },
+                            TransactionKey = encrypted.EncryptedTransactionKey,
+                        },
+                        SignatureData = signatureData is null ? null : new H005.DataTransferRequestTypeSignatureData { Value = signatureData },
+                    },
+                },
+            }, EbicsVersion.H005),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+        return new UploadRequest(xml, segments);
+    }
+
+    /// <summary>
+    /// Builds a transfer-phase <c>ebicsRequest</c> carrying one order-data <paramref name="segment"/>: the
+    /// static header holds only the <paramref name="transactionId"/>, the mutable header the
+    /// <c>Transfer</c> phase and the <paramref name="segmentNumber"/> (+ <paramref name="lastSegment"/>).
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="transactionId">The transaction id assigned by the server in the initialisation response.</param>
+    /// <param name="segmentNumber">The 1-based segment number.</param>
+    /// <param name="lastSegment">Whether this is the last segment of the transaction.</param>
+    /// <param name="segment">The raw order-data segment bytes.</param>
+    /// <returns>The serialized transfer request XML.</returns>
+    public static string BuildUploadTransferRequest(
+        EbicsVersion version,
+        string hostId,
+        byte[] transactionId,
+        ulong segmentNumber,
+        bool lastSegment,
+        byte[] segment)
+        => version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsRequestHeader
+                {
+                    Static = new H003.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H003.MutableHeaderType
+                    {
+                        TransactionPhase = H003.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H003.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+                Body = new H003.EbicsRequestBody
+                {
+                    DataTransfer = new H003.DataTransferRequestType { OrderData = new H003.DataTransferRequestTypeOrderData { Value = segment } },
+                },
+            }, EbicsVersion.H003),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsRequestHeader
+                {
+                    Static = new H004.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H004.MutableHeaderType
+                    {
+                        TransactionPhase = H004.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H004.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+                Body = new H004.EbicsRequestBody
+                {
+                    DataTransfer = new H004.DataTransferRequestType { OrderData = new H004.DataTransferRequestTypeOrderData { Value = segment } },
+                },
+            }, EbicsVersion.H004),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsRequestHeader
+                {
+                    Static = new H005.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H005.MutableHeaderType
+                    {
+                        TransactionPhase = H005.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H005.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+                Body = new H005.EbicsRequestBody
+                {
+                    DataTransfer = new H005.DataTransferRequestType { OrderData = new H005.DataTransferRequestTypeOrderData { Value = segment } },
                 },
             }, EbicsVersion.H005),
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),

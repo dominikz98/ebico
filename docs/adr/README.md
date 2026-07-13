@@ -39,6 +39,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0010](0010-pdf-bibliothek.md) | PDF-Bibliothek für den INI-/HIA-Brief: QuestPDF (Community) | accepted |
 | [0011](0011-server-stammdatenverwaltung.md) | Server-Stammdatenverwaltung (Manager über Store, Admin-API) | accepted |
 | [0012](0012-returncode-katalog.md) | EBICS-Returncode-Katalog (Modellierung & Verortung) | accepted |
+| [0013](0013-upload-transaktions-engine.md) | Upload-Transaktions-Engine & -Speicher | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

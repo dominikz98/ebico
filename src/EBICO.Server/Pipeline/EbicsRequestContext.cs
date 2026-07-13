@@ -1,11 +1,13 @@
 using EBICO.Core;
 using EBICO.Core.Versioning;
+using EBICO.Server.Transactions;
 
 namespace EBICO.Server.Pipeline;
 
 /// <summary>
 /// Carries the data of a single inbound EBICS request through the pipeline stages: the raw XML,
-/// the detected version, the parsed request envelope and the extracted order type.
+/// the detected version, the parsed request envelope, the extracted order type and — for the signed
+/// <c>ebicsRequest</c> — the transaction phase and transaction id used to route the transaction engine.
 /// </summary>
 public sealed class EbicsRequestContext
 {
@@ -14,11 +16,15 @@ public sealed class EbicsRequestContext
     /// <param name="versionInfo">The detected EBICS version information.</param>
     /// <param name="envelope">The parsed request envelope.</param>
     /// <param name="orderType">The extracted order type, or <see langword="null"/> when absent/not applicable.</param>
+    /// <param name="transactionPhase">The transaction phase of a signed <c>ebicsRequest</c>, or <see langword="null"/> when not applicable.</param>
+    /// <param name="transactionId">The transaction id carried by a transfer-phase request, or <see langword="null"/> when absent.</param>
     public EbicsRequestContext(
         string requestXml,
         EbicsVersionInfo versionInfo,
         IEbicsRequestEnvelope envelope,
-        string? orderType)
+        string? orderType,
+        EbicsTransactionPhase? transactionPhase = null,
+        byte[]? transactionId = null)
     {
         ArgumentNullException.ThrowIfNull(requestXml);
         ArgumentNullException.ThrowIfNull(versionInfo);
@@ -28,6 +34,8 @@ public sealed class EbicsRequestContext
         VersionInfo = versionInfo;
         Envelope = envelope;
         OrderType = orderType;
+        TransactionPhase = transactionPhase;
+        TransactionId = transactionId;
     }
 
     /// <summary>The raw request XML as received.</summary>
@@ -44,4 +52,16 @@ public sealed class EbicsRequestContext
 
     /// <summary>The extracted order type (e.g. <c>"HPB"</c>), or <see langword="null"/> when absent.</summary>
     public string? OrderType { get; }
+
+    /// <summary>
+    /// The transaction phase of a signed <c>ebicsRequest</c> (Initialisation/Transfer/Receipt), or
+    /// <see langword="null"/> for the unsecured/no-pub-key-digests requests that carry no phase.
+    /// </summary>
+    public EbicsTransactionPhase? TransactionPhase { get; }
+
+    /// <summary>
+    /// The 16-byte transaction id carried in the static header of a transfer-phase request, or
+    /// <see langword="null"/> when absent (initialisation phase / non-transaction requests).
+    /// </summary>
+    public byte[]? TransactionId { get; }
 }

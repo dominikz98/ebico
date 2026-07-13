@@ -3,6 +3,7 @@ using EBICO.Server.Handlers;
 using EBICO.Server.Pipeline;
 using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
+using EBICO.Server.Transactions;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Microsoft.Extensions.DependencyInjection;
@@ -43,6 +44,12 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
         services.TryAddSingleton<EbicsResponseFactory>();
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
+
+        // Transaction engine (issue #32): the upload transaction store and the two-phase engine the
+        // pipeline routes FUL/BTU initialisations and every transfer-phase request to.
+        services.TryAddSingleton<IUploadTransactionStore, InMemoryUploadTransactionStore>();
+        services.TryAddSingleton<IUploadTransactionEngine, UploadTransactionEngine>();
+
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
         // The H005 HPB handler self-signs the bank's certificates and needs a clock for their validity

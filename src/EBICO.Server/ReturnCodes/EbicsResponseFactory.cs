@@ -3,6 +3,7 @@ using EBICO.Core.Crypto;
 using EBICO.Core.ReturnCodes;
 using EBICO.Core.Versioning;
 using EBICO.Server.Pipeline;
+using EBICO.Server.Transactions;
 using H003 = EBICO.Core.Schema.H003;
 using H004 = EBICO.Core.Schema.H004;
 using H005 = EBICO.Core.Schema.H005;
@@ -94,6 +95,125 @@ public sealed class EbicsResponseFactory
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
     }
+
+    /// <summary>
+    /// Builds an <c>ebicsResponse</c> for a transaction step (issue #32 upload): it carries the
+    /// server-assigned <paramref name="transactionId"/> in the static header, echoes the transaction
+    /// <paramref name="phase"/> and — in the transfer phase — the acknowledged
+    /// <paramref name="segmentNumber"/> in the mutable header, plus the step's return code.
+    /// </summary>
+    /// <param name="version">The protocol version whose bindings/namespace to use.</param>
+    /// <param name="phase">The transaction phase to echo (Initialisation/Transfer).</param>
+    /// <param name="transactionId">The 16-byte transaction id, or <see langword="null"/> when a failure occurred before one was assigned (then the element is omitted).</param>
+    /// <param name="returnCode">The return code to report.</param>
+    /// <param name="segmentNumber">The acknowledged segment number in the transfer phase, or <see langword="null"/>.</param>
+    /// <param name="lastSegment">Whether the acknowledged segment was the last one of the transaction.</param>
+    /// <returns>The transaction response envelope, ready for serialization.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is undefined.</exception>
+    /// <remarks>
+    /// <b>⚠️ Spec-Vorbehalt:</b> <c>NumSegments</c> is deliberately not set (the schema restricts it to
+    /// download initialisation). Whether the transfer response must echo <c>SegmentNumber</c> is to be
+    /// verified against the official EBICS annexes; it is emitted when supplied.
+    /// </remarks>
+    public IEbicsResponseEnvelope BuildTransactionResponse(
+        EbicsVersion version,
+        EbicsTransactionPhase phase,
+        byte[]? transactionId,
+        EbicsReturnCode returnCode,
+        ulong? segmentNumber = null,
+        bool lastSegment = false)
+    {
+        var (headerCode, bodyCode, reportText) = Split(returnCode);
+
+        return version switch
+        {
+            EbicsVersion.H003 => new H003.EbicsResponse
+            {
+                Version = "H003",
+                Header = new H003.EbicsResponseHeader
+                {
+                    Static = new H003.ResponseStaticHeaderType { TransactionId = transactionId },
+                    Mutable = new H003.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH003Phase(phase),
+                        SegmentNumber = segmentNumber is { } h3Segment
+                            ? new H003.ResponseMutableHeaderTypeSegmentNumber { Value = h3Segment, LastSegment = lastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H003.EbicsResponseBody
+                {
+                    ReturnCode = new H003.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            EbicsVersion.H004 => new H004.EbicsResponse
+            {
+                Version = "H004",
+                Header = new H004.EbicsResponseHeader
+                {
+                    Static = new H004.ResponseStaticHeaderType { TransactionId = transactionId },
+                    Mutable = new H004.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH004Phase(phase),
+                        SegmentNumber = segmentNumber is { } h4Segment
+                            ? new H004.ResponseMutableHeaderTypeSegmentNumber { Value = h4Segment, LastSegment = lastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H004.EbicsResponseBody
+                {
+                    ReturnCode = new H004.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            EbicsVersion.H005 => new H005.EbicsResponse
+            {
+                Version = "H005",
+                Header = new H005.EbicsResponseHeader
+                {
+                    Static = new H005.ResponseStaticHeaderType { TransactionId = transactionId },
+                    Mutable = new H005.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH005Phase(phase),
+                        SegmentNumber = segmentNumber is { } h5Segment
+                            ? new H005.ResponseMutableHeaderTypeSegmentNumber { Value = h5Segment, LastSegment = lastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H005.EbicsResponseBody
+                {
+                    ReturnCode = new H005.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+    }
+
+    private static H003.TransactionPhaseType ToH003Phase(EbicsTransactionPhase phase) => phase switch
+    {
+        EbicsTransactionPhase.Transfer => H003.TransactionPhaseType.Transfer,
+        EbicsTransactionPhase.Receipt => H003.TransactionPhaseType.Receipt,
+        _ => H003.TransactionPhaseType.Initialisation,
+    };
+
+    private static H004.TransactionPhaseType ToH004Phase(EbicsTransactionPhase phase) => phase switch
+    {
+        EbicsTransactionPhase.Transfer => H004.TransactionPhaseType.Transfer,
+        EbicsTransactionPhase.Receipt => H004.TransactionPhaseType.Receipt,
+        _ => H004.TransactionPhaseType.Initialisation,
+    };
+
+    private static H005.TransactionPhaseType ToH005Phase(EbicsTransactionPhase phase) => phase switch
+    {
+        EbicsTransactionPhase.Transfer => H005.TransactionPhaseType.Transfer,
+        EbicsTransactionPhase.Receipt => H005.TransactionPhaseType.Receipt,
+        _ => H005.TransactionPhaseType.Initialisation,
+    };
 
     /// <summary>
     /// Builds an <c>ebicsKeyManagementResponse</c> for <paramref name="version"/> reporting
