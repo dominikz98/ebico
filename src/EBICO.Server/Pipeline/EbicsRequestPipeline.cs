@@ -3,6 +3,7 @@ using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using EBICO.Server.ReturnCodes;
+using EBICO.Server.Transactions;
 using Microsoft.Extensions.Options;
 using H003 = EBICO.Core.Schema.H003;
 using H004 = EBICO.Core.Schema.H004;
@@ -25,6 +26,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
 {
     private readonly IEbicsRequestVerifier _verifier;
     private readonly IEbicsOrderHandlerResolver _resolver;
+    private readonly IUploadTransactionEngine _engine;
     private readonly IEbicsErrorMapper _errorMapper;
     private readonly EbicsResponseFactory _responseFactory;
     private readonly EbicoServerOptions _options;
@@ -32,24 +34,28 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
     /// <summary>Initializes the pipeline with its collaborators.</summary>
     /// <param name="verifier">The verify-stage extension point.</param>
     /// <param name="resolver">The handle-stage order handler resolver.</param>
+    /// <param name="engine">The upload transaction engine (issue #32) that owns the transaction phases.</param>
     /// <param name="errorMapper">The exception-to-return-code mapper.</param>
     /// <param name="responseFactory">The response envelope factory.</param>
     /// <param name="options">The server options.</param>
     public EbicsRequestPipeline(
         IEbicsRequestVerifier verifier,
         IEbicsOrderHandlerResolver resolver,
+        IUploadTransactionEngine engine,
         IEbicsErrorMapper errorMapper,
         EbicsResponseFactory responseFactory,
         IOptions<EbicoServerOptions> options)
     {
         ArgumentNullException.ThrowIfNull(verifier);
         ArgumentNullException.ThrowIfNull(resolver);
+        ArgumentNullException.ThrowIfNull(engine);
         ArgumentNullException.ThrowIfNull(errorMapper);
         ArgumentNullException.ThrowIfNull(responseFactory);
         ArgumentNullException.ThrowIfNull(options);
 
         _verifier = verifier;
         _resolver = resolver;
+        _engine = engine;
         _errorMapper = errorMapper;
         _responseFactory = responseFactory;
         _options = options.Value;
@@ -73,6 +79,10 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         // The encrypted payload a successful download order (HPB) contributes to its response; stays
         // null for INI/HIA (pure return-code responses) and every error path.
         EbicsKeyManagementPayload? payload = null;
+
+        // The result of an upload transaction step (issue #32); non-null routes the respond stage to the
+        // transaction-shaped ebicsResponse (transaction id + phase). Stays null for every other request.
+        UploadTransactionResult? transaction = null;
         try
         {
             // Stage 1 + 2: Parse and dispatch on version + root element (single parse; the version
@@ -93,11 +103,14 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
                     requestXml,
                     EbicsVersions.Get(responseVersion),
                     request,
-                    TryExtractOrderType(request));
+                    TryExtractOrderType(request),
+                    TryExtractTransactionPhase(request),
+                    TryExtractTransactionId(request));
 
                 var result = await RunVerifyAndHandleAsync(context, ct).ConfigureAwait(false);
                 returnCode = result.ReturnCode;
                 payload = result.Payload;
+                transaction = result.Transaction;
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -112,38 +125,72 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
             returnCode = _errorMapper.Map(ex);
         }
 
-        // Stage 5: Respond. Key-management orders (INI/HIA/HPB) are answered with an
-        // ebicsKeyManagementResponse, everything else with an ebicsResponse. A successful HPB also
+        // Stage 5: Respond. An upload transaction step (issue #32) is answered with a transaction-shaped
+        // ebicsResponse (transaction id + phase). Key-management orders (INI/HIA/HPB) are answered with an
+        // ebicsKeyManagementResponse; everything else with a plain ebicsResponse. A successful HPB also
         // carries an encrypted DataTransfer (the bank's public keys) via the payload overload.
-        var response = (keyManagement, payload) switch
+        IEbicsResponseEnvelope response;
+        if (transaction is { } tx)
         {
-            (true, not null) => _responseFactory.BuildKeyManagementResponse(responseVersion, payload),
-            (true, null) => _responseFactory.BuildKeyManagementResponse(responseVersion, returnCode),
-            _ => _responseFactory.BuildErrorResponse(responseVersion, returnCode),
-        };
+            response = _responseFactory.BuildTransactionResponse(
+                responseVersion, tx.Phase, tx.TransactionId, tx.ReturnCode, tx.SegmentNumber, tx.LastSegment);
+        }
+        else
+        {
+            response = (keyManagement, payload) switch
+            {
+                (true, not null) => _responseFactory.BuildKeyManagementResponse(responseVersion, payload),
+                (true, null) => _responseFactory.BuildKeyManagementResponse(responseVersion, returnCode),
+                _ => _responseFactory.BuildErrorResponse(responseVersion, returnCode),
+            };
+        }
+
         var body = EbicsXmlSerializer.SerializeToUtf8Bytes(response);
         return new EbicsPipelineResult(body, responseVersion);
     }
 
-    private async Task<EbicsOrderResult> RunVerifyAndHandleAsync(EbicsRequestContext context, CancellationToken ct)
+    private async Task<(EbicsReturnCode ReturnCode, EbicsKeyManagementPayload? Payload, UploadTransactionResult? Transaction)>
+        RunVerifyAndHandleAsync(EbicsRequestContext context, CancellationToken ct)
     {
-        // Stage 3: Verify (extension point; default no-op).
+        // Stage 3: Verify (extension point; default no-op). Runs for every request, uploads included.
         var verification = await _verifier.VerifyAsync(context, ct).ConfigureAwait(false);
         if (!verification.IsVerified)
         {
-            return new EbicsOrderResult(verification.Failure ?? EbicsReturnCode.AuthenticationFailed);
+            return (verification.Failure ?? EbicsReturnCode.AuthenticationFailed, null, null);
         }
 
-        // Stage 4: Handle (extension point; the skeleton registers no handlers).
+        // Stage 4a: Upload transaction engine (issue #32). Only the signed ebicsRequest carries a
+        // transaction. A transfer-phase request (a transaction id, no order type) and an upload
+        // initialisation (FUL/BTU) belong to the engine; everything else falls through to the resolver.
+        // Robustness: route transfers on the presence of a transaction id too, since an omitted
+        // <TransactionPhase> deserializes silently to Initialisation.
+        if (context.Envelope is H003.EbicsRequest or H004.EbicsRequest or H005.EbicsRequest)
+        {
+            if (context.TransactionId is not null || context.TransactionPhase == EbicsTransactionPhase.Transfer)
+            {
+                var transfer = await _engine.ContinueUploadAsync(context, ct).ConfigureAwait(false);
+                return (transfer.ReturnCode, null, transfer);
+            }
+
+            if (context.TransactionPhase == EbicsTransactionPhase.Initialisation
+                && UploadTransactionEngine.IsUploadOrderType(context.OrderType))
+            {
+                var init = await _engine.BeginUploadAsync(context, ct).ConfigureAwait(false);
+                return (init.ReturnCode, null, init);
+            }
+        }
+
+        // Stage 4b: Handle single-phase order handlers (INI/HIA/HPB/HCA/HCS/SPR/HSA).
         var handler = _resolver.Resolve(context.Version, context.OrderType);
         if (handler is null)
         {
-            return new EbicsOrderResult(string.IsNullOrEmpty(context.OrderType)
+            return (string.IsNullOrEmpty(context.OrderType)
                 ? EbicsReturnCode.InvalidOrderType
-                : EbicsReturnCode.UnsupportedOrderType);
+                : EbicsReturnCode.UnsupportedOrderType, null, null);
         }
 
-        return await handler.HandleAsync(context, ct).ConfigureAwait(false);
+        var handled = await handler.HandleAsync(context, ct).ConfigureAwait(false);
+        return (handled.ReturnCode, handled.Payload, null);
     }
 
     // Order-type extraction. The standard ebicsRequest carries it in OrderDetails (H003/H004:
@@ -161,6 +208,49 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         H003.EbicsNoPubKeyDigestsRequest r => r.Header?.Static?.OrderDetails?.OrderType,
         H004.EbicsNoPubKeyDigestsRequest r => r.Header?.Static?.OrderDetails?.OrderType,
         H005.EbicsNoPubKeyDigestsRequest r => r.Header?.Static?.OrderDetails?.AdminOrderType,
+        _ => null,
+    };
+
+    // Transaction phase of the signed ebicsRequest (used to route the transaction engine). The
+    // unsecured / no-pub-key-digests requests carry no phase.
+    private static EbicsTransactionPhase? TryExtractTransactionPhase(IEbicsRequestEnvelope request) => request switch
+    {
+        H003.EbicsRequest r => MapPhase(r.Header?.Mutable?.TransactionPhase),
+        H004.EbicsRequest r => MapPhase(r.Header?.Mutable?.TransactionPhase),
+        H005.EbicsRequest r => MapPhase(r.Header?.Mutable?.TransactionPhase),
+        _ => null,
+    };
+
+    // Transaction id from the signed ebicsRequest static header (present in the transfer phase).
+    private static byte[]? TryExtractTransactionId(IEbicsRequestEnvelope request) => request switch
+    {
+        H003.EbicsRequest r => r.Header?.Static?.TransactionId,
+        H004.EbicsRequest r => r.Header?.Static?.TransactionId,
+        H005.EbicsRequest r => r.Header?.Static?.TransactionId,
+        _ => null,
+    };
+
+    private static EbicsTransactionPhase? MapPhase(H003.TransactionPhaseType? phase) => phase switch
+    {
+        H003.TransactionPhaseType.Transfer => EbicsTransactionPhase.Transfer,
+        H003.TransactionPhaseType.Receipt => EbicsTransactionPhase.Receipt,
+        H003.TransactionPhaseType.Initialisation => EbicsTransactionPhase.Initialisation,
+        _ => null,
+    };
+
+    private static EbicsTransactionPhase? MapPhase(H004.TransactionPhaseType? phase) => phase switch
+    {
+        H004.TransactionPhaseType.Transfer => EbicsTransactionPhase.Transfer,
+        H004.TransactionPhaseType.Receipt => EbicsTransactionPhase.Receipt,
+        H004.TransactionPhaseType.Initialisation => EbicsTransactionPhase.Initialisation,
+        _ => null,
+    };
+
+    private static EbicsTransactionPhase? MapPhase(H005.TransactionPhaseType? phase) => phase switch
+    {
+        H005.TransactionPhaseType.Transfer => EbicsTransactionPhase.Transfer,
+        H005.TransactionPhaseType.Receipt => EbicsTransactionPhase.Receipt,
+        H005.TransactionPhaseType.Initialisation => EbicsTransactionPhase.Initialisation,
         _ => null,
     };
 

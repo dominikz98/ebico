@@ -35,6 +35,13 @@ public sealed class EbicoServerOptions
     public int SegmentSizeBytes { get; set; } = 512 * 1024;
 
     /// <summary>
+    /// The maximum number of segments a single upload transaction may announce (<c>NumSegments</c>).
+    /// Defaults to 1000. An initialisation that announces more is rejected with
+    /// <c>EBICS_MAX_SEGMENTS_EXCEEDED</c> (091114). Consumed by the transaction engine (issue #32).
+    /// </summary>
+    public int MaxUploadSegments { get; set; } = 1000;
+
+    /// <summary>
     /// The content types accepted on the EBICS endpoint. Defaults to <c>text/xml</c> and
     /// <c>application/xml</c>.
     /// </summary>

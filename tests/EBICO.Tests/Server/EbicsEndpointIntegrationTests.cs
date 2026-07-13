@@ -116,6 +116,49 @@ public class EbicsEndpointIntegrationTests : IClassFixture<WebApplicationFactory
     }
 
     [Fact]
+    public async Task PostEbics_Upload_InitThenTransfer_Returns200_AndStoresOrderData()
+    {
+        // Isolated host (own in-memory stores) so the seeded subscriber and transaction stay local.
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var host = HostId.Create("ULHOST");
+        var partner = PartnerId.Create("ULPART");
+        var user = UserId.Create("ULUSER");
+
+        var master = factory.Services.GetRequiredService<IMasterDataManager>();
+        await master.SaveBankAsync(new Bank(host), _ct);
+        await master.SavePartnerAsync(new Partner(host, partner), _ct);
+        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+        await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Initialized, _ct);
+        await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Ready, _ct);
+
+        var bank = await factory.Services.GetRequiredService<IServerBankKeyStore>().GetOrCreateAsync(host, _ct);
+        var orderData = Encoding.UTF8.GetBytes("<order>http upload</order>");
+        var upload = ServerTestHelpers.BuildUploadInitRequest(
+            EbicsVersion.H004, "ULHOST", "ULPART", "ULUSER", orderData, bank.Encryption, bank.EncryptionVersion);
+
+        var client = factory.CreateClient();
+
+        // Initialisation over HTTP -> 200 with a transaction id.
+        var initResponse = await client.PostAsync("/ebics", new StringContent(upload.InitXml, Encoding.UTF8, "text/xml"), _ct);
+        initResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var initEnvelope = EbicsXmlSerializer.DeserializeEnvelope(await initResponse.Content.ReadAsStringAsync(_ct));
+        var transactionId = ServerTestHelpers.ReadTransactionId(initEnvelope);
+        transactionId.Should().NotBeNull().And.HaveCount(16);
+
+        // Transfer over HTTP -> 200 OK/OK, order data reassembled in the transaction store.
+        var transferXml = ServerTestHelpers.BuildUploadTransferRequest(
+            EbicsVersion.H004, "ULHOST", transactionId!, segmentNumber: 1, lastSegment: true, segment: upload.Segments[0]);
+        var transferResponse = await client.PostAsync("/ebics", new StringContent(transferXml, Encoding.UTF8, "text/xml"), _ct);
+        transferResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var transferEnvelope = EbicsXmlSerializer.DeserializeEnvelope(await transferResponse.Content.ReadAsStringAsync(_ct));
+        ServerTestHelpers.ReadReturnCodes(transferEnvelope).Should().Be(("000000", "000000"));
+
+        var store = factory.Services.GetRequiredService<IUploadTransactionStore>();
+        store.TryGet(Convert.ToHexString(transactionId!), out var transaction).Should().BeTrue();
+        transaction!.OrderData.Should().Equal(orderData);
+    }
+
+    [Fact]
     public async Task PostEbics_WrongContentType_Returns415()
     {
         var client = _factory.CreateClient();
