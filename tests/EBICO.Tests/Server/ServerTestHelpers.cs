@@ -313,6 +313,53 @@ internal static class ServerTestHelpers
         _ => null,
     };
 
+    /// <summary>Reads <c>NumSegments</c> from the static header of an <c>ebicsResponse</c> (download initialisation), or <see langword="null"/>.</summary>
+    /// <param name="envelope">The response envelope.</param>
+    /// <returns>The announced segment count, or <see langword="null"/> when absent.</returns>
+    public static ulong? ReadNumSegments(IEbicsEnvelope envelope) => envelope switch
+    {
+        H003.EbicsResponse r => r.Header?.Static?.NumSegments,
+        H004.EbicsResponse r => r.Header?.Static?.NumSegments,
+        H005.EbicsResponse r => r.Header?.Static?.NumSegments,
+        _ => null,
+    };
+
+    /// <summary>Reads the acknowledged segment number (and its last-segment flag) from the mutable header of an <c>ebicsResponse</c>.</summary>
+    /// <param name="envelope">The response envelope.</param>
+    /// <returns>The segment number (or <see langword="null"/>) and whether it is the last segment.</returns>
+    public static (ulong? Value, bool LastSegment) ReadSegmentNumber(IEbicsEnvelope envelope) => envelope switch
+    {
+        H003.EbicsResponse r => (r.Header?.Mutable?.SegmentNumber?.Value, r.Header?.Mutable?.SegmentNumber?.LastSegment ?? false),
+        H004.EbicsResponse r => (r.Header?.Mutable?.SegmentNumber?.Value, r.Header?.Mutable?.SegmentNumber?.LastSegment ?? false),
+        H005.EbicsResponse r => (r.Header?.Mutable?.SegmentNumber?.Value, r.Header?.Mutable?.SegmentNumber?.LastSegment ?? false),
+        _ => (null, false),
+    };
+
+    /// <summary>
+    /// Reads the download <c>body/DataTransfer</c> of an <c>ebicsResponse</c>: the (base64-decoded)
+    /// order-data segment and, on the initialisation segment, the encrypted transaction key and the
+    /// recipient-key digest (both <see langword="null"/> on transfer segments).
+    /// </summary>
+    /// <param name="version">The protocol version whose bindings to read.</param>
+    /// <param name="envelope">The response envelope.</param>
+    /// <returns>The encrypted transaction key, the order-data segment, the digest version and the digest.</returns>
+    public static (byte[]? TransactionKey, byte[]? OrderData, string? DigestVersion, byte[]? Digest) ReadDownloadDataTransfer(
+        EbicsVersion version, IEbicsEnvelope envelope)
+    {
+        switch (version)
+        {
+            case EbicsVersion.H003:
+                var t3 = ((H003.EbicsResponse)envelope).Body?.DataTransfer;
+                return (t3?.DataEncryptionInfo?.TransactionKey, t3?.OrderData?.Value, t3?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Version, t3?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Value);
+            case EbicsVersion.H004:
+                var t4 = ((H004.EbicsResponse)envelope).Body?.DataTransfer;
+                return (t4?.DataEncryptionInfo?.TransactionKey, t4?.OrderData?.Value, t4?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Version, t4?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Value);
+            default:
+                var t5 = ((H005.EbicsResponse)envelope).Body?.DataTransfer;
+                return (t5?.DataEncryptionInfo?.TransactionKey, t5?.OrderData?.Value, t5?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Version, t5?.DataEncryptionInfo?.EncryptionPubKeyDigest?.Value);
+        }
+    }
+
     private static byte[] SerializeS001OrderData(string signatureVersion, string partnerId, string userId, RsaKeyMaterial key)
     {
         var (modulus, exponent) = RsaKeyImportExport.ExportRsaKeyValue(key);
@@ -993,6 +1040,186 @@ internal static class ServerTestHelpers
                 Body = new H005.EbicsRequestBody
                 {
                     DataTransfer = new H005.DataTransferRequestType { OrderData = new H005.DataTransferRequestTypeOrderData { Value = segment } },
+                },
+            }, EbicsVersion.H005),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+    // --- Issue #33: download transaction (Initialisation + Transfer + Receipt) --------------
+
+    /// <summary>
+    /// Builds the initialisation-phase request for a generic download (FDL for H003/H004, BTD for H005):
+    /// a signed <c>ebicsRequest</c> carrying the subscriber identifiers, the download order type and
+    /// <c>TransactionPhase=Initialisation</c>. No body and no <c>NumSegments</c> (the client does not
+    /// upload anything).
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
+    /// <param name="userId">The <c>UserID</c> to place in the header.</param>
+    /// <returns>The serialized initialisation request XML.</returns>
+    public static string BuildDownloadInitRequest(EbicsVersion version, string hostId, string partnerId, string userId)
+        => version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsRequestHeader
+                {
+                    Static = new H003.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H003.StaticHeaderOrderDetailsType { OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = "FDL" } },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H003.MutableHeaderType { TransactionPhase = H003.TransactionPhaseType.Initialisation },
+                },
+            }, EbicsVersion.H003),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsRequestHeader
+                {
+                    Static = new H004.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H004.StaticHeaderOrderDetailsType { OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = "FDL" } },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H004.MutableHeaderType { TransactionPhase = H004.TransactionPhaseType.Initialisation },
+                },
+            }, EbicsVersion.H004),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsRequestHeader
+                {
+                    Static = new H005.StaticHeaderType
+                    {
+                        HostId = hostId,
+                        PartnerId = partnerId,
+                        UserId = userId,
+                        OrderDetails = new H005.StaticHeaderOrderDetailsType { AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = "BTD" } },
+                        SecurityMedium = "0000",
+                    },
+                    Mutable = new H005.MutableHeaderType { TransactionPhase = H005.TransactionPhaseType.Initialisation },
+                },
+            }, EbicsVersion.H005),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+    /// <summary>
+    /// Builds a transfer-phase <c>ebicsRequest</c> that fetches one download segment: the static header
+    /// holds only the <paramref name="transactionId"/>, the mutable header the <c>Transfer</c> phase and
+    /// the <paramref name="segmentNumber"/> (+ <paramref name="lastSegment"/>). No body.
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="transactionId">The transaction id assigned by the server in the initialisation response.</param>
+    /// <param name="segmentNumber">The 1-based segment number to fetch.</param>
+    /// <param name="lastSegment">Whether the client marks this as the last segment.</param>
+    /// <returns>The serialized transfer request XML.</returns>
+    public static string BuildDownloadTransferRequest(
+        EbicsVersion version, string hostId, byte[] transactionId, ulong segmentNumber, bool lastSegment)
+        => version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsRequestHeader
+                {
+                    Static = new H003.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H003.MutableHeaderType
+                    {
+                        TransactionPhase = H003.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H003.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+            }, EbicsVersion.H003),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsRequestHeader
+                {
+                    Static = new H004.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H004.MutableHeaderType
+                    {
+                        TransactionPhase = H004.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H004.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+            }, EbicsVersion.H004),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsRequestHeader
+                {
+                    Static = new H005.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H005.MutableHeaderType
+                    {
+                        TransactionPhase = H005.TransactionPhaseType.Transfer,
+                        SegmentNumber = new H005.MutableHeaderTypeSegmentNumber { Value = segmentNumber, LastSegment = lastSegment },
+                    },
+                },
+            }, EbicsVersion.H005),
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+
+    /// <summary>
+    /// Builds a receipt-phase <c>ebicsRequest</c> acknowledging a completed download: the static header
+    /// holds the <paramref name="transactionId"/>, the mutable header the <c>Receipt</c> phase and the
+    /// body a <c>TransferReceipt</c> with <paramref name="receiptCode"/> (0 = positive, 1 = negative).
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
+    /// <param name="transactionId">The transaction id assigned by the server in the initialisation response.</param>
+    /// <param name="receiptCode">The receipt code (0 = positive, non-0 = negative).</param>
+    /// <returns>The serialized receipt request XML.</returns>
+    public static string BuildDownloadReceiptRequest(
+        EbicsVersion version, string hostId, byte[] transactionId, byte receiptCode)
+        => version switch
+        {
+            EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
+            {
+                Version = "H003",
+                Header = new H003.EbicsRequestHeader
+                {
+                    Static = new H003.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H003.MutableHeaderType { TransactionPhase = H003.TransactionPhaseType.Receipt },
+                },
+                Body = new H003.EbicsRequestBody
+                {
+                    TransferReceipt = new H003.EbicsRequestBodyTransferReceipt { ReceiptCode = receiptCode },
+                },
+            }, EbicsVersion.H003),
+            EbicsVersion.H004 => EbicsXmlSerializer.SerializeToString(new H004.EbicsRequest
+            {
+                Version = "H004",
+                Header = new H004.EbicsRequestHeader
+                {
+                    Static = new H004.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H004.MutableHeaderType { TransactionPhase = H004.TransactionPhaseType.Receipt },
+                },
+                Body = new H004.EbicsRequestBody
+                {
+                    TransferReceipt = new H004.EbicsRequestBodyTransferReceipt { ReceiptCode = receiptCode },
+                },
+            }, EbicsVersion.H004),
+            EbicsVersion.H005 => EbicsXmlSerializer.SerializeToString(new H005.EbicsRequest
+            {
+                Version = "H005",
+                Header = new H005.EbicsRequestHeader
+                {
+                    Static = new H005.StaticHeaderType { HostId = hostId, TransactionId = transactionId },
+                    Mutable = new H005.MutableHeaderType { TransactionPhase = H005.TransactionPhaseType.Receipt },
+                },
+                Body = new H005.EbicsRequestBody
+                {
+                    TransferReceipt = new H005.EbicsRequestBodyTransferReceipt { ReceiptCode = receiptCode },
                 },
             }, EbicsVersion.H005),
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),

@@ -26,7 +26,8 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
 {
     private readonly IEbicsRequestVerifier _verifier;
     private readonly IEbicsOrderHandlerResolver _resolver;
-    private readonly IUploadTransactionEngine _engine;
+    private readonly IUploadTransactionEngine _uploadEngine;
+    private readonly IDownloadTransactionEngine _downloadEngine;
     private readonly IEbicsErrorMapper _errorMapper;
     private readonly EbicsResponseFactory _responseFactory;
     private readonly EbicoServerOptions _options;
@@ -34,28 +35,32 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
     /// <summary>Initializes the pipeline with its collaborators.</summary>
     /// <param name="verifier">The verify-stage extension point.</param>
     /// <param name="resolver">The handle-stage order handler resolver.</param>
-    /// <param name="engine">The upload transaction engine (issue #32) that owns the transaction phases.</param>
+    /// <param name="uploadEngine">The upload transaction engine (issue #32) that owns the upload phases.</param>
+    /// <param name="downloadEngine">The download transaction engine (issue #33) that owns the download phases.</param>
     /// <param name="errorMapper">The exception-to-return-code mapper.</param>
     /// <param name="responseFactory">The response envelope factory.</param>
     /// <param name="options">The server options.</param>
     public EbicsRequestPipeline(
         IEbicsRequestVerifier verifier,
         IEbicsOrderHandlerResolver resolver,
-        IUploadTransactionEngine engine,
+        IUploadTransactionEngine uploadEngine,
+        IDownloadTransactionEngine downloadEngine,
         IEbicsErrorMapper errorMapper,
         EbicsResponseFactory responseFactory,
         IOptions<EbicoServerOptions> options)
     {
         ArgumentNullException.ThrowIfNull(verifier);
         ArgumentNullException.ThrowIfNull(resolver);
-        ArgumentNullException.ThrowIfNull(engine);
+        ArgumentNullException.ThrowIfNull(uploadEngine);
+        ArgumentNullException.ThrowIfNull(downloadEngine);
         ArgumentNullException.ThrowIfNull(errorMapper);
         ArgumentNullException.ThrowIfNull(responseFactory);
         ArgumentNullException.ThrowIfNull(options);
 
         _verifier = verifier;
         _resolver = resolver;
-        _engine = engine;
+        _uploadEngine = uploadEngine;
+        _downloadEngine = downloadEngine;
         _errorMapper = errorMapper;
         _responseFactory = responseFactory;
         _options = options.Value;
@@ -83,6 +88,10 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         // The result of an upload transaction step (issue #32); non-null routes the respond stage to the
         // transaction-shaped ebicsResponse (transaction id + phase). Stays null for every other request.
         UploadTransactionResult? transaction = null;
+
+        // The result of a download transaction step (issue #33); non-null routes the respond stage to the
+        // download-shaped ebicsResponse (transaction id + phase + segment). Stays null otherwise.
+        DownloadTransactionResult? download = null;
         try
         {
             // Stage 1 + 2: Parse and dispatch on version + root element (single parse; the version
@@ -110,7 +119,8 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
                 var result = await RunVerifyAndHandleAsync(context, ct).ConfigureAwait(false);
                 returnCode = result.ReturnCode;
                 payload = result.Payload;
-                transaction = result.Transaction;
+                transaction = result.Upload;
+                download = result.Download;
             }
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -126,14 +136,20 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         }
 
         // Stage 5: Respond. An upload transaction step (issue #32) is answered with a transaction-shaped
-        // ebicsResponse (transaction id + phase). Key-management orders (INI/HIA/HPB) are answered with an
-        // ebicsKeyManagementResponse; everything else with a plain ebicsResponse. A successful HPB also
-        // carries an encrypted DataTransfer (the bank's public keys) via the payload overload.
+        // ebicsResponse (transaction id + phase); a download transaction step (issue #33) with a
+        // download-shaped ebicsResponse (transaction id + phase + segment). Key-management orders
+        // (INI/HIA/HPB) are answered with an ebicsKeyManagementResponse; everything else with a plain
+        // ebicsResponse. A successful HPB also carries an encrypted DataTransfer (the bank's public keys)
+        // via the payload overload.
         IEbicsResponseEnvelope response;
         if (transaction is { } tx)
         {
             response = _responseFactory.BuildTransactionResponse(
                 responseVersion, tx.Phase, tx.TransactionId, tx.ReturnCode, tx.SegmentNumber, tx.LastSegment);
+        }
+        else if (download is { } dtx)
+        {
+            response = _responseFactory.BuildDownloadResponse(responseVersion, dtx);
         }
         else
         {
@@ -149,34 +165,57 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         return new EbicsPipelineResult(body, responseVersion);
     }
 
-    private async Task<(EbicsReturnCode ReturnCode, EbicsKeyManagementPayload? Payload, UploadTransactionResult? Transaction)>
+    private async Task<(EbicsReturnCode ReturnCode, EbicsKeyManagementPayload? Payload, UploadTransactionResult? Upload, DownloadTransactionResult? Download)>
         RunVerifyAndHandleAsync(EbicsRequestContext context, CancellationToken ct)
     {
-        // Stage 3: Verify (extension point; default no-op). Runs for every request, uploads included.
+        // Stage 3: Verify (extension point; default no-op). Runs for every request, transactions included.
         var verification = await _verifier.VerifyAsync(context, ct).ConfigureAwait(false);
         if (!verification.IsVerified)
         {
-            return (verification.Failure ?? EbicsReturnCode.AuthenticationFailed, null, null);
+            return (verification.Failure ?? EbicsReturnCode.AuthenticationFailed, null, null, null);
         }
 
-        // Stage 4a: Upload transaction engine (issue #32). Only the signed ebicsRequest carries a
-        // transaction. A transfer-phase request (a transaction id, no order type) and an upload
-        // initialisation (FUL/BTU) belong to the engine; everything else falls through to the resolver.
-        // Robustness: route transfers on the presence of a transaction id too, since an omitted
-        // <TransactionPhase> deserializes silently to Initialisation.
+        // Stage 4a: Transaction engines (issues #32/#33). Only the signed ebicsRequest carries a
+        // transaction. Phases are routed here, before the resolver:
+        //   - Receipt is download-only (uploads have no receipt phase).
+        //   - A transfer-phase request carries only a transaction id; the download engine claims it when
+        //     the id is one of its transactions (OwnsTransaction), otherwise it is an upload transfer.
+        //     Robustness: route transfers on the presence of a transaction id too, since an omitted
+        //     <TransactionPhase> deserializes silently to Initialisation.
+        //   - Initialisation is routed by order type: FUL/BTU -> upload, FDL/BTD -> download.
         if (context.Envelope is H003.EbicsRequest or H004.EbicsRequest or H005.EbicsRequest)
         {
-            if (context.TransactionId is not null || context.TransactionPhase == EbicsTransactionPhase.Transfer)
+            if (context.TransactionPhase == EbicsTransactionPhase.Receipt)
             {
-                var transfer = await _engine.ContinueUploadAsync(context, ct).ConfigureAwait(false);
-                return (transfer.ReturnCode, null, transfer);
+                var receipt = await _downloadEngine.AcknowledgeReceiptAsync(context, ct).ConfigureAwait(false);
+                return (receipt.ReturnCode, null, null, receipt);
             }
 
-            if (context.TransactionPhase == EbicsTransactionPhase.Initialisation
-                && UploadTransactionEngine.IsUploadOrderType(context.OrderType))
+            if (context.TransactionId is not null || context.TransactionPhase == EbicsTransactionPhase.Transfer)
             {
-                var init = await _engine.BeginUploadAsync(context, ct).ConfigureAwait(false);
-                return (init.ReturnCode, null, init);
+                if (_downloadEngine.OwnsTransaction(context.TransactionId))
+                {
+                    var downloadTransfer = await _downloadEngine.ContinueDownloadAsync(context, ct).ConfigureAwait(false);
+                    return (downloadTransfer.ReturnCode, null, null, downloadTransfer);
+                }
+
+                var uploadTransfer = await _uploadEngine.ContinueUploadAsync(context, ct).ConfigureAwait(false);
+                return (uploadTransfer.ReturnCode, null, uploadTransfer, null);
+            }
+
+            if (context.TransactionPhase == EbicsTransactionPhase.Initialisation)
+            {
+                if (UploadTransactionEngine.IsUploadOrderType(context.OrderType))
+                {
+                    var uploadInit = await _uploadEngine.BeginUploadAsync(context, ct).ConfigureAwait(false);
+                    return (uploadInit.ReturnCode, null, uploadInit, null);
+                }
+
+                if (DownloadTransactionEngine.IsDownloadOrderType(context.OrderType))
+                {
+                    var downloadInit = await _downloadEngine.BeginDownloadAsync(context, ct).ConfigureAwait(false);
+                    return (downloadInit.ReturnCode, null, null, downloadInit);
+                }
             }
         }
 
@@ -186,11 +225,11 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         {
             return (string.IsNullOrEmpty(context.OrderType)
                 ? EbicsReturnCode.InvalidOrderType
-                : EbicsReturnCode.UnsupportedOrderType, null, null);
+                : EbicsReturnCode.UnsupportedOrderType, null, null, null);
         }
 
         var handled = await handler.HandleAsync(context, ct).ConfigureAwait(false);
-        return (handled.ReturnCode, handled.Payload, null);
+        return (handled.ReturnCode, handled.Payload, null, null);
     }
 
     // Order-type extraction. The standard ebicsRequest carries it in OrderDetails (H003/H004:
