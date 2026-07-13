@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
 using System.Text;
 using EBICO.Core;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 
 namespace EBICO.Server.Handlers;
@@ -62,29 +61,23 @@ public abstract class IniOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        IniKeyData data;
-        try
+        // Decode the order data; any decode/validation fault surfaces as EbicsOrderDataException and is
+        // mapped to InvalidOrderDataFormat by the pipeline's central error mapper.
+        var data = OrderDataFault.Wrap(() =>
         {
-            data = ExtractIniOrderData(context);
+            var extracted = ExtractIniOrderData(context);
 
             // Signature key only: reject an encryption/authentication version smuggled into the
             // SignatureVersion element, and reject a version not permitted for this protocol version
             // (e.g. A006 on H004).
-            if (data.Version.Purpose != KeyPurpose.Signature)
+            if (extracted.Version.Purpose != KeyPurpose.Signature)
             {
-                return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
+                throw new EbicsOrderDataException("The INI order carries a non-signature key version.");
             }
 
-            _ = KeyVersions.EnsurePermitted(data.Version, Version);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException or KeyMaterialException
-            or KeyVersionNotPermittedException or InvalidKeyVersionException or CryptographicException
-            or ArgumentException or InvalidOperationException)
-        {
-            // The order data could not be decompressed/deserialized, the key material could not be
-            // reconstructed, or the signature version is unusable/unpermitted.
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+            _ = KeyVersions.EnsurePermitted(extracted.Version, Version);
+            return extracted;
+        });
 
         if (!HostId.TryCreate(data.HostId, out var hostId)
             || !PartnerId.TryCreate(data.PartnerId, out var partnerId)
@@ -115,7 +108,7 @@ public abstract class IniOrderHandlerBase : IEbicsOrderHandler
     /// </summary>
     /// <param name="context">The request context (its <see cref="EbicsRequestContext.Envelope"/> is the unsecured request).</param>
     /// <returns>The extracted identifiers, key material and key version.</returns>
-    /// <remarks>Implementations may throw any of the exceptions caught by <see cref="HandleAsync"/>; those map to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>.</remarks>
+    /// <remarks>Implementations may throw the low-level order-data failures wrapped by <see cref="OrderDataFault"/> into <see cref="EbicsOrderDataException"/> (mapped to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>).</remarks>
     protected abstract IniKeyData ExtractIniOrderData(EbicsRequestContext context);
 
     /// <summary>Decompresses and deserializes the embedded order-data document to <typeparamref name="T"/>.</summary>

@@ -1,7 +1,7 @@
 using EBICO.Core;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 
 namespace EBICO.Server.Handlers;
@@ -60,17 +60,9 @@ public abstract class SprOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        SprRequestData request;
-        try
-        {
-            request = ExtractHeader(context);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException)
-        {
-            // The envelope was not the expected signed ebicsRequest (e.g. an unsecured request that
-            // happens to carry OrderType "SPR").
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+        // A non-conforming envelope (e.g. an unsecured request that happens to carry OrderType "SPR")
+        // surfaces as EbicsOrderDataException -> InvalidOrderDataFormat.
+        var request = OrderDataFault.Wrap(() => ExtractHeader(context));
 
         if (!HostId.TryCreate(request.HostId, out var hostId)
             || !PartnerId.TryCreate(request.PartnerId, out var partnerId)
@@ -88,16 +80,10 @@ public abstract class SprOrderHandlerBase : IEbicsOrderHandler
             return new EbicsOrderResult(EbicsReturnCode.InvalidUserOrUserState);
         }
 
-        try
-        {
-            _ = await _masterData.TransitionSubscriberAsync(hostId, partnerId, userId, SubscriberState.Suspended, ct).ConfigureAwait(false);
-        }
-        catch (Exception ex) when (ex is InvalidSubscriberStateTransitionException or UnknownSubscriberException)
-        {
-            // Defensive: the pre-checks above make this unreachable, but keep the mapping consistent if
-            // the state changed concurrently between the read and the transition.
-            return new EbicsOrderResult(EbicsReturnCode.InvalidUserOrUserState);
-        }
+        // The pre-checks above normally make the transition safe; a concurrent state change between the
+        // read and the transition surfaces InvalidSubscriberStateTransitionException /
+        // UnknownSubscriberException, which the central error mapper maps to InvalidUserOrUserState.
+        _ = await _masterData.TransitionSubscriberAsync(hostId, partnerId, userId, SubscriberState.Suspended, ct).ConfigureAwait(false);
 
         return new EbicsOrderResult(EbicsReturnCode.Ok);
     }

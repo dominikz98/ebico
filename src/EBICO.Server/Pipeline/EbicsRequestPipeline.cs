@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using EBICO.Server.ReturnCodes;

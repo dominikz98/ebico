@@ -1,13 +1,27 @@
+using System.Security.Cryptography;
 using System.Xml;
+using EBICO.Core.Crypto;
+using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Versioning;
+using EBICO.Server.Handlers;
+using EBICO.Server.State;
 
 namespace EBICO.Server.ReturnCodes;
 
 /// <summary>
-/// Default <see cref="IEbicsErrorMapper"/>: maps the version-dispatch and parsing exceptions
-/// raised by <c>EBICO.Core</c> onto EBICS return codes, falling back to
-/// <see cref="EbicsReturnCode.InternalError"/> for anything unexpected.
+/// Default <see cref="IEbicsErrorMapper"/>: the single source of truth mapping the exceptions raised
+/// while processing an EBICS request onto EBICS return codes, falling back to
+/// <see cref="EbicsReturnCode.InternalError"/> for anything unexpected (a server fault).
 /// </summary>
+/// <remarks>
+/// Order-data faults are surfaced by the handlers as <see cref="EbicsOrderDataException"/> (see
+/// <see cref="OrderDataFault"/>), whose dedicated type maps unambiguously to
+/// <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>. General-purpose exceptions
+/// (<see cref="ArgumentException"/>, a plain <see cref="InvalidOperationException"/>) are deliberately
+/// <em>not</em> mapped to a business code — outside the order-data decode step they denote a server
+/// bug and must surface as <see cref="EbicsReturnCode.InternalError"/>.
+/// </remarks>
 public sealed class EbicsErrorMapper : IEbicsErrorMapper
 {
     /// <inheritdoc />
@@ -17,6 +31,23 @@ public sealed class EbicsErrorMapper : IEbicsErrorMapper
 
         return exception switch
         {
+            // Invalid order data: undecryptable/undecompressable/undeserializable order data, key
+            // material that cannot be reconstructed, or an unusable/unpermitted key version. The
+            // handlers wrap these into EbicsOrderDataException; the low-level types are also mapped
+            // directly so callers outside a handler (e.g. the transaction engine) map consistently.
+            EbicsOrderDataException => EbicsReturnCode.InvalidOrderDataFormat,
+            KeyMaterialException => EbicsReturnCode.InvalidOrderDataFormat,
+            InvalidKeyVersionException => EbicsReturnCode.InvalidOrderDataFormat,
+            KeyVersionNotPermittedException => EbicsReturnCode.InvalidOrderDataFormat,
+            InvalidDataException => EbicsReturnCode.InvalidOrderDataFormat,
+            FormatException => EbicsReturnCode.InvalidOrderDataFormat,
+            CryptographicException => EbicsReturnCode.InvalidOrderDataFormat,
+
+            // Invalid/unknown subscriber, master-data lookup miss, or a rejected lifecycle transition.
+            InvalidEbicsIdentifierException => EbicsReturnCode.InvalidUserOrUserState,
+            InvalidSubscriberStateTransitionException => EbicsReturnCode.InvalidUserOrUserState,
+            MasterDataException => EbicsReturnCode.InvalidUserOrUserState,
+
             // Not well-formed / empty / prohibited DTD / unrecognized root element.
             EbicsEnvelopeFormatException => EbicsReturnCode.InvalidXml,
 

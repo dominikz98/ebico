@@ -1,11 +1,10 @@
-using System.Security.Cryptography;
 using System.Text;
 using EBICO.Core;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Server.Pipeline;
-using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 
 namespace EBICO.Server.Handlers;
@@ -72,16 +71,8 @@ public abstract class HcaOrderHandlerBase : IEbicsOrderHandler
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        HcaEnvelope envelope;
-        try
-        {
-            envelope = ExtractEnvelope(context);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or InvalidOperationException)
-        {
-            // The envelope was not the expected signed ebicsRequest for this version.
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+        // A non-conforming envelope surfaces as EbicsOrderDataException -> InvalidOrderDataFormat.
+        var envelope = OrderDataFault.Wrap(() => ExtractEnvelope(context));
 
         if (!HostId.TryCreate(envelope.HostId, out var hostId)
             || !PartnerId.TryCreate(envelope.PartnerId, out var partnerId)
@@ -94,28 +85,23 @@ public abstract class HcaOrderHandlerBase : IEbicsOrderHandler
         // (GetOrCreateAsync returns a pair that carries the private part).
         var bankKeys = await _bankKeyStore.GetOrCreateAsync(hostId, ct).ConfigureAwait(false);
 
-        HcaKeys keys;
-        try
+        // Decrypt and parse the order data; undecryptable/undecompressable/undeserializable data,
+        // unreconstructable key material or an unusable/unpermitted key version all surface as
+        // EbicsOrderDataException -> InvalidOrderDataFormat.
+        var keys = OrderDataFault.Wrap(() =>
         {
-            keys = DecryptAndParse(envelope, bankKeys);
+            var parsed = DecryptAndParse(envelope, bankKeys);
 
-            if (keys.AuthVersion.Purpose != KeyPurpose.Authentication
-                || keys.EncVersion.Purpose != KeyPurpose.Encryption)
+            if (parsed.AuthVersion.Purpose != KeyPurpose.Authentication
+                || parsed.EncVersion.Purpose != KeyPurpose.Encryption)
             {
-                return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
+                throw new EbicsOrderDataException("The HCA order carries a purpose-mismatched key version.");
             }
 
-            _ = KeyVersions.EnsurePermitted(keys.AuthVersion, Version);
-            _ = KeyVersions.EnsurePermitted(keys.EncVersion, Version);
-        }
-        catch (Exception ex) when (ex is InvalidDataException or FormatException or KeyMaterialException
-            or KeyVersionNotPermittedException or InvalidKeyVersionException or CryptographicException
-            or ArgumentException or InvalidOperationException)
-        {
-            // Undecryptable/undecompressable/undeserializable order data, unreconstructable key material,
-            // or an unusable/unpermitted key version.
-            return new EbicsOrderResult(EbicsReturnCode.InvalidOrderDataFormat);
-        }
+            _ = KeyVersions.EnsurePermitted(parsed.AuthVersion, Version);
+            _ = KeyVersions.EnsurePermitted(parsed.EncVersion, Version);
+            return parsed;
+        });
 
         // HCA requires a fully onboarded subscriber (INI + HIA done). The key change keeps state Ready.
         var subscriber = await _masterData.GetSubscriberAsync(hostId, partnerId, userId, ct).ConfigureAwait(false);
@@ -147,7 +133,7 @@ public abstract class HcaOrderHandlerBase : IEbicsOrderHandler
     /// </summary>
     /// <param name="orderDataXml">The decrypted and decompressed order-data XML.</param>
     /// <returns>The extracted keys and their versions.</returns>
-    /// <remarks>Implementations may throw any of the exceptions caught by <see cref="HandleAsync"/>; those map to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>.</remarks>
+    /// <remarks>Implementations may throw the low-level order-data failures wrapped by <see cref="OrderDataFault"/> into <see cref="EbicsOrderDataException"/> (mapped to <see cref="EbicsReturnCode.InvalidOrderDataFormat"/>).</remarks>
     protected abstract HcaKeys ParseOrderData(string orderDataXml);
 
     // Decrypts the order data with the bank's private E002 key, decompresses it and delegates the

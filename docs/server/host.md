@@ -111,7 +111,7 @@ beantwortet — der Client wertet den Returncode aus, nicht den HTTP-Status. Nur
 Transportfehler (Content-Type, Größe), bei denen der Server nicht sinnvoll ins Envelope
 antworten kann, führen zu HTTP 4xx.
 
-## Returncode-Katalog (server-lokal, vorläufig)
+## Returncode-Katalog (zentral in `EBICO.Core`)
 
 `EbicsReturnCode` bündelt Code, symbolischen Namen und die Ablage (`Kind`): ein
 **technischer** Code landet im `header/mutable/ReturnCode`, ein **business** Code im
@@ -119,9 +119,11 @@ antworten kann, führen zu HTTP 4xx.
 baut daraus je Version (H003/H004/H005) den typisierten Response-Graphen aus den
 committeten Schema-Bindings.
 
-Der Katalog ist bewusst **minimal und vorläufig** — nur die Codes, die das Grundgerüst
-braucht. Der vollständige, zentrale EBICS-Returncode-Katalog entsteht in **Issue #36
-(M4)**; dies spiegelt das ebenfalls vorläufige `EbicsResult` im Connector.
+Der Katalog und die Registry (`EbicsReturnCodes`) liegen seit **Issue #36 (M4)** zentral in
+`EBICO.Core.ReturnCodes` und werden von Server **und** Connector genutzt; das
+Exception→Returncode-Mapping (`IEbicsErrorMapper`/`EbicsErrorMapper`) bleibt server-seitig.
+Details, vollständige Code-Tabellen und das Fehlerverhalten:
+[Returncode-Katalog](../protocol/return-codes.md) und [ADR-0012](../adr/0012-returncode-katalog.md).
 
 ### ⚠️ Spec-Vorbehalte (gegen die offiziellen EBICS-Annexe zu verifizieren)
 
