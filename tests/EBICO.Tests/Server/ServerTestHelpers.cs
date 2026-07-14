@@ -858,6 +858,8 @@ internal static class ServerTestHelpers
     /// <param name="segmentSizeBytes">The maximum raw segment size; small values force several segments.</param>
     /// <param name="signatureData">The optional raw order-signature (ES) blob to place in the initialisation.</param>
     /// <param name="btf">The optional H005 business transaction format placed in <c>BTUOrderParams/Service</c> (ignored for H003/H004).</param>
+    /// <param name="orderType">The optional order type / admin order type to place in the header; defaults to <c>"FUL"</c> (H003/H004) / <c>"BTU"</c> (H005). Use this to submit a classical payment order type (e.g. <c>"CCT"</c>) directly.</param>
+    /// <param name="fileFormat">The optional H003/H004 <c>FULOrderParams/FileFormat</c> value (e.g. <c>"pain.001.001.09"</c>); ignored for H005.</param>
     /// <returns>The initialisation XML and the ordered ciphertext segments.</returns>
     public static UploadRequest BuildUploadInitRequest(
         EbicsVersion version,
@@ -869,13 +871,15 @@ internal static class ServerTestHelpers
         KeyVersion bankEncVersion,
         int segmentSizeBytes = 512 * 1024,
         byte[]? signatureData = null,
-        BusinessTransactionFormat? btf = null)
+        BusinessTransactionFormat? btf = null,
+        string? orderType = null,
+        string? fileFormat = null)
     {
         var compressed = EbicsCompression.Compress(orderData);
         var encrypted = EncryptionE002.Encrypt(compressed, bankEncKey, bankEncVersion);
         var segments = EbicsSegmentation.Split(encrypted.EncryptedOrderDataBytes, segmentSizeBytes).Segments;
         var numSegments = (ulong)segments.Count;
-        var orderType = version == EbicsVersion.H005 ? "BTU" : "FUL";
+        orderType ??= version == EbicsVersion.H005 ? "BTU" : "FUL";
         var digest = PublicKeyFingerprint.Compute(bankEncKey);
 
         var xml = version switch
@@ -890,7 +894,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H003.StaticHeaderOrderDetailsType { OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType } },
+                        OrderDetails = new H003.StaticHeaderOrderDetailsType
+                        {
+                            OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
+                            OrderParams = fileFormat is null ? null : new H003.FulOrderParamsType { FileFormat = new H003.FileFormatType { Value = fileFormat } },
+                        },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
                     },
@@ -919,7 +927,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H004.StaticHeaderOrderDetailsType { OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType } },
+                        OrderDetails = new H004.StaticHeaderOrderDetailsType
+                        {
+                            OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
+                            OrderParams = fileFormat is null ? null : new H004.FulOrderParamsType { FileFormat = new H004.FileFormatType { Value = fileFormat } },
+                        },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
                     },
