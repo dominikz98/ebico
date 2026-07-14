@@ -33,6 +33,14 @@ public interface IDownloadTransactionStore
     /// <returns><see langword="true"/> when a transaction was removed; otherwise <see langword="false"/>.</returns>
     bool Remove(string transactionIdHex);
 
+    /// <summary>
+    /// Returns a point-in-time snapshot of all held transactions. Used by the background cleanup service
+    /// to find expired transactions (the eviction policy lives in the engine, not the store); the
+    /// snapshot is decoupled from the store, so iterating it while other threads create/remove is safe.
+    /// </summary>
+    /// <returns>A snapshot of the currently held transactions (empty when none).</returns>
+    IReadOnlyCollection<DownloadTransaction> GetAll();
+
     /// <summary>The number of transactions currently held.</summary>
     int Count { get; }
 }

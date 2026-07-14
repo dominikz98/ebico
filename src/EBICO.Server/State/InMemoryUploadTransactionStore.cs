@@ -4,8 +4,9 @@ namespace EBICO.Server.State;
 
 /// <summary>
 /// A thread-safe in-memory <see cref="IUploadTransactionStore"/>. The default registration and the
-/// natural choice for the emulator and tests; nothing is persisted across restarts and nothing is
-/// evicted (a TTL/recovery model is issue #35).
+/// natural choice for the emulator and tests; nothing is persisted across restarts. Idle expiry
+/// (issue #35) is driven by the engine/cleanup service via <see cref="GetAll"/> and
+/// <see cref="Remove"/>; this store itself holds no eviction policy.
 /// </summary>
 public sealed class InMemoryUploadTransactionStore : IUploadTransactionStore
 {
@@ -39,6 +40,9 @@ public sealed class InMemoryUploadTransactionStore : IUploadTransactionStore
         ArgumentNullException.ThrowIfNull(transactionIdHex);
         return _transactions.TryRemove(transactionIdHex, out _);
     }
+
+    /// <inheritdoc />
+    public IReadOnlyCollection<UploadTransaction> GetAll() => _transactions.Values.ToArray();
 
     /// <inheritdoc />
     public int Count => _transactions.Count;

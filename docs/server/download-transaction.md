@@ -177,9 +177,10 @@ werden mit **HTTP 200** und dem Returncode im `ebicsResponse` beantwortet (siehe
   verschlüsselt).
 - **Segmentgröße roh vs. base64.** `SegmentSizeBytes` misst Roh-Bytes; der Bezug der EBICS-Segment-
   grenze (roh vs. base64) ist offen (siehe [Segmentierung](segmentation.md)).
-- **Verwaiste Transaktionen.** Bricht der Client nach Init/Transfer ohne Receipt ab, bleibt der
-  Zustand im In-Memory-Store liegen (kein TTL/keine Eviction) — Recovery/Timeouts sind **#35**. Die
-  bereits entnommenen Daten bleiben dann bis zu einem (nie kommenden) Receipt „in Bearbeitung".
+- **Verwaiste Transaktionen.** Der Idle-Timeout und die Eviction (lazy beim Zugriff + Hintergrund-
+  Sweeper) sind in **[#35](transaction-recovery.md)** umgesetzt: bricht der Client nach Init/Transfer
+  ohne Receipt ab, läuft die Transaktion ab und wird entfernt — die bereits entnommenen Daten werden
+  dabei **wieder eingereiht** (wie bei einer negativen Quittung), gehen also nicht verloren.
 
 ## EBICS-Versionsbezug
 

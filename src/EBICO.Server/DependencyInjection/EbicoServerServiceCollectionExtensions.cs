@@ -57,6 +57,14 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IDownloadDataProvider, InMemoryDownloadDataProvider>();
         services.TryAddSingleton<IDownloadTransactionEngine, DownloadTransactionEngine>();
 
+        // Transaction recovery/timeouts (issue #35): both engines double as transaction evictors. The
+        // forwarding registrations resolve the SAME singleton instances (AddSingleton, not TryAdd, so
+        // both land in the IEnumerable<ITransactionEvictor> the cleanup service sweeps). The background
+        // sweeper bounds memory even for orphaned transactions; lazy expiry on access complements it.
+        services.AddSingleton<ITransactionEvictor>(sp => (ITransactionEvictor)sp.GetRequiredService<IUploadTransactionEngine>());
+        services.AddSingleton<ITransactionEvictor>(sp => (ITransactionEvictor)sp.GetRequiredService<IDownloadTransactionEngine>());
+        services.AddHostedService<TransactionCleanupService>();
+
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
         // The H005 HPB handler self-signs the bank's certificates and needs a clock for their validity

@@ -51,14 +51,16 @@ public readonly record struct SegmentAppendResult(SegmentAppendStatus Status, IR
 /// <para>
 /// <b>⚠️ Spec-Vorbehalt:</b> the raw <see cref="SignatureData"/> (the order signature / ES) is retained
 /// but <em>not</em> cryptographically verified in this issue (consistent with the single-phase key
-/// handlers); the electronic-signature verification is a follow-up. Orphaned transactions (client
-/// abandons after initialisation) are not evicted here — a TTL/recovery model is issue #35.
+/// handlers); the electronic-signature verification is a follow-up. Idle expiry (issue #35) is driven by
+/// <see cref="LastActivityAt"/>/<see cref="IsExpired"/>; the store evicts expired and orphaned
+/// transactions (lazily on access and via the background cleanup service).
 /// </para>
 /// </remarks>
 public sealed class UploadTransaction
 {
     private readonly object _gate = new();
     private readonly SortedDictionary<int, byte[]> _segments = [];
+    private long _lastActivityTicks;
 
     /// <summary>Initializes a new upload transaction captured during the initialisation phase.</summary>
     /// <param name="transactionId">The 16-byte transaction id assigned by the server.</param>
@@ -93,6 +95,7 @@ public sealed class UploadTransaction
         TransactionKey = transactionKey;
         SignatureData = signatureData;
         CreatedAt = createdAt;
+        _lastActivityTicks = createdAt.UtcTicks;
     }
 
     /// <summary>The 16-byte transaction id assigned by the server.</summary>
@@ -121,6 +124,28 @@ public sealed class UploadTransaction
 
     /// <summary>The time the transaction was created.</summary>
     public DateTimeOffset CreatedAt { get; }
+
+    /// <summary>
+    /// The time of the last activity on this transaction (its creation, then each accepted transfer
+    /// step). The idle-expiry window (<see cref="IsExpired"/>) slides on this value, so a long
+    /// multi-segment transfer does not expire mid-flight. Read atomically; safe for concurrent access.
+    /// </summary>
+    public DateTimeOffset LastActivityAt => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+
+    /// <summary>Records activity on the transaction, sliding the idle-expiry window to <paramref name="now"/>.</summary>
+    /// <param name="now">The current time.</param>
+    public void Touch(DateTimeOffset now) => Interlocked.Exchange(ref _lastActivityTicks, now.UtcTicks);
+
+    /// <summary>
+    /// Whether the transaction has been idle for at least <paramref name="timeout"/> as of
+    /// <paramref name="now"/>. A non-positive <paramref name="timeout"/> disables expiry (always
+    /// <see langword="false"/>).
+    /// </summary>
+    /// <param name="now">The current time.</param>
+    /// <param name="timeout">The idle timeout; <see cref="TimeSpan.Zero"/> or less disables expiry.</param>
+    /// <returns><see langword="true"/> when the transaction has expired; otherwise <see langword="false"/>.</returns>
+    public bool IsExpired(DateTimeOffset now, TimeSpan timeout)
+        => timeout > TimeSpan.Zero && now.UtcTicks - Interlocked.Read(ref _lastActivityTicks) >= timeout.Ticks;
 
     /// <summary>Whether every announced segment has been received and the order data reassembled.</summary>
     public bool IsComplete { get; private set; }

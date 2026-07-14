@@ -37,7 +37,7 @@ namespace EBICO.Server.Transactions;
 /// verified against the official EBICS annexes.
 /// </para>
 /// </remarks>
-public sealed class UploadTransactionEngine : IUploadTransactionEngine
+public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransactionEvictor
 {
     /// <summary>The H003/H004 generic upload order type (file upload).</summary>
     public const string FulOrderType = "FUL";
@@ -119,6 +119,14 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine
             return Init(EbicsReturnCode.MaxSegmentsExceeded);
         }
 
+        // Soft ceiling on concurrent transactions (0 = unlimited). Counts completed-but-not-yet-evicted
+        // uploads within the retention window; the count-then-create is not atomic (acceptable for the
+        // emulator).
+        if (_options.MaxConcurrentTransactions > 0 && _store.Count >= _options.MaxConcurrentTransactions)
+        {
+            return Init(EbicsReturnCode.MaxTransactionsExceeded);
+        }
+
         if (fields.TransactionKey is not { } encryptedTransactionKey)
         {
             return Init(EbicsReturnCode.InvalidOrderDataFormat);
@@ -172,6 +180,17 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine
             return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment));
         }
 
+        // Lazy expiry: an idle-timed-out transaction is evicted and answered as an unknown id (091101),
+        // just as if the background sweeper had already removed it. A live one has its idle window slid.
+        var now = _timeProvider.GetUtcNow();
+        if (transaction.IsExpired(now, _options.TransactionTimeout))
+        {
+            _store.Remove(transaction.TransactionIdHex);
+            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment));
+        }
+
+        transaction.Touch(now);
+
         if (fields.SegmentNumber is not { } segmentNumber || fields.OrderData is not { } orderData)
         {
             return Task.FromResult(Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, fields.SegmentNumber, fields.LastSegment));
@@ -200,6 +219,29 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine
         };
 
         return Task.FromResult(Transfer(returnCode, transactionId, segmentNumber, fields.LastSegment));
+    }
+
+    /// <inheritdoc />
+    public Task<int> EvictExpiredAsync(CancellationToken ct = default)
+    {
+        var timeout = _options.TransactionTimeout;
+        if (timeout <= TimeSpan.Zero)
+        {
+            return Task.FromResult(0);
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var evicted = 0;
+        foreach (var transaction in _store.GetAll())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (transaction.IsExpired(now, timeout) && _store.Remove(transaction.TransactionIdHex))
+            {
+                evicted++;
+            }
+        }
+
+        return Task.FromResult(evicted);
     }
 
     // Reassembles, decrypts and decompresses the completed order data and records it on the transaction.

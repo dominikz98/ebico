@@ -39,7 +39,7 @@ namespace EBICO.Server.Transactions;
 /// receipt-code mapping are to be verified against the official EBICS annexes.
 /// </para>
 /// </remarks>
-public sealed class DownloadTransactionEngine : IDownloadTransactionEngine
+public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITransactionEvictor
 {
     /// <summary>The H003/H004 generic download order type (file download).</summary>
     public const string FdlOrderType = "FDL";
@@ -128,6 +128,13 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine
             return Init(EbicsReturnCode.InvalidUserOrUserState);
         }
 
+        // Soft ceiling on concurrent transactions (0 = unlimited). Checked before dequeuing so a rejected
+        // initialisation does not consume order data. The count-then-create is not atomic (acceptable).
+        if (_options.MaxConcurrentTransactions > 0 && _store.Count >= _options.MaxConcurrentTransactions)
+        {
+            return Init(EbicsReturnCode.MaxTransactionsExceeded);
+        }
+
         // Provision the order data. Consuming semantics: dequeue now; a negative receipt re-enqueues it.
         var orderType = context.OrderType!;
         var orderData = await _dataProvider
@@ -186,7 +193,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine
     }
 
     /// <inheritdoc />
-    public Task<DownloadTransactionResult> ContinueDownloadAsync(EbicsRequestContext context, CancellationToken ct = default)
+    public async Task<DownloadTransactionResult> ContinueDownloadAsync(EbicsRequestContext context, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -194,35 +201,46 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine
 
         if (fields.TransactionId is not { } transactionId)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, null, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxUnknownTxid, null, fields.SegmentNumber, fields.LastSegment);
         }
 
         if (!_store.TryGet(Convert.ToHexString(transactionId), out var transaction) || transaction is null)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment);
         }
+
+        // Lazy expiry: an idle-timed-out transaction is evicted (re-enqueuing its already-dequeued order
+        // data exactly once) and answered as an unknown id (091101). A live one has its idle window slid.
+        var now = _timeProvider.GetUtcNow();
+        if (transaction.IsExpired(now, _options.TransactionTimeout))
+        {
+            await EvictAsync(transaction, ct).ConfigureAwait(false);
+            return Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment);
+        }
+
+        transaction.Touch(now);
 
         // Segments are 1-based; a missing number or a number beyond the announced count is a protocol error.
         if (fields.SegmentNumber is not { } segmentNumber || segmentNumber == 0)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, fields.SegmentNumber, fields.LastSegment);
         }
 
         if (segmentNumber > (ulong)transaction.NumSegments)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxSegmentNumberExceeded, transactionId, segmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxSegmentNumberExceeded, transactionId, segmentNumber, fields.LastSegment);
         }
 
         var lastSegment = segmentNumber == (ulong)transaction.NumSegments;
         var payload = new DownloadSegmentPayload(transaction.GetSegment((int)segmentNumber));
 
-        return Task.FromResult(new DownloadTransactionResult(
+        return new DownloadTransactionResult(
             EbicsReturnCode.Ok,
             EbicsTransactionPhase.Transfer,
             transactionId,
             SegmentNumber: segmentNumber,
             LastSegment: lastSegment,
-            Segment: payload));
+            Segment: payload);
     }
 
     /// <inheritdoc />
@@ -262,6 +280,45 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine
             .EnqueueAsync(transaction.Subscriber, transaction.OrderType, transaction.OrderDataPlaintext, ct)
             .ConfigureAwait(false);
         return Receipt(EbicsReturnCode.DownloadPostprocessSkipped, transactionId);
+    }
+
+    /// <inheritdoc />
+    public async Task<int> EvictExpiredAsync(CancellationToken ct = default)
+    {
+        var timeout = _options.TransactionTimeout;
+        if (timeout <= TimeSpan.Zero)
+        {
+            return 0;
+        }
+
+        var now = _timeProvider.GetUtcNow();
+        var evicted = 0;
+        foreach (var transaction in _store.GetAll())
+        {
+            ct.ThrowIfCancellationRequested();
+            if (transaction.IsExpired(now, timeout) && await EvictAsync(transaction, ct).ConfigureAwait(false))
+            {
+                evicted++;
+            }
+        }
+
+        return evicted;
+    }
+
+    // Evicts one transaction and re-enqueues its already-dequeued order data. The Remove return value is
+    // the "exactly once" guard: whoever wins the race (lazy path vs. sweeper) re-enqueues, the loser does
+    // not, so the data lands back in the queue exactly once.
+    private async Task<bool> EvictAsync(DownloadTransaction transaction, CancellationToken ct)
+    {
+        if (!_store.Remove(transaction.TransactionIdHex))
+        {
+            return false;
+        }
+
+        await _dataProvider
+            .EnqueueAsync(transaction.Subscriber, transaction.OrderType, transaction.OrderDataPlaintext, ct)
+            .ConfigureAwait(false);
+        return true;
     }
 
     private static DownloadTransactionResult Init(EbicsReturnCode returnCode)
