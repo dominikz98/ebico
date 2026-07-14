@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Btf;
 using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
@@ -125,7 +126,8 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
                     request,
                     TryExtractOrderType(request),
                     TryExtractTransactionPhase(request),
-                    TryExtractTransactionId(request));
+                    TryExtractTransactionId(request),
+                    TryExtractBtf(request));
 
                 var result = await RunVerifyAndHandleAsync(context, ct).ConfigureAwait(false);
                 returnCode = result.ReturnCode;
@@ -335,6 +337,17 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         H005.EbicsNoPubKeyDigestsRequest r => r.Header?.Static?.OrderDetails?.AdminOrderType,
         _ => null,
     };
+
+    // Business Transaction Format extraction (issue #38). Only H005 carries a BTF, in the
+    // BTUOrderParams/BTDOrderParams service element of the signed ebicsRequest; H003/H004 and the
+    // H005 key-management requests have no BTF service.
+    private static BusinessTransactionFormat? TryExtractBtf(IEbicsRequestEnvelope request)
+    {
+        var orderParams = (request as H005.EbicsRequest)?.Header?.Static?.OrderDetails?.OrderParams;
+        return BusinessTransactionFormat.TryFromBtfParams(orderParams as H005.BtfParamsTyp, out var btf)
+            ? btf
+            : null;
+    }
 
     // Transaction phase of the signed ebicsRequest (used to route the transaction engine). The
     // unsecured / no-pub-key-digests requests carry no phase.

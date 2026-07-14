@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Btf;
 using EBICO.Core.Versioning;
 using EBICO.Server.Transactions;
 
@@ -18,13 +19,15 @@ public sealed class EbicsRequestContext
     /// <param name="orderType">The extracted order type, or <see langword="null"/> when absent/not applicable.</param>
     /// <param name="transactionPhase">The transaction phase of a signed <c>ebicsRequest</c>, or <see langword="null"/> when not applicable.</param>
     /// <param name="transactionId">The transaction id carried by a transfer-phase request, or <see langword="null"/> when absent.</param>
+    /// <param name="btf">The extracted H005 business transaction format, or <see langword="null"/> when absent/not applicable.</param>
     public EbicsRequestContext(
         string requestXml,
         EbicsVersionInfo versionInfo,
         IEbicsRequestEnvelope envelope,
         string? orderType,
         EbicsTransactionPhase? transactionPhase = null,
-        byte[]? transactionId = null)
+        byte[]? transactionId = null,
+        BusinessTransactionFormat? btf = null)
     {
         ArgumentNullException.ThrowIfNull(requestXml);
         ArgumentNullException.ThrowIfNull(versionInfo);
@@ -36,6 +39,7 @@ public sealed class EbicsRequestContext
         OrderType = orderType;
         TransactionPhase = transactionPhase;
         TransactionId = transactionId;
+        Btf = btf;
     }
 
     /// <summary>The raw request XML as received.</summary>
@@ -52,6 +56,12 @@ public sealed class EbicsRequestContext
 
     /// <summary>The extracted order type (e.g. <c>"HPB"</c>), or <see langword="null"/> when absent.</summary>
     public string? OrderType { get; }
+
+    /// <summary>
+    /// The H005 business transaction format extracted from the <c>BTUOrderParams</c>/<c>BTDOrderParams</c>
+    /// service element, or <see langword="null"/> for H003/H004 and for H005 requests that carry no BTF.
+    /// </summary>
+    public BusinessTransactionFormat? Btf { get; }
 
     /// <summary>
     /// The transaction phase of a signed <c>ebicsRequest</c> (Initialisation/Transfer/Receipt), or

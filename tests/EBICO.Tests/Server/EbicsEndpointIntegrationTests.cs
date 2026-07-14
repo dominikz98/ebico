@@ -127,7 +127,9 @@ public class EbicsEndpointIntegrationTests : IClassFixture<WebApplicationFactory
         var master = factory.Services.GetRequiredService<IMasterDataManager>();
         await master.SaveBankAsync(new Bank(host), _ct);
         await master.SavePartnerAsync(new Partner(host, partner), _ct);
-        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+        // Generic upload authorisation for FUL (issue #38); transitions preserve the permission set.
+        await master.SaveSubscriberAsync(
+            new Subscriber(host, partner, user, permissions: [new SubscriberPermission("FUL", SignatureClass.T)]), _ct);
         await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Initialized, _ct);
         await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Ready, _ct);
 
@@ -170,7 +172,9 @@ public class EbicsEndpointIntegrationTests : IClassFixture<WebApplicationFactory
         var master = factory.Services.GetRequiredService<IMasterDataManager>();
         await master.SaveBankAsync(new Bank(host), _ct);
         await master.SavePartnerAsync(new Partner(host, partner), _ct);
-        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+        // Generic download authorisation for FDL (issue #38); transitions preserve the permission set.
+        await master.SaveSubscriberAsync(
+            new Subscriber(host, partner, user, permissions: [new SubscriberPermission("FDL", SignatureClass.T)]), _ct);
         await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Initialized, _ct);
         await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Ready, _ct);
 

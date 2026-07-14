@@ -82,6 +82,17 @@ public sealed class Subscriber
     }
 
     /// <summary>
+    /// Indicates whether the subscriber holds <em>any</em> permission for <paramref name="orderType"/>,
+    /// regardless of its <see cref="SignatureClass"/> — the "may submit / may fetch" gate used by the
+    /// transaction engines to authorise an order (issue #38). Contrast with <see cref="CanAuthorize(string)"/>,
+    /// which additionally requires a bank-technical (E/A/B) signature.
+    /// </summary>
+    /// <param name="orderType">The order/BTF type to check.</param>
+    /// <returns><see langword="true"/> when at least one permission exists for the order type.</returns>
+    public bool HasPermissionFor(string orderType) => _permissions.Any(p =>
+        string.Equals(p.OrderType, orderType, StringComparison.Ordinal));
+
+    /// <summary>
     /// Indicates whether the subscriber may authorise <paramref name="orderType"/>, i.e.
     /// holds a permission for it with a bank-technical signature class (E/A/B).
     /// </summary>
