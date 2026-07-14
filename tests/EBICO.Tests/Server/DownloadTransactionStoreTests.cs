@@ -81,6 +81,20 @@ public class DownloadTransactionStoreTests
         store.Remove(hex).Should().BeFalse();
     }
 
+    [Fact]
+    public void Store_GetAll_ReturnsSnapshotDecoupledFromLaterRemove()
+    {
+        var store = new InMemoryDownloadTransactionStore();
+        var transaction = NewTransaction(Enumerable.Repeat((byte)0x0D, 16).ToArray(), [1]);
+        store.Create(transaction);
+
+        var snapshot = store.GetAll();
+        store.Remove(transaction.TransactionIdHex);
+
+        snapshot.Should().ContainSingle().Which.Should().BeSameAs(transaction);
+        store.GetAll().Should().BeEmpty();
+    }
+
     // --- DownloadTransaction ---------------------------------------------------------------
 
     [Fact]
@@ -111,6 +125,22 @@ public class DownloadTransactionStoreTests
         var act = () => NewTransaction(new byte[16]);
 
         act.Should().Throw<ArgumentException>();
+    }
+
+    [Fact]
+    public void Transaction_IdleExpiry_SlidesOnTouch()
+    {
+        var transaction = NewTransaction(new byte[16], [1]);
+        var timeout = TimeSpan.FromHours(1);
+
+        transaction.LastActivityAt.Should().Be(transaction.CreatedAt);
+        transaction.IsExpired(transaction.CreatedAt + timeout, timeout).Should().BeTrue();
+
+        var later = transaction.CreatedAt + TimeSpan.FromMinutes(30);
+        transaction.Touch(later);
+        transaction.IsExpired(transaction.CreatedAt + timeout, timeout).Should().BeFalse();
+        transaction.IsExpired(later + timeout, timeout).Should().BeTrue();
+        transaction.IsExpired(later + timeout, TimeSpan.Zero).Should().BeFalse();
     }
 
     // --- InMemoryDownloadDataProvider ------------------------------------------------------

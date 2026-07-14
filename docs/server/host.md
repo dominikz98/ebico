@@ -46,7 +46,12 @@ sodass Aufrufer jeden Baustein vorab überschreiben können (Muster wie `AddEbic
 
 `EbicoServerOptions` steuert Endpoint-Pfad, Fallback-Antwortversion (wenn die
 Request-Version nicht erkennbar ist), maximale Body-Größe und die akzeptierten
-Content-Types.
+Content-Types. Seit **M4** zusätzlich die Transaction-Engine-Parameter: Segmentgröße
+(`SegmentSizeBytes`), die Segment-Obergrenzen (`MaxUploadSegments`/`MaxDownloadSegments`)
+und — mit [#35](transaction-recovery.md) — der Transaktions-Idle-Timeout
+(`TransactionTimeout`), das Sweep-Intervall des Cleanup-Dienstes
+(`TransactionCleanupInterval`) und die obere Schranke paralleler Transaktionen
+(`MaxConcurrentTransactions`).
 
 ## Request-Pipeline
 

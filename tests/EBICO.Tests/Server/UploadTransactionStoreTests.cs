@@ -78,6 +78,92 @@ public class UploadTransactionStoreTests
         act.Should().Throw<ArgumentNullException>();
     }
 
+    [Fact]
+    public void GetAll_EmptyStore_ReturnsEmpty()
+    {
+        var store = new InMemoryUploadTransactionStore();
+
+        store.GetAll().Should().BeEmpty();
+    }
+
+    [Fact]
+    public void GetAll_ReturnsAllTransactions()
+    {
+        var store = new InMemoryUploadTransactionStore();
+        var a = NewTransaction(Enumerable.Repeat((byte)1, 16).ToArray());
+        var b = NewTransaction(Enumerable.Repeat((byte)2, 16).ToArray());
+        store.Create(a);
+        store.Create(b);
+
+        store.GetAll().Should().BeEquivalentTo([a, b]);
+    }
+
+    [Fact]
+    public void GetAll_SnapshotUnaffectedByLaterRemove()
+    {
+        var store = new InMemoryUploadTransactionStore();
+        var transaction = NewTransaction(Enumerable.Repeat((byte)3, 16).ToArray());
+        store.Create(transaction);
+
+        var snapshot = store.GetAll();
+        store.Remove(transaction.TransactionIdHex);
+
+        snapshot.Should().ContainSingle().Which.Should().BeSameAs(transaction);
+    }
+
+    // --- Idle expiry (UploadTransaction) ---------------------------------------------------
+
+    [Fact]
+    public void LastActivityAt_Initially_EqualsCreatedAt()
+    {
+        var transaction = NewTransaction(new byte[16]);
+
+        transaction.LastActivityAt.Should().Be(transaction.CreatedAt);
+    }
+
+    [Fact]
+    public void IsExpired_BeforeTimeout_ReturnsFalse()
+    {
+        var transaction = NewTransaction(new byte[16]);
+        var now = transaction.CreatedAt + TimeSpan.FromMinutes(59);
+
+        transaction.IsExpired(now, TimeSpan.FromHours(1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void IsExpired_AtOrAfterTimeout_ReturnsTrue()
+    {
+        var transaction = NewTransaction(new byte[16]);
+
+        transaction.IsExpired(transaction.CreatedAt + TimeSpan.FromHours(1), TimeSpan.FromHours(1)).Should().BeTrue();
+        transaction.IsExpired(transaction.CreatedAt + TimeSpan.FromHours(2), TimeSpan.FromHours(1)).Should().BeTrue();
+    }
+
+    [Fact]
+    public void IsExpired_WithNonPositiveTimeout_ReturnsFalse()
+    {
+        var transaction = NewTransaction(new byte[16]);
+        var farFuture = transaction.CreatedAt + TimeSpan.FromDays(365);
+
+        transaction.IsExpired(farFuture, TimeSpan.Zero).Should().BeFalse();
+        transaction.IsExpired(farFuture, TimeSpan.FromSeconds(-1)).Should().BeFalse();
+    }
+
+    [Fact]
+    public void Touch_SlidesTheExpiryWindow()
+    {
+        var transaction = NewTransaction(new byte[16]);
+        var timeout = TimeSpan.FromHours(1);
+        var later = transaction.CreatedAt + TimeSpan.FromMinutes(30);
+
+        transaction.Touch(later);
+
+        transaction.LastActivityAt.Should().Be(later);
+        // Would have expired at CreatedAt+1h; after the touch it lives until later+1h.
+        transaction.IsExpired(transaction.CreatedAt + TimeSpan.FromMinutes(61), timeout).Should().BeFalse();
+        transaction.IsExpired(later + timeout, timeout).Should().BeTrue();
+    }
+
     // --- Segment buffering (UploadTransaction) ---------------------------------------------
 
     [Fact]

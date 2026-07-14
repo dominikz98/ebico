@@ -107,3 +107,28 @@ public sealed class FixedTimeProvider : TimeProvider
     /// <inheritdoc />
     public override DateTimeOffset GetUtcNow() => _now;
 }
+
+/// <summary>
+/// A <see cref="TimeProvider"/> whose current instant can be moved forward, for testing idle-timeout and
+/// expiry behavior deterministically (unlike <see cref="FixedTimeProvider"/>, which cannot advance).
+/// Only the clock is emulated (no timer callbacks); expiry logic is tested by advancing and querying.
+/// </summary>
+public sealed class MutableTimeProvider : TimeProvider
+{
+    private DateTimeOffset _now;
+
+    /// <summary>Creates a provider starting at <paramref name="start"/>.</summary>
+    /// <param name="start">The initial instant.</param>
+    public MutableTimeProvider(DateTimeOffset start) => _now = start;
+
+    /// <inheritdoc />
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    /// <summary>Sets the current instant.</summary>
+    /// <param name="now">The new instant.</param>
+    public void SetUtcNow(DateTimeOffset now) => _now = now;
+
+    /// <summary>Moves the current instant forward by <paramref name="by"/>.</summary>
+    /// <param name="by">The amount to advance.</param>
+    public void Advance(TimeSpan by) => _now += by;
+}

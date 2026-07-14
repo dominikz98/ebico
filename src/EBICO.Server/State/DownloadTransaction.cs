@@ -25,13 +25,15 @@ namespace EBICO.Server.State;
 /// </para>
 /// <para>
 /// <b>⚠️ Spec-Vorbehalt:</b> the download response is not signed (X002 is M4) and no order signature is
-/// produced. Orphaned transactions (client abandons after initialisation) are not evicted here — a
-/// TTL/recovery model is issue #35.
+/// produced. Idle expiry (issue #35) is driven by <see cref="LastActivityAt"/>/<see cref="IsExpired"/>;
+/// an expired or orphaned download is evicted (lazily on access and via the background cleanup service)
+/// and its (already dequeued) order data is re-enqueued so it is not lost.
 /// </para>
 /// </remarks>
 public sealed class DownloadTransaction
 {
     private readonly IReadOnlyList<byte[]> _segments;
+    private long _lastActivityTicks;
 
     /// <summary>Initializes a new download transaction prepared during the initialisation phase.</summary>
     /// <param name="transactionId">The 16-byte transaction id assigned by the server.</param>
@@ -80,6 +82,7 @@ public sealed class DownloadTransaction
         EncryptionVersion = encryptionVersion;
         OrderDataPlaintext = orderDataPlaintext;
         CreatedAt = createdAt;
+        _lastActivityTicks = createdAt.UtcTicks;
     }
 
     /// <summary>The 16-byte transaction id assigned by the server.</summary>
@@ -114,6 +117,28 @@ public sealed class DownloadTransaction
 
     /// <summary>The time the transaction was created.</summary>
     public DateTimeOffset CreatedAt { get; }
+
+    /// <summary>
+    /// The time of the last activity on this transaction (its creation, then each served transfer
+    /// segment). The idle-expiry window (<see cref="IsExpired"/>) slides on this value, so a long
+    /// multi-segment download does not expire mid-flight. Read atomically; safe for concurrent access.
+    /// </summary>
+    public DateTimeOffset LastActivityAt => new(Interlocked.Read(ref _lastActivityTicks), TimeSpan.Zero);
+
+    /// <summary>Records activity on the transaction, sliding the idle-expiry window to <paramref name="now"/>.</summary>
+    /// <param name="now">The current time.</param>
+    public void Touch(DateTimeOffset now) => Interlocked.Exchange(ref _lastActivityTicks, now.UtcTicks);
+
+    /// <summary>
+    /// Whether the transaction has been idle for at least <paramref name="timeout"/> as of
+    /// <paramref name="now"/>. A non-positive <paramref name="timeout"/> disables expiry (always
+    /// <see langword="false"/>).
+    /// </summary>
+    /// <param name="now">The current time.</param>
+    /// <param name="timeout">The idle timeout; <see cref="TimeSpan.Zero"/> or less disables expiry.</param>
+    /// <returns><see langword="true"/> when the transaction has expired; otherwise <see langword="false"/>.</returns>
+    public bool IsExpired(DateTimeOffset now, TimeSpan timeout)
+        => timeout > TimeSpan.Zero && now.UtcTicks - Interlocked.Read(ref _lastActivityTicks) >= timeout.Ticks;
 
     /// <summary>Returns the encrypted ciphertext of the given 1-based segment.</summary>
     /// <param name="segmentNumber">The 1-based segment number in <c>[1, <see cref="NumSegments"/>]</c>.</param>

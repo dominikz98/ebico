@@ -4,7 +4,9 @@ using EBICO.Server;
 using EBICO.Server.Pipeline;
 using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
+using EBICO.Server.Transactions;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 
 namespace EBICO.Tests.Server;
@@ -95,5 +97,48 @@ public class EbicoServerServiceCollectionExtensionsTests
         var act = () => ((IServiceCollection)null!).AddEbicoServer();
 
         act.Should().Throw<ArgumentNullException>();
+    }
+
+    // --- Transaction recovery/timeouts (issue #35) -----------------------------------------
+
+    [Fact]
+    public void AddEbicoServer_AppliesDefaultTransactionOptions()
+    {
+        var services = new ServiceCollection();
+        services.AddEbicoServer();
+        using var provider = services.BuildServiceProvider();
+
+        var options = provider.GetRequiredService<IOptions<EbicoServerOptions>>().Value;
+
+        options.TransactionTimeout.Should().Be(TimeSpan.FromHours(1));
+        options.TransactionCleanupInterval.Should().Be(TimeSpan.FromMinutes(1));
+        options.MaxConcurrentTransactions.Should().Be(0);
+    }
+
+    [Fact]
+    public void AddEbicoServer_RegistersCleanupHostedService()
+    {
+        var services = new ServiceCollection();
+        services.AddEbicoServer();
+
+        services.Should().ContainSingle(d =>
+            d.ServiceType == typeof(IHostedService) && d.ImplementationType == typeof(TransactionCleanupService));
+    }
+
+    [Fact]
+    public void AddEbicoServer_RegistersBothEnginesAsEvictors_SameInstances()
+    {
+        var services = new ServiceCollection();
+        services.AddEbicoServer();
+        using var provider = services.BuildServiceProvider();
+
+        var evictors = provider.GetServices<ITransactionEvictor>().ToArray();
+        var uploadEngine = provider.GetRequiredService<IUploadTransactionEngine>();
+        var downloadEngine = provider.GetRequiredService<IDownloadTransactionEngine>();
+
+        evictors.Should().HaveCount(2);
+        // The forwarding registrations resolve the same singleton engine instances.
+        evictors.Should().Contain(e => ReferenceEquals(e, uploadEngine));
+        evictors.Should().Contain(e => ReferenceEquals(e, downloadEngine));
     }
 }
