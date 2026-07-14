@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using EBICO.Core;
+using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
@@ -122,6 +123,16 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         if (subscriber is null || subscriber.State != SubscriberState.Ready)
         {
             return Init(EbicsReturnCode.InvalidUserOrUserState);
+        }
+
+        // Authorisation per BTF/order type (issue #38): the subscriber must hold a permission for the
+        // requested order type. Checked before dequeuing so an unauthorised download consumes no data.
+        // For H005 the BTF service (BTDOrderParams/Service) is resolved to its classical order-type code;
+        // for H003/H004 the order type (FDL) is used directly.
+        var effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf);
+        if (effectiveOrderType is null || !subscriber.HasPermissionFor(effectiveOrderType))
+        {
+            return Init(EbicsReturnCode.AuthorisationOrderTypeFailed);
         }
 
         // The response is encrypted for the subscriber's encryption key (E002), stored during HIA. A

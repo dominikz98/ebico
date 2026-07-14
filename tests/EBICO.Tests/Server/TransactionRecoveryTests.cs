@@ -339,7 +339,18 @@ public class TransactionRecoveryTests
 
         await master.SaveBankAsync(new Bank(host), _ct);
         await master.SavePartnerAsync(new Partner(host, partner), _ct);
-        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+
+        // Generic upload/download authorisation (issue #38): the engines require a permission for the
+        // requested order type. Transitions preserve the permission set.
+        await master.SaveSubscriberAsync(
+            new Subscriber(host, partner, user, permissions:
+            [
+                new SubscriberPermission("FUL", SignatureClass.T),
+                new SubscriberPermission("BTU", SignatureClass.T),
+                new SubscriberPermission("FDL", SignatureClass.T),
+                new SubscriberPermission("BTD", SignatureClass.T),
+            ]),
+            _ct);
 
         if (state is SubscriberState.Initialized or SubscriberState.Ready)
         {

@@ -86,8 +86,11 @@ die neuen `Subscriber`-Mutatoren jeweils eine neue Instanz; der Manager persisti
 | `RevokePermissionsAsync(orderType)` | entfernt **alle** Berechtigungen eines Auftragstyps |
 | `SetPermissionsAsync(permissions)` | ersetzt die gesamte Menge (Duplikate werden zusammengefasst) |
 
-> **OrderType/BTF ist derzeit ein freier String.** Das typisierte BTF-/Order-Modell landet in
-> M5; bis dahin sind Werte wie `"CCT"`, `"STA"` frei wählbar.
+> **OrderType/BTF:** `SubscriberPermission.OrderType` bleibt ein String (z. B. `"CCT"`, `"STA"`), wird
+> aber seit dem [BTF-Framework (#38)](btf-framework.md) **erzwungen**: Upload/Download werden nur
+> ausgeführt, wenn die Teilnehmerin eine passende Berechtigung hält (sonst `090003`). Bei H005 wird der
+> BTF-Service (`BTUOrderParams`/`BTDOrderParams`) über den `BtfOrderTypeCatalog` auf den klassischen Code
+> gemappt und dagegen geprüft.
 
 ## Admin-API (HTTP)
 

@@ -102,6 +102,21 @@ public class SubscriberTests
     }
 
     [Fact]
+    public void HasPermissionFor_TrueForAnySignatureClass()
+    {
+        var permissions = new[]
+        {
+            new SubscriberPermission("CCT", SignatureClass.E),
+            new SubscriberPermission("STA", SignatureClass.T),
+        };
+        var subscriber = NewSubscriber(permissions: permissions);
+
+        subscriber.HasPermissionFor("CCT").Should().BeTrue("a bank-technical permission exists");
+        subscriber.HasPermissionFor("STA").Should().BeTrue("a transport permission also grants the gate");
+        subscriber.HasPermissionFor("ZZZ").Should().BeFalse("there is no permission for ZZZ");
+    }
+
+    [Fact]
     public void IsTransportOnlyFor_TrueWhenAllMatchingPermissionsAreTransport()
     {
         var permissions = new[]

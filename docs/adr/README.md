@@ -42,6 +42,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0013](0013-upload-transaktions-engine.md) | Upload-Transaktions-Engine & -Speicher | accepted |
 | [0014](0014-download-transaktions-engine.md) | Download-Transaktions-Engine, -Speicher & Datenbereitstellung | accepted |
 | [0015](0015-ereignis-protokollspeicher.md) | Ereignis-/Protokollspeicher (`IEventLog`) | accepted |
+| [0016](0016-btf-framework-und-berechtigung.md) | BTF-Framework & Berechtigungsprüfung | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

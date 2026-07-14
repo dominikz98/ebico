@@ -7,6 +7,7 @@ using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using EBICO.Server.Pipeline;
 using EBICO.Server.State;
+using EBICO.Server.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EBICO.Tests.Server;
@@ -326,7 +327,19 @@ public class DownloadTransactionTests
 
         await master.SaveBankAsync(new Bank(host), _ct);
         await master.SavePartnerAsync(new Partner(host, partner), _ct);
-        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+
+        // Generic authorisation (issue #38): the engines require a permission for the requested order type.
+        // FDL/BTD cover the downloads; FUL/BTU cover the concurrent-upload routing test. Transitions
+        // preserve the permission set.
+        await master.SaveSubscriberAsync(
+            new Subscriber(host, partner, user, permissions:
+            [
+                new SubscriberPermission(DownloadTransactionEngine.FdlOrderType, SignatureClass.T),
+                new SubscriberPermission(DownloadTransactionEngine.BtdOrderType, SignatureClass.T),
+                new SubscriberPermission(UploadTransactionEngine.FulOrderType, SignatureClass.T),
+                new SubscriberPermission(UploadTransactionEngine.BtuOrderType, SignatureClass.T),
+            ]),
+            _ct);
 
         if (state is SubscriberState.Initialized or SubscriberState.Ready)
         {

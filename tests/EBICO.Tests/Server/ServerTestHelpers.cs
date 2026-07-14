@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using EBICO.Core;
+using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
@@ -856,6 +857,7 @@ internal static class ServerTestHelpers
     /// <param name="bankEncVersion">The bank's encryption key version (e.g. <c>"E002"</c>).</param>
     /// <param name="segmentSizeBytes">The maximum raw segment size; small values force several segments.</param>
     /// <param name="signatureData">The optional raw order-signature (ES) blob to place in the initialisation.</param>
+    /// <param name="btf">The optional H005 business transaction format placed in <c>BTUOrderParams/Service</c> (ignored for H003/H004).</param>
     /// <returns>The initialisation XML and the ordered ciphertext segments.</returns>
     public static UploadRequest BuildUploadInitRequest(
         EbicsVersion version,
@@ -866,7 +868,8 @@ internal static class ServerTestHelpers
         RsaKeyMaterial bankEncKey,
         KeyVersion bankEncVersion,
         int segmentSizeBytes = 512 * 1024,
-        byte[]? signatureData = null)
+        byte[]? signatureData = null,
+        BusinessTransactionFormat? btf = null)
     {
         var compressed = EbicsCompression.Compress(orderData);
         var encrypted = EncryptionE002.Encrypt(compressed, bankEncKey, bankEncVersion);
@@ -945,7 +948,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H005.StaticHeaderOrderDetailsType { AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType } },
+                        OrderDetails = new H005.StaticHeaderOrderDetailsType
+                        {
+                            AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType },
+                            OrderParams = btf is { } bu ? new H005.BtuParamsType { Service = bu.ToRestrictedServiceType() } : null,
+                        },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
                     },
@@ -1057,8 +1064,10 @@ internal static class ServerTestHelpers
     /// <param name="hostId">The <c>HostID</c> to place in the header.</param>
     /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
     /// <param name="userId">The <c>UserID</c> to place in the header.</param>
+    /// <param name="btf">The optional H005 business transaction format placed in <c>BTDOrderParams/Service</c> (ignored for H003/H004).</param>
     /// <returns>The serialized initialisation request XML.</returns>
-    public static string BuildDownloadInitRequest(EbicsVersion version, string hostId, string partnerId, string userId)
+    public static string BuildDownloadInitRequest(
+        EbicsVersion version, string hostId, string partnerId, string userId, BusinessTransactionFormat? btf = null)
         => version switch
         {
             EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
@@ -1103,7 +1112,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H005.StaticHeaderOrderDetailsType { AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = "BTD" } },
+                        OrderDetails = new H005.StaticHeaderOrderDetailsType
+                        {
+                            AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = "BTD" },
+                            OrderParams = btf is { } bd ? new H005.BtdParamsType { Service = bd.ToRestrictedServiceType() } : null,
+                        },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H005.MutableHeaderType { TransactionPhase = H005.TransactionPhaseType.Initialisation },

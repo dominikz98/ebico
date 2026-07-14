@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using EBICO.Core;
+using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
@@ -111,6 +112,15 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         if (subscriber is null || subscriber.State != SubscriberState.Ready)
         {
             return Init(EbicsReturnCode.InvalidUserOrUserState);
+        }
+
+        // Authorisation per BTF/order type (issue #38): the subscriber must hold a permission for the
+        // requested order type. For H005 the BTF service (BTUOrderParams/Service) is resolved to its
+        // classical order-type code; for H003/H004 the order type (FUL) is used directly.
+        var effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf);
+        if (effectiveOrderType is null || !subscriber.HasPermissionFor(effectiveOrderType))
+        {
+            return Init(EbicsReturnCode.AuthorisationOrderTypeFailed);
         }
 
         // NumSegments is mandatory for uploads and must be within the configured ceiling.

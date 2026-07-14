@@ -7,6 +7,7 @@ using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using EBICO.Server.Pipeline;
 using EBICO.Server.State;
+using EBICO.Server.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EBICO.Tests.Server;
@@ -247,7 +248,16 @@ public class UploadTransactionTests
 
         await master.SaveBankAsync(new Bank(host), _ct);
         await master.SavePartnerAsync(new Partner(host, partner), _ct);
-        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+
+        // Generic upload authorisation (issue #38): the engine requires a permission for the requested
+        // order type (FUL for H003/H004, BTU for H005). Transitions preserve the permission set.
+        await master.SaveSubscriberAsync(
+            new Subscriber(host, partner, user, permissions:
+            [
+                new SubscriberPermission(UploadTransactionEngine.FulOrderType, SignatureClass.T),
+                new SubscriberPermission(UploadTransactionEngine.BtuOrderType, SignatureClass.T),
+            ]),
+            _ct);
 
         if (state is SubscriberState.Initialized or SubscriberState.Ready)
         {
