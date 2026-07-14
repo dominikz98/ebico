@@ -100,4 +100,77 @@ public class BtfOrderTypeCatalogTests
         BtfOrderTypeCatalog.ResolveOrderType(null, btf: null).Should().BeNull();
         BtfOrderTypeCatalog.ResolveOrderType("   ", btf: null).Should().BeNull();
     }
+
+    // --- Issue #39: CIP seed, file-format resolution, upload routing ------------------------
+
+    [Fact]
+    public void TryGetBtf_InstantCreditTransfer_ResolvesServiceWithInstOption()
+    {
+        BtfOrderTypeCatalog.TryGetBtf("CIP", out var btf).Should().BeTrue();
+
+        btf.Service.Should().Be("SCT");
+        btf.Option.Should().Be("INST");
+        btf.MessageName.Should().Be("pain.001");
+    }
+
+    [Fact]
+    public void TryGetOrderType_DistinguishesCctFromCipByOption()
+    {
+        var cct = new BusinessTransactionFormat("SCT", messageName: "pain.001");
+        var cip = new BusinessTransactionFormat("SCT", option: "INST", messageName: "pain.001");
+
+        BtfOrderTypeCatalog.TryGetOrderType(cct, out var cctCode).Should().BeTrue();
+        cctCode.Should().Be("CCT");
+
+        BtfOrderTypeCatalog.TryGetOrderType(cip, out var cipCode).Should().BeTrue();
+        cipCode.Should().Be("CIP");
+    }
+
+    [Theory]
+    [InlineData("CCT", true)]
+    [InlineData("CDD", true)]
+    [InlineData("CDB", true)]
+    [InlineData("CIP", true)]
+    [InlineData("C53", false)] // a download order type
+    [InlineData("FUL", false)]
+    [InlineData("HPB", false)]
+    [InlineData(null, false)]
+    public void IsUploadOrderType_RecognisesDirectUploadCodes(string? orderType, bool expected)
+    {
+        BtfOrderTypeCatalog.IsUploadOrderType(orderType).Should().Be(expected);
+    }
+
+    [Theory]
+    [InlineData("pain.001.001.09", "CCT")]
+    [InlineData("pain.001.001.03", "CCT")]
+    [InlineData("pain.008.001.02", "CDD")] // both CDD/CDB carry pain.008; the un-optioned CDD wins
+    public void TryGetOrderTypeByFileFormat_MatchesMessageFamily(string fileFormat, string expected)
+    {
+        BtfOrderTypeCatalog.TryGetOrderTypeByFileFormat(fileFormat, out var orderType).Should().BeTrue();
+        orderType.Should().Be(expected);
+    }
+
+    [Fact]
+    public void TryGetOrderTypeByFileFormat_UnknownFamily_ReturnsFalse()
+    {
+        BtfOrderTypeCatalog.TryGetOrderTypeByFileFormat("camt.053.001.08", out _).Should().BeFalse();
+    }
+
+    [Fact]
+    public void ResolveUploadOrderType_PrefersBtf_ThenFileFormat_ThenDirectCode()
+    {
+        // H005 BTU with a mapped BTF.
+        BtfOrderTypeCatalog
+            .ResolveUploadOrderType("BTU", new BusinessTransactionFormat("SCT", messageName: "pain.001"), fileFormat: null)
+            .Should().Be("CCT");
+
+        // H003/H004 generic FUL with a file format.
+        BtfOrderTypeCatalog.ResolveUploadOrderType("FUL", btf: null, fileFormat: "pain.008.001.02").Should().Be("CDD");
+
+        // Classical order type submitted directly.
+        BtfOrderTypeCatalog.ResolveUploadOrderType("CCT", btf: null, fileFormat: null).Should().Be("CCT");
+
+        // Generic FUL without a recognised file format falls back to the raw order type.
+        BtfOrderTypeCatalog.ResolveUploadOrderType("FUL", btf: null, fileFormat: null).Should().Be("FUL");
+    }
 }

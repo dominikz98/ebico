@@ -71,6 +71,7 @@ public sealed class UploadTransaction
     /// <param name="transactionKey">The decrypted AES-128 transaction key used to decrypt the reassembled order data.</param>
     /// <param name="signatureData">The raw order-signature (ES) blob from the initialisation, retained for later verification; may be <see langword="null"/>.</param>
     /// <param name="createdAt">The time the transaction was created.</param>
+    /// <param name="effectiveOrderType">The resolved classical order-type code (e.g. <c>"CCT"</c>) the transfer-phase order processing dispatches on; captured at initialisation because the transfer requests carry no order type. May be <see langword="null"/> when the raw <paramref name="orderType"/> does not resolve to a business order.</param>
     /// <exception cref="ArgumentNullException"><paramref name="transactionId"/>, <paramref name="orderType"/> or <paramref name="transactionKey"/> is <see langword="null"/>.</exception>
     public UploadTransaction(
         byte[] transactionId,
@@ -80,7 +81,8 @@ public sealed class UploadTransaction
         int numSegments,
         byte[] transactionKey,
         byte[]? signatureData,
-        DateTimeOffset createdAt)
+        DateTimeOffset createdAt,
+        string? effectiveOrderType = null)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
         ArgumentNullException.ThrowIfNull(orderType);
@@ -91,6 +93,7 @@ public sealed class UploadTransaction
         Version = version;
         Subscriber = subscriber;
         OrderType = orderType;
+        EffectiveOrderType = effectiveOrderType;
         NumSegments = numSegments;
         TransactionKey = transactionKey;
         SignatureData = signatureData;
@@ -112,6 +115,13 @@ public sealed class UploadTransaction
 
     /// <summary>The upload order type (e.g. <c>"FUL"</c>/<c>"BTU"</c>).</summary>
     public string OrderType { get; }
+
+    /// <summary>
+    /// The resolved classical order-type code (e.g. <c>"CCT"</c>/<c>"CDD"</c>) captured during
+    /// initialisation, or <see langword="null"/> when the raw <see cref="OrderType"/> did not resolve to
+    /// a business order. Used by the transfer-phase order processing, which no longer sees the order type.
+    /// </summary>
+    public string? EffectiveOrderType { get; }
 
     /// <summary>The total number of segments announced for the transaction.</summary>
     public int NumSegments { get; }

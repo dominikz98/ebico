@@ -102,6 +102,12 @@ public enum EbicsEventType
 
     /// <summary>An in-flight transaction expired and was evicted (idle-timeout / cleanup sweep).</summary>
     TransactionEvicted,
+
+    /// <summary>An uploaded business order (e.g. a SEPA payment) was validated, accepted and filed for delivery (issue #39).</summary>
+    OrderAccepted,
+
+    /// <summary>An uploaded business order was rejected because its payload failed validation (issue #39).</summary>
+    OrderRejected,
 }
 
 /// <summary>The severity of an <see cref="EbicsEvent"/>.</summary>

@@ -54,6 +54,7 @@ konkreten Orders (#39–#42) erweitern sie, #43 dokumentiert das Ergebnis als Ab
 | OrderType | Richtung | Service | Option | Container | MsgName | Beschreibung |
 | --- | --- | --- | --- | --- | --- | --- |
 | `CCT` | Upload | `SCT` | – | – | `pain.001` | SEPA Credit Transfer |
+| `CIP` | Upload | `SCT` | `INST` | – | `pain.001` | SEPA Instant Credit Transfer |
 | `CDD` | Upload | `SDD` | `COR` | – | `pain.008` | SEPA Direct Debit (CORE) |
 | `CDB` | Upload | `SDD` | `B2B` | – | `pain.008` | SEPA Direct Debit (B2B) |
 | `STA` | Download | `EOP` | – | `ZIP` | `mt940` | Kontoauszug (SWIFT MT940) |
@@ -127,9 +128,12 @@ beantwortet.
   Annex verifiziert ist.
 - **Admin-/technische OrderTypes bleiben Admin-OrderTypes.** `HAC`/`HAA`/`HTD`/`HKD`/`HPD`/`PTK` werden
   bewusst **nicht** als BTF-Service modelliert (in H005 weiterhin `AdminOrderType`); sie sind Thema von #41.
-- **`FUL`/`FDL`-`FileFormat` → BTF.** Bei H004 steckt die fachliche Auftragsart im
-  `FULOrderParams`/`FDLOrderParams`-`FileFormat`; die Übersetzung nach BTF ist #39/#40 vorbehalten. #38
-  autorisiert H004 direkt über den OrderType-String (`FUL`/`FDL` bzw. den klassischen Code).
+- **`FUL`-`FileFormat` → OrderType (Upload, umgesetzt in #39).** Bei H003/H004 steckt die fachliche
+  Auftragsart im `FULOrderParams/FileFormat`; `BtfOrderTypeCatalog.TryGetOrderTypeByFileFormat` /
+  `ResolveUploadOrderType` bilden die MsgName-Familie (z. B. `pain.001.001.09` → `CCT`) für die
+  Upload-Autorisierung/-Verarbeitung ab (siehe [Zahlungsverkehr-Orders](payment-orders.md)). Die
+  **Download**-Seite (`FDL`-`FileFormat`) bleibt **[#40](download-transaction.md)** vorbehalten; die
+  Option (CORE/B2B) ist aus dem FileFormat allein nicht ableitbar (CDD-Default).
 - **`SignatureFlag` (ES-Pflicht je BTF).** Ob ein BTU-Auftrag eine ES fordert, steuert spec-seitig
   `BTUOrderParams/SignatureFlag`; das ist von der reinen OrderType-Berechtigung getrennt und offen
   (vgl. [Upload-Transaktion](upload-transaction.md)).

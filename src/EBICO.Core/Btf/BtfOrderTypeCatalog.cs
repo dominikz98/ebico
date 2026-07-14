@@ -45,6 +45,7 @@ public static class BtfOrderTypeCatalog
     [
         // --- Uploads (BTU) ---
         new("CCT", new BusinessTransactionFormat("SCT", messageName: "pain.001"), BtfDirection.Upload, "SEPA Credit Transfer"),
+        new("CIP", new BusinessTransactionFormat("SCT", option: "INST", messageName: "pain.001"), BtfDirection.Upload, "SEPA Instant Credit Transfer"),
         new("CDD", new BusinessTransactionFormat("SDD", option: "COR", messageName: "pain.008"), BtfDirection.Upload, "SEPA Direct Debit (CORE)"),
         new("CDB", new BusinessTransactionFormat("SDD", option: "B2B", messageName: "pain.008"), BtfDirection.Upload, "SEPA Direct Debit (B2B)"),
 
@@ -120,6 +121,90 @@ public static class BtfOrderTypeCatalog
         }
 
         return string.IsNullOrWhiteSpace(adminOrderType) ? null : adminOrderType;
+    }
+
+    /// <summary>
+    /// Whether <paramref name="orderType"/> is a classical order-type code that maps to an <b>upload</b>
+    /// business transaction (<see cref="BtfDirection.Upload"/> or <see cref="BtfDirection.Both"/>) — the
+    /// payment order types (CCT/CIP/CDD/CDB) a client may submit <i>directly</i> (H003/H004) instead of
+    /// through the generic <c>FUL</c>/<c>BTU</c>. Used by the upload routing to recognise direct codes.
+    /// </summary>
+    /// <param name="orderType">The classical order type code, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> for a direct upload order-type code; otherwise <see langword="false"/>.</returns>
+    public static bool IsUploadOrderType(string? orderType)
+    {
+        if (string.IsNullOrWhiteSpace(orderType))
+        {
+            return false;
+        }
+
+        foreach (var entry in Entries)
+        {
+            if (entry.Direction is BtfDirection.Upload or BtfDirection.Both
+                && string.Equals(entry.OrderType, orderType, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Resolves the classical order-type code for a generic file upload (<c>FUL</c>) by its
+    /// <c>FULOrderParams/FileFormat</c> value (e.g. <c>"pain.001.001.09"</c>), matching on the message-name
+    /// family of the catalog's upload entries. When several upload entries share a message family
+    /// (e.g. <c>CDD</c>/<c>CDB</c> both carry <c>pain.008</c>) the first — the un-optioned default
+    /// (<c>CCT</c>, <c>CDD</c>) — wins; the service option (INST/B2B) cannot be told apart from the file
+    /// format alone (best-effort, see <c>docs/server/payment-orders.md</c>).
+    /// </summary>
+    /// <param name="fileFormat">The <c>FileFormat</c> value (e.g. <c>"pain.008.001.02"</c>).</param>
+    /// <param name="orderType">The classical order type code when the method returns <see langword="true"/>.</param>
+    /// <returns><see langword="true"/> when the file format maps to an upload order type; otherwise <see langword="false"/>.</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="fileFormat"/> is <see langword="null"/>.</exception>
+    public static bool TryGetOrderTypeByFileFormat(string fileFormat, out string orderType)
+    {
+        ArgumentNullException.ThrowIfNull(fileFormat);
+
+        foreach (var entry in Entries)
+        {
+            if (entry.Direction is BtfDirection.Upload or BtfDirection.Both
+                && entry.Btf.MessageName is { } messageName
+                && MessageNameMatches(messageName, fileFormat))
+            {
+                orderType = entry.OrderType;
+                return true;
+            }
+        }
+
+        orderType = string.Empty;
+        return false;
+    }
+
+    /// <summary>
+    /// Resolves the effective classical order-type code for an <b>upload</b> across the three submission
+    /// conventions, in precedence order: the H005 <paramref name="btf"/> (<c>BTU</c>), a generic
+    /// <c>FUL</c> with a <paramref name="fileFormat"/> (H003/H004), or a classical order type submitted
+    /// directly. Falls back to the raw <paramref name="orderType"/> when no more specific mapping applies
+    /// (mirrors <see cref="ResolveOrderType"/> for the download side).
+    /// </summary>
+    /// <param name="orderType">The extracted order/admin-order type (e.g. <c>"CCT"</c>, <c>"FUL"</c>, <c>"BTU"</c>), or <see langword="null"/>.</param>
+    /// <param name="btf">The extracted H005 BTF, or <see langword="null"/> when absent.</param>
+    /// <param name="fileFormat">The H003/H004 <c>FULOrderParams/FileFormat</c> value, or <see langword="null"/> when absent.</param>
+    /// <returns>The effective upload order-type code, or <see langword="null"/> when nothing is available.</returns>
+    public static string? ResolveUploadOrderType(string? orderType, BusinessTransactionFormat? btf, string? fileFormat)
+    {
+        if (btf is { } value)
+        {
+            return TryGetOrderType(value, out var mapped) ? mapped : value.CanonicalKey;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fileFormat) && TryGetOrderTypeByFileFormat(fileFormat, out var byFormat))
+        {
+            return byFormat;
+        }
+
+        return string.IsNullOrWhiteSpace(orderType) ? null : orderType;
     }
 
     private static bool OptionMatches(string? mappingOption, string? candidateOption)

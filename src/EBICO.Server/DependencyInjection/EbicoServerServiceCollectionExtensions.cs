@@ -1,5 +1,6 @@
 using EBICO.Server;
 using EBICO.Server.Handlers;
+using EBICO.Server.Orders;
 using EBICO.Server.Pipeline;
 using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
@@ -47,6 +48,11 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
         services.TryAddSingleton<EbicsResponseFactory>();
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
+
+        // Order processing (issue #39): the order-type-specific post-processing the upload engine invokes
+        // once the order data is decoded. Default: SEPA payments (CCT/CDD/CDB/CIP) — validate the pain
+        // payload and file the pain.002 status report for later download. Pluggable via TryAddSingleton.
+        services.TryAddSingleton<IUploadOrderProcessor, SepaPaymentUploadProcessor>();
 
         // Transaction engine (issue #32): the upload transaction store and the two-phase engine the
         // pipeline routes FUL/BTU initialisations and every transfer-phase request to.

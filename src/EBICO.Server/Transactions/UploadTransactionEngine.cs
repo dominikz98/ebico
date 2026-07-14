@@ -7,6 +7,7 @@ using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using EBICO.Server.Handlers;
+using EBICO.Server.Orders;
 using EBICO.Server.Pipeline;
 using EBICO.Server.State;
 using Microsoft.Extensions.Options;
@@ -50,6 +51,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     private readonly IMasterDataManager _masterData;
     private readonly IServerBankKeyStore _bankKeyStore;
     private readonly IEventLog _eventLog;
+    private readonly IUploadOrderProcessor _orderProcessor;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
 
@@ -58,6 +60,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="bankKeyStore">The store providing the bank's key pair (its private encryption key decrypts the transaction key).</param>
     /// <param name="eventLog">The append-only event log (issue #69) the upload lifecycle events are written to.</param>
+    /// <param name="orderProcessor">The order-type-specific processor invoked once the order data is decoded (issue #39).</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment/transaction limits).</param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
@@ -66,6 +69,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         IMasterDataManager masterData,
         IServerBankKeyStore bankKeyStore,
         IEventLog eventLog,
+        IUploadOrderProcessor orderProcessor,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
     {
@@ -73,6 +77,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(bankKeyStore);
         ArgumentNullException.ThrowIfNull(eventLog);
+        ArgumentNullException.ThrowIfNull(orderProcessor);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -80,18 +85,21 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         _masterData = masterData;
         _bankKeyStore = bankKeyStore;
         _eventLog = eventLog;
+        _orderProcessor = orderProcessor;
         _timeProvider = timeProvider;
         _options = options.Value;
     }
 
     /// <summary>
-    /// Whether <paramref name="orderType"/> is a generic upload order type handled by the engine
-    /// (<see cref="FulOrderType"/> for H003/H004, <see cref="BtuOrderType"/> for H005).
+    /// Whether <paramref name="orderType"/> routes to the upload engine: the generic upload order types
+    /// (<see cref="FulOrderType"/> for H003/H004, <see cref="BtuOrderType"/> for H005) or a classical
+    /// upload order-type code submitted directly (e.g. <c>"CCT"</c>/<c>"CDD"</c>, via
+    /// <see cref="BtfOrderTypeCatalog.IsUploadOrderType"/>).
     /// </summary>
     /// <param name="orderType">The extracted order type, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> for an upload order type; otherwise <see langword="false"/>.</returns>
     public static bool IsUploadOrderType(string? orderType)
-        => orderType is FulOrderType or BtuOrderType;
+        => orderType is FulOrderType or BtuOrderType || BtfOrderTypeCatalog.IsUploadOrderType(orderType);
 
     /// <inheritdoc />
     public async Task<UploadTransactionResult> BeginUploadAsync(EbicsRequestContext context, CancellationToken ct = default)
@@ -115,9 +123,11 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         }
 
         // Authorisation per BTF/order type (issue #38): the subscriber must hold a permission for the
-        // requested order type. For H005 the BTF service (BTUOrderParams/Service) is resolved to its
-        // classical order-type code; for H003/H004 the order type (FUL) is used directly.
-        var effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf);
+        // requested order type. The effective code is resolved across the three upload conventions
+        // (issue #39): H005 BTU (BTUOrderParams/Service), H003/H004 generic FUL + FULOrderParams/FileFormat,
+        // or a classical order type submitted directly. Authorising against the resolved code fixes the
+        // FUL case (otherwise the check would run against "FUL", not e.g. "CCT").
+        var effectiveOrderType = BtfOrderTypeCatalog.ResolveUploadOrderType(context.OrderType, context.Btf, fields.FileFormat);
         if (effectiveOrderType is null || !subscriber.HasPermissionFor(effectiveOrderType))
         {
             return Init(EbicsReturnCode.AuthorisationOrderTypeFailed);
@@ -170,7 +180,8 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             (int)numSegments,
             transactionKey,
             fields.SignatureData,
-            _timeProvider.GetUtcNow());
+            _timeProvider.GetUtcNow(),
+            effectiveOrderType);
 
         _store.Create(transaction);
 
@@ -238,7 +249,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             SegmentAppendStatus.Duplicate => EbicsReturnCode.TxMessageReplay,
             SegmentAppendStatus.Underrun => EbicsReturnCode.TxSegmentNumberUnderrun,
             SegmentAppendStatus.Buffered => EbicsReturnCode.Ok,
-            SegmentAppendStatus.Ready => FinalizeOrder(transaction, append.OrderedSegments!),
+            SegmentAppendStatus.Ready => await FinalizeOrderAsync(transaction, append.OrderedSegments!, ct).ConfigureAwait(false),
             _ => EbicsReturnCode.InternalError,
         };
 
@@ -315,27 +326,52 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             },
             ct);
 
-    // Reassembles, decrypts and decompresses the completed order data and records it on the transaction.
-    // Decode failures map to InvalidOrderDataFormat (090004); the order signature (ES) is not verified in
+    // Reassembles, decrypts and decompresses the completed order data, runs the order-type-specific
+    // processing (issue #39) and records the plaintext on the transaction. Decode failures map to
+    // InvalidOrderDataFormat (090004); a payment order whose payload fails validation is rejected with the
+    // processor's return code (090004) and is NOT retained. The order signature (ES) is not verified in
     // this issue (Spec-Vorbehalt).
-    private static EbicsReturnCode FinalizeOrder(UploadTransaction transaction, IReadOnlyList<byte[]> orderedSegments)
+    private async Task<EbicsReturnCode> FinalizeOrderAsync(
+        UploadTransaction transaction, IReadOnlyList<byte[]> orderedSegments, CancellationToken ct)
     {
+        byte[] orderData;
         try
         {
-            var orderData = OrderDataFault.Wrap(() =>
+            orderData = OrderDataFault.Wrap(() =>
             {
                 var ciphertext = EbicsSegmentation.Reassemble(orderedSegments);
                 var compressed = EncryptionE002.DecryptOrderData(ciphertext, transaction.TransactionKey);
                 return EbicsCompression.Decompress(compressed);
             });
-
-            transaction.Complete(orderData);
-            return EbicsReturnCode.Ok;
         }
         catch (EbicsOrderDataException)
         {
             return EbicsReturnCode.InvalidOrderDataFormat;
         }
+
+        // Order-type-specific processing (issue #39): a payment upload (CCT/CDD/CDB/CIP) is validated and
+        // its pain.002 status report filed for later delivery here. Order types the processor does not
+        // handle keep the previous behaviour: retain the plaintext on the transaction, no processing.
+        if (transaction.EffectiveOrderType is { } effectiveOrderType && _orderProcessor.CanProcess(effectiveOrderType))
+        {
+            var processing = await _orderProcessor.ProcessAsync(
+                new UploadOrderContext(
+                    transaction.Subscriber,
+                    transaction.Version,
+                    effectiveOrderType,
+                    orderData,
+                    transaction.TransactionIdHex),
+                ct).ConfigureAwait(false);
+
+            // A rejected payload is not completed/retained; the transfer step reports the rejection code.
+            if (processing.ReturnCode.Code != EbicsReturnCode.OkCode)
+            {
+                return processing.ReturnCode;
+            }
+        }
+
+        transaction.Complete(orderData);
+        return EbicsReturnCode.Ok;
     }
 
     private static UploadTransactionResult Init(EbicsReturnCode returnCode)
@@ -347,28 +383,33 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     // --- Version-neutral field extraction (mirrors EbicsRequestPipeline.TryExtractOrderType) --------
 
     private readonly record struct InitFields(
-        string? HostId, string? PartnerId, string? UserId, ulong? NumSegments, byte[]? TransactionKey, byte[]? SignatureData);
+        string? HostId, string? PartnerId, string? UserId, ulong? NumSegments, byte[]? TransactionKey, byte[]? SignatureData, string? FileFormat);
 
     private readonly record struct TransferFields(
         byte[]? TransactionId, ulong? SegmentNumber, bool LastSegment, byte[]? OrderData);
 
     private static InitFields ExtractInit(IEbicsRequestEnvelope envelope) => envelope switch
     {
+        // H003/H004 carry the pain format in FULOrderParams/FileFormat (generic file upload); H005 carries
+        // the business identity in the BTF (context.Btf), so it has no FileFormat here.
         H003.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
-            r.Body?.DataTransfer?.SignatureData?.Value),
+            r.Body?.DataTransfer?.SignatureData?.Value,
+            (r.Header?.Static?.OrderDetails?.OrderParams as H003.FulOrderParamsType)?.FileFormat?.Value),
         H004.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
-            r.Body?.DataTransfer?.SignatureData?.Value),
+            r.Body?.DataTransfer?.SignatureData?.Value,
+            (r.Header?.Static?.OrderDetails?.OrderParams as H004.FulOrderParamsType)?.FileFormat?.Value),
         H005.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
-            r.Body?.DataTransfer?.SignatureData?.Value),
+            r.Body?.DataTransfer?.SignatureData?.Value,
+            FileFormat: null),
         _ => default,
     };
 

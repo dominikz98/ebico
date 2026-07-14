@@ -93,4 +93,14 @@ public sealed class EbicoServerOptions
     /// <c>application/xml</c>.
     /// </summary>
     public IReadOnlyCollection<string> AllowedContentTypes { get; set; } = ["text/xml", "application/xml"];
+
+    /// <summary>
+    /// The download order type under which a payment upload's generated <c>pain.002</c> status report is
+    /// filed for later delivery (issue #39). Defaults to <c>"PSR"</c> (Payment Status Report). This is a
+    /// <b>best-effort placeholder</b> until the official EBICS/BTF external code list pins the real
+    /// download order type; the end-to-end download of the status report (mapping an <c>FDL</c> file
+    /// format / <c>BTD</c> BTF onto this queue) lands with the download orders (issue #40). Consumed by
+    /// the SEPA payment upload processor (<c>SepaPaymentUploadProcessor</c>).
+    /// </summary>
+    public string PaymentStatusReportOrderType { get; set; } = "PSR";
 }
