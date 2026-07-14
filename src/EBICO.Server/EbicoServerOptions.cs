@@ -80,6 +80,15 @@ public sealed class EbicoServerOptions
     public int MaxConcurrentTransactions { get; set; }
 
     /// <summary>
+    /// The maximum number of entries the in-memory event log (<c>IEventLog</c>, issue #69) retains.
+    /// Defaults to <c>10000</c>. When the cap is reached the oldest event is dropped as a new one is
+    /// appended (ring buffer), bounding memory for a long-running emulator. A value of <c>0</c> disables
+    /// the bound (the log grows until the process restarts). Consumed by <c>InMemoryEventLog</c>; ignored
+    /// by a persistent event-log implementation.
+    /// </summary>
+    public int MaxEventLogEntries { get; set; } = 10_000;
+
+    /// <summary>
     /// The content types accepted on the EBICS endpoint. Defaults to <c>text/xml</c> and
     /// <c>application/xml</c>.
     /// </summary>

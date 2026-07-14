@@ -51,6 +51,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     private readonly IMasterDataManager _masterData;
     private readonly IServerKeyStore _keyStore;
     private readonly IDownloadDataProvider _dataProvider;
+    private readonly IEventLog _eventLog;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
 
@@ -59,6 +60,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="keyStore">The server key store the subscriber's encryption key is read from.</param>
     /// <param name="dataProvider">The provider supplying the order data to download.</param>
+    /// <param name="eventLog">The append-only event log (issue #69) the download lifecycle events are written to.</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment size/limits).</param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
@@ -67,6 +69,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         IMasterDataManager masterData,
         IServerKeyStore keyStore,
         IDownloadDataProvider dataProvider,
+        IEventLog eventLog,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
     {
@@ -74,6 +77,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(keyStore);
         ArgumentNullException.ThrowIfNull(dataProvider);
+        ArgumentNullException.ThrowIfNull(eventLog);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -81,6 +85,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         _masterData = masterData;
         _keyStore = keyStore;
         _dataProvider = dataProvider;
+        _eventLog = eventLog;
         _timeProvider = timeProvider;
         _options = options.Value;
     }
@@ -174,6 +179,15 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             _timeProvider.GetUtcNow());
 
         _store.Create(transaction);
+
+        await AppendEventAsync(
+            transaction,
+            EbicsEventType.DownloadStarted,
+            EbicsEventSeverity.Info,
+            EbicsEventVisibility.CustomerVisible,
+            EbicsReturnCode.Ok,
+            $"Download started ({segmented.NumSegments} segment(s), order type {orderType}).",
+            ct).ConfigureAwait(false);
 
         // The initialisation response carries segment 1 together with the DataEncryptionInfo.
         var firstSegment = new DownloadSegmentPayload(
@@ -273,12 +287,29 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         // post-processing skipped, re-enqueue the data so it can be downloaded again.
         if (receiptCode == 0)
         {
+            await AppendEventAsync(
+                transaction,
+                EbicsEventType.DownloadCompleted,
+                EbicsEventSeverity.Info,
+                EbicsEventVisibility.CustomerVisible,
+                EbicsReturnCode.DownloadPostprocessDone,
+                $"Download completed with a positive receipt (order type {transaction.OrderType}).",
+                ct).ConfigureAwait(false);
             return Receipt(EbicsReturnCode.DownloadPostprocessDone, transactionId);
         }
 
         await _dataProvider
             .EnqueueAsync(transaction.Subscriber, transaction.OrderType, transaction.OrderDataPlaintext, ct)
             .ConfigureAwait(false);
+
+        await AppendEventAsync(
+            transaction,
+            EbicsEventType.ReceiptNegative,
+            EbicsEventSeverity.Warning,
+            EbicsEventVisibility.CustomerVisible,
+            EbicsReturnCode.DownloadPostprocessSkipped,
+            $"Download acknowledged with a negative receipt; data re-enqueued (order type {transaction.OrderType}).",
+            ct).ConfigureAwait(false);
         return Receipt(EbicsReturnCode.DownloadPostprocessSkipped, transactionId);
     }
 
@@ -298,12 +329,46 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             ct.ThrowIfCancellationRequested();
             if (transaction.IsExpired(now, timeout) && await EvictAsync(transaction, ct).ConfigureAwait(false))
             {
+                await AppendEventAsync(
+                    transaction,
+                    EbicsEventType.TransactionEvicted,
+                    EbicsEventSeverity.Warning,
+                    EbicsEventVisibility.Internal,
+                    returnCode: null,
+                    $"Download transaction evicted after idle timeout; data re-enqueued (order type {transaction.OrderType}).",
+                    ct).ConfigureAwait(false);
                 evicted++;
             }
         }
 
         return evicted;
     }
+
+    // Writes a transaction lifecycle event (issue #69) carrying the transaction's full subscriber triple,
+    // order type and hex id. Complements the pipeline's per-request event with business-level semantics.
+    private Task AppendEventAsync(
+        DownloadTransaction transaction,
+        EbicsEventType type,
+        EbicsEventSeverity severity,
+        EbicsEventVisibility visibility,
+        EbicsReturnCode? returnCode,
+        string message,
+        CancellationToken ct)
+        => _eventLog.AppendAsync(
+            new EbicsEvent
+            {
+                Type = type,
+                Severity = severity,
+                Visibility = visibility,
+                HostId = transaction.Subscriber.HostId,
+                PartnerId = transaction.Subscriber.PartnerId,
+                UserId = transaction.Subscriber.UserId,
+                OrderType = transaction.OrderType,
+                TransactionId = transaction.TransactionIdHex,
+                ReturnCode = returnCode,
+                Message = message,
+            },
+            ct);
 
     // Evicts one transaction and re-enqueues its already-dequeued order data. The Remove return value is
     // the "exactly once" guard: whoever wins the race (lazy path vs. sweeper) re-enqueues, the loser does

@@ -48,6 +48,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     private readonly IUploadTransactionStore _store;
     private readonly IMasterDataManager _masterData;
     private readonly IServerBankKeyStore _bankKeyStore;
+    private readonly IEventLog _eventLog;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
 
@@ -55,6 +56,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     /// <param name="store">The upload transaction store.</param>
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="bankKeyStore">The store providing the bank's key pair (its private encryption key decrypts the transaction key).</param>
+    /// <param name="eventLog">The append-only event log (issue #69) the upload lifecycle events are written to.</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment/transaction limits).</param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
@@ -62,18 +64,21 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         IUploadTransactionStore store,
         IMasterDataManager masterData,
         IServerBankKeyStore bankKeyStore,
+        IEventLog eventLog,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(bankKeyStore);
+        ArgumentNullException.ThrowIfNull(eventLog);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
 
         _store = store;
         _masterData = masterData;
         _bankKeyStore = bankKeyStore;
+        _eventLog = eventLog;
         _timeProvider = timeProvider;
         _options = options.Value;
     }
@@ -159,11 +164,20 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
 
         _store.Create(transaction);
 
+        await AppendEventAsync(
+            transaction,
+            EbicsEventType.UploadStarted,
+            EbicsEventSeverity.Info,
+            EbicsEventVisibility.CustomerVisible,
+            EbicsReturnCode.Ok,
+            $"Upload started ({transaction.NumSegments} segment(s), order type {transaction.OrderType}).",
+            ct).ConfigureAwait(false);
+
         return new UploadTransactionResult(EbicsReturnCode.Ok, EbicsTransactionPhase.Initialisation, transactionId);
     }
 
     /// <inheritdoc />
-    public Task<UploadTransactionResult> ContinueUploadAsync(EbicsRequestContext context, CancellationToken ct = default)
+    public async Task<UploadTransactionResult> ContinueUploadAsync(EbicsRequestContext context, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -172,12 +186,12 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         // Without a transaction id there is nothing to continue; there is no id to echo either.
         if (fields.TransactionId is not { } transactionId)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, null, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxUnknownTxid, null, fields.SegmentNumber, fields.LastSegment);
         }
 
         if (!_store.TryGet(Convert.ToHexString(transactionId), out var transaction) || transaction is null)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment);
         }
 
         // Lazy expiry: an idle-timed-out transaction is evicted and answered as an unknown id (091101),
@@ -186,25 +200,25 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         if (transaction.IsExpired(now, _options.TransactionTimeout))
         {
             _store.Remove(transaction.TransactionIdHex);
-            return Task.FromResult(Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxUnknownTxid, transactionId, fields.SegmentNumber, fields.LastSegment);
         }
 
         transaction.Touch(now);
 
         if (fields.SegmentNumber is not { } segmentNumber || fields.OrderData is not { } orderData)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, fields.SegmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, fields.SegmentNumber, fields.LastSegment);
         }
 
         // Segments are 1-based; a number beyond the announced count is a protocol error.
         if (segmentNumber == 0)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, segmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.InvalidRequestContent, transactionId, segmentNumber, fields.LastSegment);
         }
 
         if (segmentNumber > (ulong)transaction.NumSegments)
         {
-            return Task.FromResult(Transfer(EbicsReturnCode.TxSegmentNumberExceeded, transactionId, segmentNumber, fields.LastSegment));
+            return Transfer(EbicsReturnCode.TxSegmentNumberExceeded, transactionId, segmentNumber, fields.LastSegment);
         }
 
         var append = transaction.AppendSegment((int)segmentNumber, orderData, fields.LastSegment);
@@ -218,16 +232,29 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             _ => EbicsReturnCode.InternalError,
         };
 
-        return Task.FromResult(Transfer(returnCode, transactionId, segmentNumber, fields.LastSegment));
+        // The last segment completed the order (reassembled/decrypted/decompressed): a business-level event.
+        if (append.Status == SegmentAppendStatus.Ready && returnCode.Code == EbicsReturnCode.OkCode)
+        {
+            await AppendEventAsync(
+                transaction,
+                EbicsEventType.UploadCompleted,
+                EbicsEventSeverity.Info,
+                EbicsEventVisibility.CustomerVisible,
+                EbicsReturnCode.Ok,
+                $"Upload completed ({transaction.NumSegments} segment(s), order type {transaction.OrderType}).",
+                ct).ConfigureAwait(false);
+        }
+
+        return Transfer(returnCode, transactionId, segmentNumber, fields.LastSegment);
     }
 
     /// <inheritdoc />
-    public Task<int> EvictExpiredAsync(CancellationToken ct = default)
+    public async Task<int> EvictExpiredAsync(CancellationToken ct = default)
     {
         var timeout = _options.TransactionTimeout;
         if (timeout <= TimeSpan.Zero)
         {
-            return Task.FromResult(0);
+            return 0;
         }
 
         var now = _timeProvider.GetUtcNow();
@@ -237,12 +264,46 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             ct.ThrowIfCancellationRequested();
             if (transaction.IsExpired(now, timeout) && _store.Remove(transaction.TransactionIdHex))
             {
+                await AppendEventAsync(
+                    transaction,
+                    EbicsEventType.TransactionEvicted,
+                    EbicsEventSeverity.Warning,
+                    EbicsEventVisibility.Internal,
+                    returnCode: null,
+                    $"Upload transaction evicted after idle timeout (order type {transaction.OrderType}).",
+                    ct).ConfigureAwait(false);
                 evicted++;
             }
         }
 
-        return Task.FromResult(evicted);
+        return evicted;
     }
+
+    // Writes a transaction lifecycle event (issue #69) carrying the transaction's full subscriber triple,
+    // order type and hex id. Complements the pipeline's per-request event with business-level semantics.
+    private Task AppendEventAsync(
+        UploadTransaction transaction,
+        EbicsEventType type,
+        EbicsEventSeverity severity,
+        EbicsEventVisibility visibility,
+        EbicsReturnCode? returnCode,
+        string message,
+        CancellationToken ct)
+        => _eventLog.AppendAsync(
+            new EbicsEvent
+            {
+                Type = type,
+                Severity = severity,
+                Visibility = visibility,
+                HostId = transaction.Subscriber.HostId,
+                PartnerId = transaction.Subscriber.PartnerId,
+                UserId = transaction.Subscriber.UserId,
+                OrderType = transaction.OrderType,
+                TransactionId = transaction.TransactionIdHex,
+                ReturnCode = returnCode,
+                Message = message,
+            },
+            ct);
 
     // Reassembles, decrypts and decompresses the completed order data and records it on the transaction.
     // Decode failures map to InvalidOrderDataFormat (090004); the order signature (ES) is not verified in

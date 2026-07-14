@@ -41,6 +41,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0012](0012-returncode-katalog.md) | EBICS-Returncode-Katalog (Modellierung & Verortung) | accepted |
 | [0013](0013-upload-transaktions-engine.md) | Upload-Transaktions-Engine & -Speicher | accepted |
 | [0014](0014-download-transaktions-engine.md) | Download-Transaktions-Engine, -Speicher & Datenbereitstellung | accepted |
+| [0015](0015-ereignis-protokollspeicher.md) | Ereignis-/Protokollspeicher (`IEventLog`) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
@@ -57,6 +58,9 @@ Themen, die eine eigene ADR bekommen, sobald sie anstehen:
 - ~~**Persistenz des Server-States** (In-Memory-Default, pluggable Store)~~ — **entschieden** in
   [ADR-0011](0011-server-stammdatenverwaltung.md) (In-Memory-Default, pluggbar via `TryAddSingleton`;
   Stammdatenverwaltung als Manager über dem Store, #30). Ein konkreter persistenter Store bleibt bei Bedarf offen.
+- **Persistenter Store (SQLite o. ä.)** — offen. [ADR-0015](0015-ereignis-protokollspeicher.md) hält den
+  Ereignis-/Protokollspeicher (`IEventLog`) bewusst In-Memory + async-pluggbar; der `IEventLog` ist der
+  erste Kandidat für eine echte Persistenz-Implementierung (bekäme dann eine eigene ADR).
 - ~~**Returncode-Modellierung** (`EbicsResult<T>` vs. Exceptions, Katalog)~~ — **entschieden** in
   [ADR-0012](0012-returncode-katalog.md) (zentraler Katalog + Registry in `EBICO.Core.ReturnCodes`,
   Mapping server-seitig, technisch/fachlich getrennt).

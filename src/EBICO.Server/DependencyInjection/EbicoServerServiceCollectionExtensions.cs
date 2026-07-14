@@ -38,6 +38,9 @@ public static class EbicoServerServiceCollectionExtensions
 
         services.TryAddSingleton<IEbicsStateStore, InMemoryEbicsStateStore>();
         services.TryAddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
+        // Shared append-only event/protocol log (issue #69): the source HAC (M5) and the Suite inspector
+        // (M7) read from. In-memory default, pluggable via TryAddSingleton (SQLite is a follow-up, ADR-0015).
+        services.TryAddSingleton<IEventLog, InMemoryEventLog>();
         services.TryAddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         services.TryAddSingleton<IMasterDataManager, MasterDataManager>();
         services.TryAddSingleton<IEbicsRequestVerifier, NoOpEbicsRequestVerifier>();
