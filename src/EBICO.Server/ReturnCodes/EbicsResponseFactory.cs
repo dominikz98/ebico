@@ -194,6 +194,209 @@ public sealed class EbicsResponseFactory
         };
     }
 
+    /// <summary>
+    /// Builds an <c>ebicsResponse</c> for a download transaction step (issue #33): it carries the
+    /// transaction id, echoes the <paramref name="result"/> phase and — for a data-bearing step — the
+    /// announced <c>NumSegments</c> (initialisation only), the delivered <c>SegmentNumber</c> and the
+    /// order-data segment in <c>body/DataTransfer</c>. The initialisation segment additionally carries
+    /// the E002 <c>DataEncryptionInfo</c> (encrypted transaction key + recipient-key digest); transfer
+    /// segments carry order data only. Receipt and error responses carry no <c>DataTransfer</c>.
+    /// </summary>
+    /// <param name="version">The protocol version whose bindings/namespace to use.</param>
+    /// <param name="result">The download transaction step outcome to render.</param>
+    /// <returns>The download response envelope, ready for serialization.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is undefined.</exception>
+    /// <remarks>
+    /// <b>⚠️ Spec-Vorbehalt:</b> the canonical placement (NumSegments + segment 1 in the initialisation
+    /// response, segments 2..N in the transfer responses, DataEncryptionInfo in the initialisation
+    /// response only) is to be verified against the official EBICS annexes. The response is not signed
+    /// (X002 is M4).
+    /// </remarks>
+    public IEbicsResponseEnvelope BuildDownloadResponse(EbicsVersion version, DownloadTransactionResult result)
+    {
+        var (headerCode, bodyCode, reportText) = Split(result.ReturnCode);
+
+        return version switch
+        {
+            EbicsVersion.H003 => new H003.EbicsResponse
+            {
+                Version = "H003",
+                Header = new H003.EbicsResponseHeader
+                {
+                    Static = new H003.ResponseStaticHeaderType
+                    {
+                        TransactionId = result.TransactionId,
+                        NumSegments = result.NumSegments,
+                    },
+                    Mutable = new H003.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH003Phase(result.Phase),
+                        SegmentNumber = result.SegmentNumber is { } h3Segment
+                            ? new H003.ResponseMutableHeaderTypeSegmentNumber { Value = h3Segment, LastSegment = result.LastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H003.EbicsResponseBody
+                {
+                    DataTransfer = BuildH003DataTransfer(result.Segment),
+                    ReturnCode = new H003.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            EbicsVersion.H004 => new H004.EbicsResponse
+            {
+                Version = "H004",
+                Header = new H004.EbicsResponseHeader
+                {
+                    Static = new H004.ResponseStaticHeaderType
+                    {
+                        TransactionId = result.TransactionId,
+                        NumSegments = result.NumSegments,
+                    },
+                    Mutable = new H004.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH004Phase(result.Phase),
+                        SegmentNumber = result.SegmentNumber is { } h4Segment
+                            ? new H004.ResponseMutableHeaderTypeSegmentNumber { Value = h4Segment, LastSegment = result.LastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H004.EbicsResponseBody
+                {
+                    DataTransfer = BuildH004DataTransfer(result.Segment),
+                    ReturnCode = new H004.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            EbicsVersion.H005 => new H005.EbicsResponse
+            {
+                Version = "H005",
+                Header = new H005.EbicsResponseHeader
+                {
+                    Static = new H005.ResponseStaticHeaderType
+                    {
+                        TransactionId = result.TransactionId,
+                        NumSegments = result.NumSegments,
+                    },
+                    Mutable = new H005.ResponseMutableHeaderType
+                    {
+                        TransactionPhase = ToH005Phase(result.Phase),
+                        SegmentNumber = result.SegmentNumber is { } h5Segment
+                            ? new H005.ResponseMutableHeaderTypeSegmentNumber { Value = h5Segment, LastSegment = result.LastSegment }
+                            : null,
+                        ReturnCode = headerCode,
+                        ReportText = reportText,
+                    },
+                },
+                Body = new H005.EbicsResponseBody
+                {
+                    DataTransfer = BuildH005DataTransfer(result.Segment),
+                    ReturnCode = new H005.EbicsResponseBodyReturnCode { Value = bodyCode },
+                },
+            },
+            _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
+        };
+    }
+
+    // Builds the H003 download DataTransfer: OrderData always, DataEncryptionInfo only on the
+    // initialisation segment (when the encrypted transaction key is present). Null for receipt/errors.
+    private static H003.DataTransferResponseType? BuildH003DataTransfer(DownloadSegmentPayload? segment)
+    {
+        if (segment is not { } payload)
+        {
+            return null;
+        }
+
+        var dataTransfer = new H003.DataTransferResponseType
+        {
+            OrderData = new H003.DataTransferResponseTypeOrderData { Value = payload.OrderData },
+        };
+
+        if (payload.EncryptedTransactionKey is not null
+            && payload.EncryptionPubKeyDigest is not null
+            && payload.EncryptionVersion is { } version)
+        {
+            dataTransfer.DataEncryptionInfo = new H003.DataTransferResponseTypeDataEncryptionInfo
+            {
+                EncryptionPubKeyDigest = new H003.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                {
+                    Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                    Version = version.Value,
+                    Value = payload.EncryptionPubKeyDigest,
+                },
+                TransactionKey = payload.EncryptedTransactionKey,
+            };
+        }
+
+        return dataTransfer;
+    }
+
+    // Builds the H004 download DataTransfer (see BuildH003DataTransfer).
+    private static H004.DataTransferResponseType? BuildH004DataTransfer(DownloadSegmentPayload? segment)
+    {
+        if (segment is not { } payload)
+        {
+            return null;
+        }
+
+        var dataTransfer = new H004.DataTransferResponseType
+        {
+            OrderData = new H004.DataTransferResponseTypeOrderData { Value = payload.OrderData },
+        };
+
+        if (payload.EncryptedTransactionKey is not null
+            && payload.EncryptionPubKeyDigest is not null
+            && payload.EncryptionVersion is { } version)
+        {
+            dataTransfer.DataEncryptionInfo = new H004.DataTransferResponseTypeDataEncryptionInfo
+            {
+                EncryptionPubKeyDigest = new H004.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                {
+                    Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                    Version = version.Value,
+                    Value = payload.EncryptionPubKeyDigest,
+                },
+                TransactionKey = payload.EncryptedTransactionKey,
+            };
+        }
+
+        return dataTransfer;
+    }
+
+    // Builds the H005 download DataTransfer (see BuildH003DataTransfer).
+    private static H005.DataTransferResponseType? BuildH005DataTransfer(DownloadSegmentPayload? segment)
+    {
+        if (segment is not { } payload)
+        {
+            return null;
+        }
+
+        var dataTransfer = new H005.DataTransferResponseType
+        {
+            OrderData = new H005.DataTransferResponseTypeOrderData { Value = payload.OrderData },
+        };
+
+        if (payload.EncryptedTransactionKey is not null
+            && payload.EncryptionPubKeyDigest is not null
+            && payload.EncryptionVersion is { } version)
+        {
+            dataTransfer.DataEncryptionInfo = new H005.DataTransferResponseTypeDataEncryptionInfo
+            {
+                EncryptionPubKeyDigest = new H005.DataEncryptionInfoTypeEncryptionPubKeyDigest
+                {
+                    Algorithm = PublicKeyFingerprint.DigestAlgorithm,
+                    Version = version.Value,
+                    Value = payload.EncryptionPubKeyDigest,
+                },
+                TransactionKey = payload.EncryptedTransactionKey,
+            };
+        }
+
+        return dataTransfer;
+    }
+
     private static H003.TransactionPhaseType ToH003Phase(EbicsTransactionPhase phase) => phase switch
     {
         EbicsTransactionPhase.Transfer => H003.TransactionPhaseType.Transfer,

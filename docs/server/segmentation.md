@@ -145,4 +145,6 @@ Elemente). Der Cast `int → ulong` erfolgt erst beim Header-Mapping in #32/#33.
 - [Hostable Server-Grundgerüst](host.md) — Pipeline, Returncodes, `MaxRequestBodyBytes`
 - [Verschlüsselung E002](../protocol/encryption-e002.md) — der optionale Verschlüsselungsschritt der Pipeline
 - [EBICS-Returncode-Katalog](../protocol/return-codes.md) — die (noch ungenutzten) Segment-Returncodes
+- [Upload-Transaktion](upload-transaction.md) — Empfangsrichtung: `Reassemble` verdrahtet (#32)
+- [Download-Transaktion](download-transaction.md) — Senderichtung: `Split` verdrahtet (#33)
 - [Connector-Architektur](../connector/architecture.md) — Send-Pipeline & Transaktions-Skelett (Upload/Download)

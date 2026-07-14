@@ -22,7 +22,7 @@ public static class EbicoAdminApiRouteBuilderExtensions
     /// Maps the admin API endpoints under <paramref name="prefix"/> (default <c>/admin</c>): nested
     /// resources <c>/banks</c>, <c>/banks/{hostId}/partners</c> and
     /// <c>/banks/{hostId}/partners/{partnerId}/subscribers</c>, plus subscriber permission and
-    /// state sub-resources.
+    /// state sub-resources and the per-subscriber download-data queue (issue #33).
     /// </summary>
     /// <param name="endpoints">The endpoint route builder.</param>
     /// <param name="prefix">The route prefix the admin API is mounted at.</param>
@@ -39,6 +39,7 @@ public static class EbicoAdminApiRouteBuilderExtensions
         MapBankEndpoints(group);
         MapPartnerEndpoints(group);
         MapSubscriberEndpoints(group);
+        MapDownloadDataEndpoints(group);
 
         return group;
     }
@@ -155,6 +156,34 @@ public static class EbicoAdminApiRouteBuilderExtensions
                 HostId.Create(hostId), PartnerId.Create(partnerId), UserId.Create(userId),
                 ParseState(body.Target), http.RequestAborted).ConfigureAwait(false);
             return Results.Ok(ToDto(updated));
+        }));
+    }
+
+    // --- Download data (issue #33) ---------------------------------------------------------
+
+    private static void MapDownloadDataEndpoints(RouteGroupBuilder group)
+    {
+        const string item = "/banks/{hostId}/partners/{partnerId}/subscribers/{userId}/downloads/{orderType}";
+
+        group.MapGet(item, (string hostId, string partnerId, string userId, string orderType, IDownloadDataProvider provider, HttpContext http) => Guard(async () =>
+        {
+            var subscriber = new SubscriberKeyRef(HostId.Create(hostId), PartnerId.Create(partnerId), UserId.Create(userId));
+            var pending = await provider.CountAsync(subscriber, orderType, http.RequestAborted).ConfigureAwait(false);
+            return Results.Ok(new DownloadDataStatusDto(pending));
+        }));
+
+        group.MapPost(item, (string hostId, string partnerId, string userId, string orderType, DownloadDataDto? body, IDownloadDataProvider provider, HttpContext http) => Guard(async () =>
+        {
+            if (body is null || string.IsNullOrEmpty(body.Base64Data))
+            {
+                return Results.Problem("A base64-encoded order-data payload is required.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            var subscriber = new SubscriberKeyRef(HostId.Create(hostId), PartnerId.Create(partnerId), UserId.Create(userId));
+            var orderData = Convert.FromBase64String(body.Base64Data); // FormatException -> 400 via Guard
+            await provider.EnqueueAsync(subscriber, orderType, orderData, http.RequestAborted).ConfigureAwait(false);
+            var pending = await provider.CountAsync(subscriber, orderType, http.RequestAborted).ConfigureAwait(false);
+            return Results.Ok(new DownloadDataStatusDto(pending));
         }));
     }
 

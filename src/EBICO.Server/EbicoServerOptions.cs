@@ -42,6 +42,14 @@ public sealed class EbicoServerOptions
     public int MaxUploadSegments { get; set; } = 1000;
 
     /// <summary>
+    /// The maximum number of segments a single download transaction may produce when the server
+    /// segments the order data. Defaults to 1000. Order data that would split into more segments is
+    /// rejected in the initialisation phase with <c>EBICS_MAX_SEGMENTS_EXCEEDED</c> (091114). Consumed
+    /// by the download transaction engine (issue #33).
+    /// </summary>
+    public int MaxDownloadSegments { get; set; } = 1000;
+
+    /// <summary>
     /// The content types accepted on the EBICS endpoint. Defaults to <c>text/xml</c> and
     /// <c>application/xml</c>.
     /// </summary>

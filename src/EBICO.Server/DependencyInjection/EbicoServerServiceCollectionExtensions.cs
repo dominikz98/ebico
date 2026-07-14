@@ -50,6 +50,13 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IUploadTransactionStore, InMemoryUploadTransactionStore>();
         services.TryAddSingleton<IUploadTransactionEngine, UploadTransactionEngine>();
 
+        // Download transaction engine (issue #33): the download transaction store, the order-data
+        // provider (seedable via the admin API) and the three-phase engine the pipeline routes FDL/BTD
+        // initialisations, the receipt phase and matching transfer-phase requests to.
+        services.TryAddSingleton<IDownloadTransactionStore, InMemoryDownloadTransactionStore>();
+        services.TryAddSingleton<IDownloadDataProvider, InMemoryDownloadDataProvider>();
+        services.TryAddSingleton<IDownloadTransactionEngine, DownloadTransactionEngine>();
+
         services.TryAddSingleton<IEbicsRequestPipeline, EbicsRequestPipeline>();
 
         // The H005 HPB handler self-signs the bank's certificates and needs a clock for their validity

@@ -40,6 +40,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0011](0011-server-stammdatenverwaltung.md) | Server-Stammdatenverwaltung (Manager über Store, Admin-API) | accepted |
 | [0012](0012-returncode-katalog.md) | EBICS-Returncode-Katalog (Modellierung & Verortung) | accepted |
 | [0013](0013-upload-transaktions-engine.md) | Upload-Transaktions-Engine & -Speicher | accepted |
+| [0014](0014-download-transaktions-engine.md) | Download-Transaktions-Engine, -Speicher & Datenbereitstellung | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

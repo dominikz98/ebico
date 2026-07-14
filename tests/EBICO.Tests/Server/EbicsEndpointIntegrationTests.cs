@@ -159,6 +159,67 @@ public class EbicsEndpointIntegrationTests : IClassFixture<WebApplicationFactory
     }
 
     [Fact]
+    public async Task PostEbics_Download_InitReceipt_Returns200_SeededViaAdminApi_AndConsumesData()
+    {
+        // Isolated host (own in-memory stores) so the seeded subscriber and data stay local.
+        var factory = _factory.WithWebHostBuilder(_ => { });
+        var host = HostId.Create("DLHOST");
+        var partner = PartnerId.Create("DLPART");
+        var user = UserId.Create("DLUSER");
+
+        var master = factory.Services.GetRequiredService<IMasterDataManager>();
+        await master.SaveBankAsync(new Bank(host), _ct);
+        await master.SavePartnerAsync(new Partner(host, partner), _ct);
+        await master.SaveSubscriberAsync(new Subscriber(host, partner, user), _ct);
+        await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Initialized, _ct);
+        await master.TransitionSubscriberAsync(host, partner, user, SubscriberState.Ready, _ct);
+
+        // The subscriber's encryption key must be on file (normally stored during HIA); keep the private
+        // part to decrypt the downloaded data.
+        var subscriberEnc = RsaKeyMaterial.Generate();
+        await factory.Services.GetRequiredService<IServerKeyStore>().StoreAsync(
+            new SubscriberKeyRef(host, partner, user),
+            new StoredPublicKey(subscriberEnc.ToPublicOnly(), KeyVersion.Create("E002")),
+            _ct);
+
+        var client = factory.CreateClient();
+
+        // Make order data available for download via the admin API (base64 JSON).
+        var orderData = Encoding.UTF8.GetBytes("<order>http download</order>");
+        var seedJson = $"{{\"base64Data\":\"{Convert.ToBase64String(orderData)}\"}}";
+        var seedResponse = await client.PostAsync(
+            "/admin/banks/DLHOST/partners/DLPART/subscribers/DLUSER/downloads/FDL",
+            new StringContent(seedJson, Encoding.UTF8, "application/json"), _ct);
+        seedResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        // Initialisation over HTTP -> 200 with a transaction id and the (single) encrypted segment.
+        var initResponse = await client.PostAsync(
+            "/ebics", new StringContent(ServerTestHelpers.BuildDownloadInitRequest(EbicsVersion.H004, "DLHOST", "DLPART", "DLUSER"), Encoding.UTF8, "text/xml"), _ct);
+        initResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var initEnvelope = EbicsXmlSerializer.DeserializeEnvelope(await initResponse.Content.ReadAsStringAsync(_ct));
+        ServerTestHelpers.ReadReturnCodes(initEnvelope).Should().Be(("000000", "000000"));
+        var transactionId = ServerTestHelpers.ReadTransactionId(initEnvelope);
+        transactionId.Should().NotBeNull().And.HaveCount(16);
+        ServerTestHelpers.ReadNumSegments(initEnvelope).Should().Be(1UL);
+
+        // The delivered data decrypts (subscriber private key) and decompresses to the original.
+        var (txKey, segment, _, _) = ServerTestHelpers.ReadDownloadDataTransfer(EbicsVersion.H004, initEnvelope);
+        var decrypted = EncryptionE002.Decrypt(new EncryptedOrderData(txKey!, segment!), subscriberEnc, KeyVersion.Create("E002"));
+        EbicsCompression.Decompress(decrypted).Should().Equal(orderData);
+
+        // Positive receipt over HTTP -> 200 with EBICS_DOWNLOAD_POSTPROCESS_DONE (011000, technical/header).
+        var receiptResponse = await client.PostAsync(
+            "/ebics", new StringContent(ServerTestHelpers.BuildDownloadReceiptRequest(EbicsVersion.H004, "DLHOST", transactionId!, 0), Encoding.UTF8, "text/xml"), _ct);
+        receiptResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        var receiptEnvelope = EbicsXmlSerializer.DeserializeEnvelope(await receiptResponse.Content.ReadAsStringAsync(_ct));
+        ServerTestHelpers.ReadReturnCodes(receiptEnvelope).Should().Be(("011000", "000000"));
+
+        // The data was consumed: the admin queue is empty again.
+        var statusResponse = await client.GetStringAsync("/admin/banks/DLHOST/partners/DLPART/subscribers/DLUSER/downloads/FDL", _ct);
+        statusResponse.Should().Contain("\"pending\":0");
+    }
+
+    [Fact]
     public async Task PostEbics_WrongContentType_Returns415()
     {
         var client = _factory.CreateClient();

@@ -15,7 +15,7 @@
 > Bewusst **noch nicht**: die **Signaturprüfung des OrderData** (ES / A00x) — die
 > `SignatureData` aus der Initialisation wird **einbehalten**, aber **nicht** kryptografisch
 > verifiziert (siehe Spec-Vorbehalte, Folge-Issue); die **Download**-Transaktion inkl.
-> Receipt-Phase (#33); **Recovery/Timeouts** und die Eviction verwaister Transaktionen (#35);
+> Receipt-Phase ([#33](download-transaction.md)); **Recovery/Timeouts** und die Eviction verwaister Transaktionen (#35);
 > die X002-Request-Signaturprüfung (Verify-Stufe bleibt No-Op).
 
 ## Zweck
@@ -169,6 +169,7 @@ keine proprietären Fixtures):
 
 ## Verwandte Doku
 
+- [Download-Transaktion (Initialisation + Transfer + Receipt)](download-transaction.md) — das gespiegelte Pendant (Senderichtung)
 - [Segmentierung, Kompression & Base64-Pipeline](segmentation.md) — die genutzten Byte-Primitiven
 - [Verschlüsselung E002](../protocol/encryption-e002.md) — Transaktionsschlüssel- & Order-Data-Entschlüsselung
 - [Hostable Server-Grundgerüst](host.md) — Pipeline, Fehlerabbildung, `EbicoServerOptions`
