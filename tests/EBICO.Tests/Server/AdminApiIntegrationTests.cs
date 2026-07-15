@@ -37,6 +37,55 @@ public class AdminApiIntegrationTests
     }
 
     [Fact]
+    public async Task PutBank_WithUrl_RoundTrips()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST",
+            new BankUpsertDto("EBICO", ["H005"], "https://ebico.example/ebics"), _ct);
+
+        var bank = await client.GetFromJsonAsync<BankDto>("/admin/banks/EBICOHOST", _ct);
+        bank!.Url.Should().Be("https://ebico.example/ebics");
+    }
+
+    [Fact]
+    public async Task PutPartner_WithAddressAndAccounts_RoundTrips()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST", new BankUpsertDto(null, null), _ct);
+
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST/partners/PARTNER01",
+            new PartnerUpsertDto(
+                "Acme GmbH",
+                new AddressDto("Acme GmbH", City: "Berlin"),
+                [new AccountDto("DE89370400440532013000", "COBADEFFXXX", Id: "ACC1")]),
+            _ct);
+
+        var partner = await client.GetFromJsonAsync<PartnerDto>("/admin/banks/EBICOHOST/partners/PARTNER01", _ct);
+        partner!.Address!.City.Should().Be("Berlin");
+        partner.Accounts.Should().ContainSingle().Which.Iban.Should().Be("DE89370400440532013000");
+    }
+
+    [Fact]
+    public async Task PutSubscriber_WithName_RoundTrips()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST", new BankUpsertDto(null, null), _ct);
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST/partners/PARTNER01", new PartnerUpsertDto(null), _ct);
+
+        await client.PutAsJsonAsync(
+            "/admin/banks/EBICOHOST/partners/PARTNER01/subscribers/USER01",
+            new SubscriberUpsertDto(null, null, null, "Alice"), _ct);
+
+        var subscriber = await client.GetFromJsonAsync<SubscriberDto>(
+            "/admin/banks/EBICOHOST/partners/PARTNER01/subscribers/USER01", _ct);
+        subscriber!.Name.Should().Be("Alice");
+    }
+
+    [Fact]
     public async Task GetBank_Unknown_Returns404()
     {
         using var factory = NewFactory();

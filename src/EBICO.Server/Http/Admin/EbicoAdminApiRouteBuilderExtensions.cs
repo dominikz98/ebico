@@ -61,7 +61,7 @@ public static class EbicoAdminApiRouteBuilderExtensions
         group.MapPut("/banks/{hostId}", (string hostId, BankUpsertDto? body, IMasterDataManager manager, HttpContext http) => Guard(async () =>
         {
             var dto = body ?? new BankUpsertDto(null, null);
-            var bank = new Bank(HostId.Create(hostId), dto.Name, ParseVersions(dto.SupportedVersions));
+            var bank = new Bank(HostId.Create(hostId), dto.Name, ParseVersions(dto.SupportedVersions), dto.Url);
             var stored = await manager.SaveBankAsync(bank, http.RequestAborted).ConfigureAwait(false);
             return Results.Ok(ToDto(stored));
         }));
@@ -89,7 +89,12 @@ public static class EbicoAdminApiRouteBuilderExtensions
 
         group.MapPut("/banks/{hostId}/partners/{partnerId}", (string hostId, string partnerId, PartnerUpsertDto? body, IMasterDataManager manager, HttpContext http) => Guard(async () =>
         {
-            var partner = new Partner(HostId.Create(hostId), PartnerId.Create(partnerId), body?.Name);
+            var partner = new Partner(
+                HostId.Create(hostId),
+                PartnerId.Create(partnerId),
+                body?.Name,
+                MapAddress(body?.Address),
+                MapAccounts(body?.Accounts));
             var stored = await manager.SavePartnerAsync(partner, http.RequestAborted).ConfigureAwait(false);
             return Results.Ok(ToDto(stored));
         }));
@@ -127,7 +132,8 @@ public static class EbicoAdminApiRouteBuilderExtensions
                 UserId.Create(userId),
                 ParseSystemId(dto.SystemId),
                 ParseState(dto.State),
-                MapPermissions(dto.Permissions));
+                MapPermissions(dto.Permissions),
+                dto.Name);
             var stored = await manager.SaveSubscriberAsync(subscriber, http.RequestAborted).ConfigureAwait(false);
             return Results.Ok(ToDto(stored));
         }));
@@ -226,10 +232,23 @@ public static class EbicoAdminApiRouteBuilderExtensions
     // --- Domain <-> DTO mapping ------------------------------------------------------------
 
     private static BankDto ToDto(Bank bank)
-        => new(bank.HostId.Value, bank.Name, bank.SupportedVersions.Select(v => v.ToString()).ToArray());
+        => new(bank.HostId.Value, bank.Name, bank.SupportedVersions.Select(v => v.ToString()).ToArray(), bank.Url);
 
     private static PartnerDto ToDto(Partner partner)
-        => new(partner.HostId.Value, partner.PartnerId.Value, partner.Name);
+        => new(
+            partner.HostId.Value,
+            partner.PartnerId.Value,
+            partner.Name,
+            ToDto(partner.Address),
+            partner.Accounts.Select(ToDto).ToArray());
+
+    private static AddressDto? ToDto(Address? address)
+        => address is null
+            ? null
+            : new AddressDto(address.Name, address.Street, address.PostCode, address.City, address.Region, address.Country);
+
+    private static AccountDto ToDto(BankAccount account)
+        => new(account.Iban, account.Bic, account.Holder, account.Currency, account.Description, account.Id);
 
     private static SubscriberDto ToDto(Subscriber subscriber)
         => new(
@@ -238,7 +257,18 @@ public static class EbicoAdminApiRouteBuilderExtensions
             subscriber.UserId.Value,
             subscriber.SystemId?.Value,
             subscriber.State.ToString(),
-            subscriber.Permissions.Select(p => new SubscriberPermissionDto(p.OrderType, p.SignatureClass.ToString())).ToArray());
+            subscriber.Permissions.Select(p => new SubscriberPermissionDto(p.OrderType, p.SignatureClass.ToString())).ToArray(),
+            subscriber.Name);
+
+    private static Address? MapAddress(AddressDto? address)
+        => address is null
+            ? null
+            : new Address(address.Name, address.Street, address.PostCode, address.City, address.Region, address.Country);
+
+    private static IReadOnlyList<BankAccount> MapAccounts(IReadOnlyList<AccountDto>? accounts)
+        => accounts is null
+            ? []
+            : accounts.Select(a => new BankAccount(a.Iban, a.Bic, a.Holder, a.Currency ?? "EUR", a.Description, a.Id)).ToArray();
 
     private static IReadOnlyList<EbicsVersion>? ParseVersions(IReadOnlyList<string>? versions)
     {

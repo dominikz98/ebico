@@ -118,6 +118,13 @@ Content-Type: application/json
 { "systemId": null, "state": "New", "permissions": [ { "orderType": "CCT", "signatureClass": "E" } ] }
 ```
 
+> **Erweiterte Stammdaten (#41):** Für die Status-/Protokoll-Orders
+> ([status-protocol-orders.md](status-protocol-orders.md)) tragen die Upsert-DTOs zusätzliche, optionale
+> Felder: `Bank.url` (HPD-Zugangs-URL), `Partner.address` (`{name,street,postCode,city,region,country}`) und
+> `Partner.accounts` (`[{iban,bic,holder,currency,description,id}]`, von HTD/HKD ausgeliefert) sowie
+> `Subscriber.name` (Teilnehmer-Name). Alle sind rückwärtskompatibel (Default `null`/leer) und werden vom
+> jeweiligen `GET` wieder zurückgeliefert.
+
 Fehlerabbildung:
 
 | Situation | HTTP-Status |

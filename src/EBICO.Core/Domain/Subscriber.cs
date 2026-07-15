@@ -21,13 +21,15 @@ public sealed class Subscriber
     /// <param name="systemId">Optional system identifier for technical / multi-user subscribers.</param>
     /// <param name="state">The initial lifecycle state; defaults to <see cref="SubscriberState.New"/>.</param>
     /// <param name="permissions">Optional order authorisations held by the subscriber.</param>
+    /// <param name="name">Optional human-readable name of the user (surfaced by HTD/HKD).</param>
     public Subscriber(
         HostId hostId,
         PartnerId partnerId,
         UserId userId,
         SystemId? systemId = null,
         SubscriberState state = SubscriberState.New,
-        IEnumerable<SubscriberPermission>? permissions = null)
+        IEnumerable<SubscriberPermission>? permissions = null,
+        string? name = null)
     {
         HostId = hostId;
         PartnerId = partnerId;
@@ -35,6 +37,7 @@ public sealed class Subscriber
         SystemId = systemId;
         State = state;
         _permissions = permissions?.ToArray() ?? [];
+        Name = name;
     }
 
     /// <summary>The bank's host identifier (<c>HostID</c>).</summary>
@@ -48,6 +51,9 @@ public sealed class Subscriber
 
     /// <summary>The optional system identifier (<c>SystemID</c>) for technical / multi-user subscribers.</summary>
     public SystemId? SystemId { get; }
+
+    /// <summary>The optional human-readable name of the user (surfaced by HTD/HKD), or <see langword="null"/>.</summary>
+    public string? Name { get; }
 
     /// <summary>The current lifecycle state.</summary>
     public SubscriberState State { get; }
@@ -78,7 +84,7 @@ public sealed class Subscriber
                 $"Cannot transition subscriber '{UserId}' from {State} to {target}.");
         }
 
-        return new Subscriber(HostId, PartnerId, UserId, SystemId, target, _permissions);
+        return new Subscriber(HostId, PartnerId, UserId, SystemId, target, _permissions, Name);
     }
 
     /// <summary>
@@ -131,7 +137,7 @@ public sealed class Subscriber
             return this;
         }
 
-        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, [.. _permissions, permission]);
+        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, [.. _permissions, permission], Name);
     }
 
     /// <summary>
@@ -151,7 +157,7 @@ public sealed class Subscriber
 
         return remaining.Length == _permissions.Length
             ? this
-            : new Subscriber(HostId, PartnerId, UserId, SystemId, State, remaining);
+            : new Subscriber(HostId, PartnerId, UserId, SystemId, State, remaining, Name);
     }
 
     /// <summary>
@@ -165,7 +171,7 @@ public sealed class Subscriber
     {
         ArgumentNullException.ThrowIfNull(permissions);
 
-        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, permissions.Distinct());
+        return new Subscriber(HostId, PartnerId, UserId, SystemId, State, permissions.Distinct(), Name);
     }
 
     private static bool IsAllowedTransition(SubscriberState from, SubscriberState to) => (from, to) switch
