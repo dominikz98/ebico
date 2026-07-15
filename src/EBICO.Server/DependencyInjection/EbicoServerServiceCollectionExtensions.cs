@@ -64,6 +64,11 @@ public static class EbicoServerServiceCollectionExtensions
         // initialisations, the receipt phase and matching transfer-phase requests to.
         services.TryAddSingleton<IDownloadTransactionStore, InMemoryDownloadTransactionStore>();
         services.TryAddSingleton<IDownloadDataProvider, InMemoryDownloadDataProvider>();
+
+        // Download order processing (issue #40): on-demand generation of statement/report content
+        // (STA/VMK/C53/C52/C54) when no payload is pre-seeded for the resolved order type. Default:
+        // synthetic MT940/MT942/camt.05x statements. Pluggable via TryAddSingleton.
+        services.TryAddSingleton<IDownloadOrderProcessor, StatementDownloadProcessor>();
         services.TryAddSingleton<IDownloadTransactionEngine, DownloadTransactionEngine>();
 
         // Transaction recovery/timeouts (issue #35): both engines double as transaction evictors. The

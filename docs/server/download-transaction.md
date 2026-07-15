@@ -17,8 +17,10 @@
 > Download-OrderTypes **FDL** (H003/H004) und **BTD** (H005).
 > Bewusst **noch nicht**: die **Signatur** der Antwort (X002 = M4; die Antwort ist unsigniert);
 > **Recovery/Timeouts** und die Eviction verwaister Transaktionen (#35); ein echter
-> persistenter Auftragsdatenspeicher (der `IDownloadDataProvider` ist In-Memory, austauschbar);
-> auftragstypspezifische Datengenerierung (FDL-/BTD-Parameter werden nicht ausgewertet).
+> persistenter Auftragsdatenspeicher (der `IDownloadDataProvider` ist In-Memory, austauschbar).
+> Die **auftragstypspezifische Datengenerierung** (FDL-`FileFormat`/BTD-BTF → aufgelöster Order-Typ,
+> synthetische Kontoauszüge/Reports mit Zeitraum-Filter) wurde mit den
+> [Download-Orders (#40)](statement-orders.md) nachgereicht.
 
 ## Zweck
 
