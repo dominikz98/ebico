@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
@@ -53,7 +54,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     private readonly IMasterDataManager _masterData;
     private readonly IServerKeyStore _keyStore;
     private readonly IDownloadDataProvider _dataProvider;
-    private readonly IDownloadOrderProcessor _downloadOrderProcessor;
+    private readonly IReadOnlyList<IDownloadOrderProcessor> _downloadOrderProcessors;
     private readonly IEventLog _eventLog;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
@@ -63,7 +64,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="keyStore">The server key store the subscriber's encryption key is read from.</param>
     /// <param name="dataProvider">The provider supplying the order data to download.</param>
-    /// <param name="downloadOrderProcessor">The on-demand content generator invoked when no payload is pre-seeded for a resolved statement order type (issue #40).</param>
+    /// <param name="downloadOrderProcessors">The on-demand content generators invoked when no payload is pre-seeded for a resolved order type; the first whose <see cref="IDownloadOrderProcessor.CanProcess"/> matches is used (statements #40, status/protocol orders #41).</param>
     /// <param name="eventLog">The append-only event log (issue #69) the download lifecycle events are written to.</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment size/limits).</param>
@@ -73,7 +74,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         IMasterDataManager masterData,
         IServerKeyStore keyStore,
         IDownloadDataProvider dataProvider,
-        IDownloadOrderProcessor downloadOrderProcessor,
+        IEnumerable<IDownloadOrderProcessor> downloadOrderProcessors,
         IEventLog eventLog,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
@@ -82,7 +83,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(keyStore);
         ArgumentNullException.ThrowIfNull(dataProvider);
-        ArgumentNullException.ThrowIfNull(downloadOrderProcessor);
+        ArgumentNullException.ThrowIfNull(downloadOrderProcessors);
         ArgumentNullException.ThrowIfNull(eventLog);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
@@ -91,7 +92,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         _masterData = masterData;
         _keyStore = keyStore;
         _dataProvider = dataProvider;
-        _downloadOrderProcessor = downloadOrderProcessor;
+        _downloadOrderProcessors = downloadOrderProcessors.ToArray();
         _eventLog = eventLog;
         _timeProvider = timeProvider;
         _options = options.Value;
@@ -99,14 +100,17 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
 
     /// <summary>
     /// Whether <paramref name="orderType"/> is a download order type handled by the engine: the generic
-    /// <see cref="FdlOrderType"/> (H003/H004) or <see cref="BtdOrderType"/> (H005), or a classical
+    /// <see cref="FdlOrderType"/> (H003/H004) or <see cref="BtdOrderType"/> (H005), a classical
     /// statement/report order type submitted directly (STA/VMK/C53/C52/C54, see
-    /// <see cref="BtfOrderTypeCatalog.IsDownloadOrderType"/>).
+    /// <see cref="BtfOrderTypeCatalog.IsDownloadOrderType"/>), or an administrative status/protocol order
+    /// type (HTD/HKD/HAA/HPD/HAC/PTK, see <see cref="StatusProtocolOrderTypes"/>, issue #41).
     /// </summary>
     /// <param name="orderType">The extracted order type, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> for a download order type; otherwise <see langword="false"/>.</returns>
     public static bool IsDownloadOrderType(string? orderType)
-        => orderType is FdlOrderType or BtdOrderType || BtfOrderTypeCatalog.IsDownloadOrderType(orderType);
+        => orderType is FdlOrderType or BtdOrderType
+            || BtfOrderTypeCatalog.IsDownloadOrderType(orderType)
+            || StatusProtocolOrderTypes.IsStatusProtocolOrderType(orderType);
 
     /// <inheritdoc />
     public bool OwnsTransaction(byte[]? transactionId)
@@ -180,12 +184,16 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
                 .ConfigureAwait(false);
         }
 
-        if (orderData is null && _downloadOrderProcessor.CanProcess(effectiveOrderType))
+        if (orderData is null)
         {
-            queueKey = effectiveOrderType;
-            orderData = await _downloadOrderProcessor
-                .GenerateAsync(new DownloadOrderRequest(keyRef, context.Version, effectiveOrderType, fields.DateRange), ct)
-                .ConfigureAwait(false);
+            var processor = _downloadOrderProcessors.FirstOrDefault(p => p.CanProcess(effectiveOrderType));
+            if (processor is not null)
+            {
+                queueKey = effectiveOrderType;
+                orderData = await processor
+                    .GenerateAsync(new DownloadOrderRequest(keyRef, context.Version, effectiveOrderType, fields.DateRange), ct)
+                    .ConfigureAwait(false);
+            }
         }
 
         if (orderData is null)

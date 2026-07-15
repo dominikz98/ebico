@@ -65,10 +65,15 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IDownloadTransactionStore, InMemoryDownloadTransactionStore>();
         services.TryAddSingleton<IDownloadDataProvider, InMemoryDownloadDataProvider>();
 
-        // Download order processing (issue #40): on-demand generation of statement/report content
-        // (STA/VMK/C53/C52/C54) when no payload is pre-seeded for the resolved order type. Default:
-        // synthetic MT940/MT942/camt.05x statements. Pluggable via TryAddSingleton.
-        services.TryAddSingleton<IDownloadOrderProcessor, StatementDownloadProcessor>();
+        // Download order processing (issues #40/#41): on-demand generation of order data when no payload is
+        // pre-seeded for the resolved order type. The engine consumes the whole IEnumerable and uses the
+        // first processor whose CanProcess matches (AddSingleton, not TryAdd, so several coexist — a caller
+        // can add its own before AddEbicoServer). Defaults: synthetic MT940/MT942/camt.05x statements
+        // (STA/VMK/C53/C52/C54), subscriber/parameter data (HTD/HKD/HAA/HPD) and the customer protocol
+        // (HAC/PTK) projected from the event log.
+        services.AddSingleton<IDownloadOrderProcessor, StatementDownloadProcessor>();
+        services.AddSingleton<IDownloadOrderProcessor, SubscriberInfoDownloadProcessor>();
+        services.AddSingleton<IDownloadOrderProcessor, CustomerProtocolDownloadProcessor>();
         services.TryAddSingleton<IDownloadTransactionEngine, DownloadTransactionEngine>();
 
         // Transaction recovery/timeouts (issue #35): both engines double as transaction evictors. The

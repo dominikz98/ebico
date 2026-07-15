@@ -45,6 +45,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0016](0016-btf-framework-und-berechtigung.md) | BTF-Framework & Berechtigungsprüfung | accepted |
 | [0017](0017-zahlungsverkehr-order-verarbeitung.md) | Zahlungsverkehr-Order-Verarbeitung (Validierung & Statusreport-Ablage) | accepted |
 | [0018](0018-kontoauszug-download-orders.md) | Kontoauszug-/Report-Download-Orders (synthetische Generierung, camt.05x.001.08, ZIP-Container) | accepted |
+| [0019](0019-status-protokoll-orders.md) | Status- & Protokoll-Orders (Domänen-Erweiterung, HAC/PTK als IEventLog-Projektion) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

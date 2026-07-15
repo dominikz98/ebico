@@ -23,6 +23,7 @@ Alle unter `src/EBICO.Core/Domain/` (Namespace `EBICO.Core.Domain`):
 | `SubscriberState` (Enum) | `SubscriberState.cs` | Lebenszyklus: `New`/`Initialized`/`Ready`/`Suspended` |
 | `SignatureClass` (Enum) + `SignatureClassExtensions` | `SignatureClass.cs` | Signaturklasse `E`/`A`/`B`/`T` + Transport-vs-Bank-Klassifikation |
 | `SubscriberPermission` | `SubscriberPermission.cs` | Berechtigung: Auftragstyp × Signaturklasse |
+| `Address`, `BankAccount` | `Address.cs`, `BankAccount.cs` | Kunden-Adresse / -Konto (von HTD/HKD ausgeliefert, #41) |
 | `Bank`, `Partner`, `Subscriber` | `Bank.cs`, `Partner.cs`, `Subscriber.cs` | schlanke, unveränderliche Aggregate |
 | `EbicsDomainException` (+ abgeleitete) | `DomainExceptions.cs` | Validierungsfehler des Domänenmodells |
 
@@ -120,16 +121,18 @@ subscriber.Transition(SubscriberState.New);             // InvalidSubscriberStat
 Schlank und unveränderlich (`sealed class`, Get-only-Properties), analog zu
 `EbicsVersionInfo`:
 
-- `Bank` — Identität `HostId`, optionaler `Name`, unterstützte `EbicsVersion`s (Default: alle).
+- `Bank` — Identität `HostId`, optionaler `Name` (HPD-`Institute`), unterstützte `EbicsVersion`s
+  (Default: alle) und optionaler `Url` (HPD-Zugangs-URL, #41).
 - `Partner` — Identität (`HostId`, `PartnerId`), optionaler `Name`; gehört zu **genau einer**
   Bank und gruppiert deren Subscriber. Das Scoping pro Bank ermöglicht die
   Mehr-Mandanten-Fähigkeit (derselbe `PartnerId`-String bezeichnet an verschiedenen Banken
-  verschiedene Kunden) und wurde im Server-Layer (#30) ergänzt.
+  verschiedene Kunden) und wurde im Server-Layer (#30) ergänzt. Trägt zusätzlich eine optionale
+  `Address` und `BankAccount`s (von HTD/HKD ausgeliefert, #41).
 - `Subscriber` — Identität über das Tripel (`HostId`, `PartnerId`, `UserId`), optionale
-  `SystemId` (technischer Teilnehmer → `IsTechnicalSubscriber`), `SubscriberState` und
-  `SubscriberPermission`s. Berechtigungen werden unveränderlich fortgeschrieben:
-  `WithPermission` / `WithoutPermissionsFor` / `WithPermissions` liefern (wie `Transition`)
-  jeweils eine neue Instanz.
+  `SystemId` (technischer Teilnehmer → `IsTechnicalSubscriber`), optionaler `Name` (von HTD/HKD
+  ausgeliefert, #41), `SubscriberState` und `SubscriberPermission`s. Berechtigungen werden
+  unveränderlich fortgeschrieben: `WithPermission` / `WithoutPermissionsFor` / `WithPermissions`
+  liefern (wie `Transition`) jeweils eine neue Instanz (der `Name` bleibt dabei erhalten).
 
 Die serverseitige CRUD-Verwaltung dieser Aggregate (inkl. referentieller Integrität und
 kaskadierendem Löschen) beschreibt die [Stammdatenverwaltung](../server/master-data.md) (#30).
