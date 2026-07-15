@@ -51,6 +51,7 @@ public static class BtfOrderTypeCatalog
 
         // --- Downloads (BTD) ---
         new("STA", new BusinessTransactionFormat("EOP", container: ContainerStringType.Zip, messageName: "mt940"), BtfDirection.Download, "Statement (SWIFT MT940)"),
+        new("VMK", new BusinessTransactionFormat("STM", container: ContainerStringType.Zip, messageName: "mt942"), BtfDirection.Download, "Interim Transaction Report (SWIFT MT942)"),
         new("C53", new BusinessTransactionFormat("EOP", container: ContainerStringType.Zip, messageName: "camt.053"), BtfDirection.Download, "Bank-to-Customer Statement (camt.053)"),
         new("C52", new BusinessTransactionFormat("STM", container: ContainerStringType.Zip, messageName: "camt.052"), BtfDirection.Download, "Bank-to-Customer Account Report (camt.052)"),
         new("C54", new BusinessTransactionFormat("EOP", container: ContainerStringType.Zip, messageName: "camt.054"), BtfDirection.Download, "Debit/Credit Notification (camt.054)"),
@@ -151,6 +152,34 @@ public static class BtfOrderTypeCatalog
     }
 
     /// <summary>
+    /// Whether <paramref name="orderType"/> is a classical order-type code that maps to a <b>download</b>
+    /// business transaction (<see cref="BtfDirection.Download"/> or <see cref="BtfDirection.Both"/>) — the
+    /// statement/report order types (STA/VMK/C53/C52/C54) a client may request <i>directly</i> (H003/H004)
+    /// instead of through the generic <c>FDL</c>/<c>BTD</c>. Used by the download routing to recognise
+    /// direct codes.
+    /// </summary>
+    /// <param name="orderType">The classical order type code, or <see langword="null"/>.</param>
+    /// <returns><see langword="true"/> for a direct download order-type code; otherwise <see langword="false"/>.</returns>
+    public static bool IsDownloadOrderType(string? orderType)
+    {
+        if (string.IsNullOrWhiteSpace(orderType))
+        {
+            return false;
+        }
+
+        foreach (var entry in Entries)
+        {
+            if (entry.Direction is BtfDirection.Download or BtfDirection.Both
+                && string.Equals(entry.OrderType, orderType, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// Resolves the classical order-type code for a generic file upload (<c>FUL</c>) by its
     /// <c>FULOrderParams/FileFormat</c> value (e.g. <c>"pain.001.001.09"</c>), matching on the message-name
     /// family of the catalog's upload entries. When several upload entries share a message family
@@ -160,15 +189,16 @@ public static class BtfOrderTypeCatalog
     /// </summary>
     /// <param name="fileFormat">The <c>FileFormat</c> value (e.g. <c>"pain.008.001.02"</c>).</param>
     /// <param name="orderType">The classical order type code when the method returns <see langword="true"/>.</param>
-    /// <returns><see langword="true"/> when the file format maps to an upload order type; otherwise <see langword="false"/>.</returns>
+    /// <param name="direction">The transfer direction to match (default <see cref="BtfDirection.Upload"/>); the download side (FDL statements) passes <see cref="BtfDirection.Download"/>.</param>
+    /// <returns><see langword="true"/> when the file format maps to an order type in the direction; otherwise <see langword="false"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="fileFormat"/> is <see langword="null"/>.</exception>
-    public static bool TryGetOrderTypeByFileFormat(string fileFormat, out string orderType)
+    public static bool TryGetOrderTypeByFileFormat(string fileFormat, out string orderType, BtfDirection direction = BtfDirection.Upload)
     {
         ArgumentNullException.ThrowIfNull(fileFormat);
 
         foreach (var entry in Entries)
         {
-            if (entry.Direction is BtfDirection.Upload or BtfDirection.Both
+            if (DirectionMatches(entry.Direction, direction)
                 && entry.Btf.MessageName is { } messageName
                 && MessageNameMatches(messageName, fileFormat))
             {
@@ -206,6 +236,35 @@ public static class BtfOrderTypeCatalog
 
         return string.IsNullOrWhiteSpace(orderType) ? null : orderType;
     }
+
+    /// <summary>
+    /// Resolves the effective classical order-type code for a <b>download</b> across the three request
+    /// conventions, in precedence order: the H005 <paramref name="btf"/> (<c>BTD</c>), a generic <c>FDL</c>
+    /// with a <paramref name="fileFormat"/> (H003/H004), or a classical order type requested directly. Falls
+    /// back to the raw <paramref name="orderType"/> when no more specific mapping applies (the download twin
+    /// of <see cref="ResolveUploadOrderType"/>).
+    /// </summary>
+    /// <param name="orderType">The extracted order/admin-order type (e.g. <c>"STA"</c>, <c>"FDL"</c>, <c>"BTD"</c>), or <see langword="null"/>.</param>
+    /// <param name="btf">The extracted H005 BTF, or <see langword="null"/> when absent.</param>
+    /// <param name="fileFormat">The H003/H004 <c>FDLOrderParams/FileFormat</c> value (e.g. <c>"camt.053"</c>, <c>"mt940"</c>), or <see langword="null"/> when absent.</param>
+    /// <returns>The effective download order-type code, or <see langword="null"/> when nothing is available.</returns>
+    public static string? ResolveDownloadOrderType(string? orderType, BusinessTransactionFormat? btf, string? fileFormat)
+    {
+        if (btf is { } value)
+        {
+            return TryGetOrderType(value, out var mapped) ? mapped : value.CanonicalKey;
+        }
+
+        if (!string.IsNullOrWhiteSpace(fileFormat) && TryGetOrderTypeByFileFormat(fileFormat, out var byFormat, BtfDirection.Download))
+        {
+            return byFormat;
+        }
+
+        return string.IsNullOrWhiteSpace(orderType) ? null : orderType;
+    }
+
+    private static bool DirectionMatches(BtfDirection entryDirection, BtfDirection wanted)
+        => entryDirection == BtfDirection.Both || entryDirection == wanted;
 
     private static bool OptionMatches(string? mappingOption, string? candidateOption)
         => string.Equals(mappingOption, candidateOption, StringComparison.Ordinal);

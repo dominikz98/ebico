@@ -1077,10 +1077,22 @@ internal static class ServerTestHelpers
     /// <param name="partnerId">The <c>PartnerID</c> to place in the header.</param>
     /// <param name="userId">The <c>UserID</c> to place in the header.</param>
     /// <param name="btf">The optional H005 business transaction format placed in <c>BTDOrderParams/Service</c> (ignored for H003/H004).</param>
+    /// <param name="orderType">The optional order/admin-order type to place in the header; defaults to <c>"FDL"</c> (H003/H004) / <c>"BTD"</c> (H005). Use this to request a classical download order type (e.g. <c>"STA"</c>) directly.</param>
+    /// <param name="fileFormat">The optional H003/H004 <c>FDLOrderParams/FileFormat</c> value (e.g. <c>"camt.053"</c>, <c>"mt940"</c>); ignored for H005.</param>
+    /// <param name="dateRange">The optional reporting period placed in the order params (all versions); both bounds must be set.</param>
     /// <returns>The serialized initialisation request XML.</returns>
     public static string BuildDownloadInitRequest(
-        EbicsVersion version, string hostId, string partnerId, string userId, BusinessTransactionFormat? btf = null)
-        => version switch
+        EbicsVersion version,
+        string hostId,
+        string partnerId,
+        string userId,
+        BusinessTransactionFormat? btf = null,
+        string? orderType = null,
+        string? fileFormat = null,
+        DateRange? dateRange = null)
+    {
+        orderType ??= version == EbicsVersion.H005 ? "BTD" : "FDL";
+        return version switch
         {
             EbicsVersion.H003 => EbicsXmlSerializer.SerializeToString(new H003.EbicsRequest
             {
@@ -1092,7 +1104,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H003.StaticHeaderOrderDetailsType { OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = "FDL" } },
+                        OrderDetails = new H003.StaticHeaderOrderDetailsType
+                        {
+                            OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
+                            OrderParams = BuildH003DownloadParams(fileFormat, dateRange),
+                        },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H003.MutableHeaderType { TransactionPhase = H003.TransactionPhaseType.Initialisation },
@@ -1108,7 +1124,11 @@ internal static class ServerTestHelpers
                         HostId = hostId,
                         PartnerId = partnerId,
                         UserId = userId,
-                        OrderDetails = new H004.StaticHeaderOrderDetailsType { OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = "FDL" } },
+                        OrderDetails = new H004.StaticHeaderOrderDetailsType
+                        {
+                            OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
+                            OrderParams = BuildH004DownloadParams(fileFormat, dateRange),
+                        },
                         SecurityMedium = "0000",
                     },
                     Mutable = new H004.MutableHeaderType { TransactionPhase = H004.TransactionPhaseType.Initialisation },
@@ -1126,8 +1146,8 @@ internal static class ServerTestHelpers
                         UserId = userId,
                         OrderDetails = new H005.StaticHeaderOrderDetailsType
                         {
-                            AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = "BTD" },
-                            OrderParams = btf is { } bd ? new H005.BtdParamsType { Service = bd.ToRestrictedServiceType() } : null,
+                            AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType },
+                            OrderParams = BuildH005DownloadParams(btf, dateRange),
                         },
                         SecurityMedium = "0000",
                     },
@@ -1136,6 +1156,59 @@ internal static class ServerTestHelpers
             }, EbicsVersion.H005),
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
+    }
+
+    private static DateTime ToXsdDate(DateOnly? value) => value!.Value.ToDateTime(TimeOnly.MinValue);
+
+    // H003 download order params: FDLOrderParams (FileFormat + optional DateRange) when a file format is
+    // given, else StandardOrderParams (DateRange only) when a range is given, else none (the bare form).
+    private static object? BuildH003DownloadParams(string? fileFormat, DateRange? dateRange)
+    {
+        if (fileFormat is not null)
+        {
+            return new H003.FdlOrderParamsType
+            {
+                FileFormat = new H003.FileFormatType { Value = fileFormat },
+                DateRange = dateRange is { } dr ? new H003.FdlOrderParamsTypeDateRange { Start = ToXsdDate(dr.Start), End = ToXsdDate(dr.End) } : null,
+            };
+        }
+
+        return dateRange is { } d
+            ? new H003.StandardOrderParamsType { DateRange = new H003.StandardOrderParamsTypeDateRange { Start = ToXsdDate(d.Start), End = ToXsdDate(d.End) } }
+            : null;
+    }
+
+    private static object? BuildH004DownloadParams(string? fileFormat, DateRange? dateRange)
+    {
+        if (fileFormat is not null)
+        {
+            return new H004.FdlOrderParamsType
+            {
+                FileFormat = new H004.FileFormatType { Value = fileFormat },
+                DateRange = dateRange is { } dr ? new H004.FdlOrderParamsTypeDateRange { Start = ToXsdDate(dr.Start), End = ToXsdDate(dr.End) } : null,
+            };
+        }
+
+        return dateRange is { } d
+            ? new H004.StandardOrderParamsType { DateRange = new H004.StandardOrderParamsTypeDateRange { Start = ToXsdDate(d.Start), End = ToXsdDate(d.End) } }
+            : null;
+    }
+
+    // H005 download order params: BTDOrderParams carrying the BTF service and/or the reporting period.
+    // Kept null when neither is present, preserving the exact wire form for bare no-arg callers.
+    private static H005.BtdParamsType? BuildH005DownloadParams(BusinessTransactionFormat? btf, DateRange? dateRange)
+    {
+        if (btf is null && dateRange is null)
+        {
+            return null;
+        }
+
+        return new H005.BtdParamsType
+        {
+            Service = btf is { } b ? b.ToRestrictedServiceType() : null,
+            DateRange = dateRange is { } dr ? new H005.DateRangeType { Start = ToXsdDate(dr.Start), End = ToXsdDate(dr.End) } : null,
+        };
+    }
 
     /// <summary>
     /// Builds a transfer-phase <c>ebicsRequest</c> that fetches one download segment: the static header

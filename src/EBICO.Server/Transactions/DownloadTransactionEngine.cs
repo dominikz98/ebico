@@ -6,6 +6,7 @@ using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
+using EBICO.Server.Orders;
 using EBICO.Server.Pipeline;
 using EBICO.Server.State;
 using Microsoft.Extensions.Options;
@@ -52,6 +53,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     private readonly IMasterDataManager _masterData;
     private readonly IServerKeyStore _keyStore;
     private readonly IDownloadDataProvider _dataProvider;
+    private readonly IDownloadOrderProcessor _downloadOrderProcessor;
     private readonly IEventLog _eventLog;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
@@ -61,6 +63,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="keyStore">The server key store the subscriber's encryption key is read from.</param>
     /// <param name="dataProvider">The provider supplying the order data to download.</param>
+    /// <param name="downloadOrderProcessor">The on-demand content generator invoked when no payload is pre-seeded for a resolved statement order type (issue #40).</param>
     /// <param name="eventLog">The append-only event log (issue #69) the download lifecycle events are written to.</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment size/limits).</param>
@@ -70,6 +73,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         IMasterDataManager masterData,
         IServerKeyStore keyStore,
         IDownloadDataProvider dataProvider,
+        IDownloadOrderProcessor downloadOrderProcessor,
         IEventLog eventLog,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
@@ -78,6 +82,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(keyStore);
         ArgumentNullException.ThrowIfNull(dataProvider);
+        ArgumentNullException.ThrowIfNull(downloadOrderProcessor);
         ArgumentNullException.ThrowIfNull(eventLog);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
@@ -86,19 +91,22 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         _masterData = masterData;
         _keyStore = keyStore;
         _dataProvider = dataProvider;
+        _downloadOrderProcessor = downloadOrderProcessor;
         _eventLog = eventLog;
         _timeProvider = timeProvider;
         _options = options.Value;
     }
 
     /// <summary>
-    /// Whether <paramref name="orderType"/> is a generic download order type handled by the engine
-    /// (<see cref="FdlOrderType"/> for H003/H004, <see cref="BtdOrderType"/> for H005).
+    /// Whether <paramref name="orderType"/> is a download order type handled by the engine: the generic
+    /// <see cref="FdlOrderType"/> (H003/H004) or <see cref="BtdOrderType"/> (H005), or a classical
+    /// statement/report order type submitted directly (STA/VMK/C53/C52/C54, see
+    /// <see cref="BtfOrderTypeCatalog.IsDownloadOrderType"/>).
     /// </summary>
     /// <param name="orderType">The extracted order type, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> for a download order type; otherwise <see langword="false"/>.</returns>
     public static bool IsDownloadOrderType(string? orderType)
-        => orderType is FdlOrderType or BtdOrderType;
+        => orderType is FdlOrderType or BtdOrderType || BtfOrderTypeCatalog.IsDownloadOrderType(orderType);
 
     /// <inheritdoc />
     public bool OwnsTransaction(byte[]? transactionId)
@@ -127,9 +135,10 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
 
         // Authorisation per BTF/order type (issue #38): the subscriber must hold a permission for the
         // requested order type. Checked before dequeuing so an unauthorised download consumes no data.
-        // For H005 the BTF service (BTDOrderParams/Service) is resolved to its classical order-type code;
-        // for H003/H004 the order type (FDL) is used directly.
-        var effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf);
+        // The effective (classical) order type is resolved across the three conventions: the H005 BTF
+        // (BTDOrderParams/Service), an H003/H004 FDL + FileFormat, or a classical code submitted directly
+        // (issue #40). It is used both here and as the queue/generation key below.
+        var effectiveOrderType = BtfOrderTypeCatalog.ResolveDownloadOrderType(context.OrderType, context.Btf, fields.FileFormat);
         if (effectiveOrderType is null || !subscriber.HasPermissionFor(effectiveOrderType))
         {
             return Init(EbicsReturnCode.AuthorisationOrderTypeFailed);
@@ -152,10 +161,33 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         }
 
         // Provision the order data. Consuming semantics: dequeue now; a negative receipt re-enqueues it.
-        var orderType = context.OrderType!;
+        // Precedence: (1) pre-seeded data under the resolved order type; (2) a backward-compat probe under
+        // the raw FDL/BTD key (what the engine keyed on before #40, so a queue seeded under "FDL"/"BTD"
+        // keeps working); (3) on-demand generation for a statement/report order type. The key actually hit
+        // is remembered so a re-enqueue (negative receipt / eviction) lands back under the same key.
+        var queueKey = effectiveOrderType;
         var orderData = await _dataProvider
-            .TryDequeueAsync(new DownloadDataRequest(context.Version, keyRef, orderType), ct)
+            .TryDequeueAsync(new DownloadDataRequest(context.Version, keyRef, queueKey), ct)
             .ConfigureAwait(false);
+
+        if (orderData is null
+            && context.OrderType is { } rawOrderType
+            && !string.Equals(effectiveOrderType, rawOrderType, StringComparison.Ordinal))
+        {
+            queueKey = rawOrderType;
+            orderData = await _dataProvider
+                .TryDequeueAsync(new DownloadDataRequest(context.Version, keyRef, queueKey), ct)
+                .ConfigureAwait(false);
+        }
+
+        if (orderData is null && _downloadOrderProcessor.CanProcess(effectiveOrderType))
+        {
+            queueKey = effectiveOrderType;
+            orderData = await _downloadOrderProcessor
+                .GenerateAsync(new DownloadOrderRequest(keyRef, context.Version, effectiveOrderType, fields.DateRange), ct)
+                .ConfigureAwait(false);
+        }
+
         if (orderData is null)
         {
             return Init(EbicsReturnCode.NoDownloadDataAvailable);
@@ -172,7 +204,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
         {
             // Cannot serve this payload within the configured ceiling; return it to the queue so it is
             // not lost, then report the limit.
-            await _dataProvider.EnqueueAsync(keyRef, orderType, orderData, ct).ConfigureAwait(false);
+            await _dataProvider.EnqueueAsync(keyRef, queueKey, orderData, ct).ConfigureAwait(false);
             return Init(EbicsReturnCode.MaxSegmentsExceeded);
         }
 
@@ -181,7 +213,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             transactionId,
             context.Version,
             keyRef,
-            orderType,
+            queueKey,
             segmented.Segments,
             encrypted.EncryptedTransactionKey,
             digest,
@@ -197,7 +229,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             EbicsEventSeverity.Info,
             EbicsEventVisibility.CustomerVisible,
             EbicsReturnCode.Ok,
-            $"Download started ({segmented.NumSegments} segment(s), order type {orderType}).",
+            $"Download started ({segmented.NumSegments} segment(s), order type {queueKey}).",
             ct).ConfigureAwait(false);
 
         // The initialisation response carries segment 1 together with the DataEncryptionInfo.
@@ -408,7 +440,8 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
 
     // --- Version-neutral field extraction (mirrors UploadTransactionEngine) --------------------------
 
-    private readonly record struct InitFields(string? HostId, string? PartnerId, string? UserId);
+    private readonly record struct InitFields(
+        string? HostId, string? PartnerId, string? UserId, string? FileFormat, DateRange? DateRange);
 
     private readonly record struct TransferFields(byte[]? TransactionId, ulong? SegmentNumber, bool LastSegment);
 
@@ -416,10 +449,37 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
 
     private static InitFields ExtractInit(IEbicsRequestEnvelope envelope) => envelope switch
     {
-        H003.EbicsRequest r => new InitFields(r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId),
-        H004.EbicsRequest r => new InitFields(r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId),
-        H005.EbicsRequest r => new InitFields(r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId),
+        H003.EbicsRequest r => new InitFields(
+            r.Header?.Static?.HostId,
+            r.Header?.Static?.PartnerId,
+            r.Header?.Static?.UserId,
+            (r.Header?.Static?.OrderDetails?.OrderParams as H003.FdlOrderParamsType)?.FileFormat?.Value,
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
+        H004.EbicsRequest r => new InitFields(
+            r.Header?.Static?.HostId,
+            r.Header?.Static?.PartnerId,
+            r.Header?.Static?.UserId,
+            (r.Header?.Static?.OrderDetails?.OrderParams as H004.FdlOrderParamsType)?.FileFormat?.Value,
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
+        H005.EbicsRequest r => new InitFields(
+            r.Header?.Static?.HostId,
+            r.Header?.Static?.PartnerId,
+            r.Header?.Static?.UserId,
+            null,
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
         _ => default,
+    };
+
+    // Extracts the reporting period from the version-specific order-params element (FDLOrderParams or
+    // StandardOrderParams for H003/H004, BTDOrderParams for H005). Returns null when no DateRange is present.
+    private static DateRange? ExtractDateRange(object? orderParams) => orderParams switch
+    {
+        H003.FdlOrderParamsType { DateRange: { } d } => new DateRange(DateOnly.FromDateTime(d.Start), DateOnly.FromDateTime(d.End)),
+        H003.StandardOrderParamsType { DateRange: { } d } => new DateRange(DateOnly.FromDateTime(d.Start), DateOnly.FromDateTime(d.End)),
+        H004.FdlOrderParamsType { DateRange: { } d } => new DateRange(DateOnly.FromDateTime(d.Start), DateOnly.FromDateTime(d.End)),
+        H004.StandardOrderParamsType { DateRange: { } d } => new DateRange(DateOnly.FromDateTime(d.Start), DateOnly.FromDateTime(d.End)),
+        H005.BtfParamsTyp { DateRange: { } d } => new DateRange(DateOnly.FromDateTime(d.Start), DateOnly.FromDateTime(d.End)),
+        _ => null,
     };
 
     private static TransferFields ExtractTransfer(IEbicsRequestEnvelope envelope) => envelope switch

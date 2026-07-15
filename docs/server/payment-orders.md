@@ -15,8 +15,9 @@
 > Bewusst **noch nicht**: eine echte **ISO-20022-XSD-Validierung** (strukturell/semantisch statt XSD);
 > die **ES/`SignatureFlag`-Prüfung** (weiterhin zurückgestellt, konsistent mit
 > [#32](upload-transaction.md)); das **End-to-End-Herunterladen** des Statusreports (Mapping
-> FDL-`FileFormat`/BTD-BTF → Statusreport-Queue) — das folgt mit den
-> [Download-Orders (#40)](download-transaction.md).
+> FDL-`FileFormat`/BTD-BTF → `PSR`-Queue): die Generate-on-Demand-Download-Maschine kam mit den
+> [Download-Orders (#40)](statement-orders.md), das `PSR`-Mapping selbst bleibt aber offen (kein
+> BTF/Order-Typ zeigt auf `PSR`).
 
 ## Zweck
 
@@ -123,9 +124,10 @@ Die übrigen Transaktions-/Segment-Codes (`091101`/`091104`/…) stammen unverä
 - **ES/`SignatureFlag` weiterhin ungeprüft.** Die Payload ist entschlüsselt, aber nicht authentifiziert
   (konsistent mit [#32](upload-transaction.md)).
 - **Statusreport-Download offen.** `PaymentStatusReportOrderType` (`"PSR"`) ist ein Best-Effort-
-  Platzhalter; das Mapping FDL-`FileFormat`/BTD-BTF → Statusreport-Queue und damit der End-to-End-Abruf
-  folgen mit **[#40](download-transaction.md)** (die Download-Engine entnimmt heute nach dem rohen
-  Order-Typ FDL/BTD).
+  Platzhalter. Die [Download-Orders (#40)](statement-orders.md) haben die Download-Engine so umgestellt,
+  dass sie nach dem **aufgelösten** Order-Typ entnimmt (statt nur nach rohem FDL/BTD); es gibt aber weiterhin
+  **kein** BTF/Order-Typ, der auf die `PSR`-Queue zeigt, sodass der Statusreport nur über die
+  [Admin-API](master-data.md) beobachtbar ist. Das `PSR`-Mapping bleibt ein Folgeschritt.
 - **FUL-B2B-Ambiguität.** CDD/CDB teilen `pain.008`; über FUL/FileFormat gewinnt der CORE-Default (CDD).
 - **pain.002-Version.** Fest `pain.002.001.03` statt strikt an die Upload-Version gekoppelt.
 
@@ -157,7 +159,8 @@ Die übrigen Transaktions-/Segment-Codes (`091101`/`091104`/…) stammen unverä
 
 - [Upload-Transaktion (Initialisation + Transfer)](upload-transaction.md) — die Empfangsmaschine, an der #39 andockt
 - [BTF-Framework (H005)](btf-framework.md) — BTF↔OrderType-Katalog, Berechtigungsprüfung
-- [Download-Transaktion](download-transaction.md) — der Ablage-/Auslieferungskanal (`IDownloadDataProvider`); Statusreport-Abruf = #40
+- [Download-Transaktion](download-transaction.md) — der Ablage-/Auslieferungskanal (`IDownloadDataProvider`)
+- [Download-Orders: Kontoauszüge & Reports](statement-orders.md) — die Download-Gegenseite (#40); stellte die Engine auf Entnahme nach aufgelöstem Order-Typ um (`PSR`-Mapping weiter offen)
 - [Ereignis-/Protokollspeicher (IEventLog)](event-log.md) — `OrderAccepted`/`OrderRejected`-Ereignisse
 - [Stammdatenverwaltung](master-data.md) — Berechtigungen, Admin-API (Download-Queue)
 - [EBICS-Returncode-Katalog](../protocol/return-codes.md) — `090004`/`090003`
