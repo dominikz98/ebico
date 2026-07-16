@@ -49,10 +49,19 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<EbicsResponseFactory>();
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();
 
-        // Order processing (issue #39): the order-type-specific post-processing the upload engine invokes
-        // once the order data is decoded. Default: SEPA payments (CCT/CDD/CDB/CIP) — validate the pain
-        // payload and file the pain.002 status report for later download. Pluggable via TryAddSingleton.
-        services.TryAddSingleton<IUploadOrderProcessor, SepaPaymentUploadProcessor>();
+        // Order processing (issues #39/#42): the order-type-specific post-processing the upload engine
+        // invokes once the order data is decoded. The engine consumes the whole IEnumerable and uses the
+        // first processor whose CanProcess matches (AddSingleton, not TryAdd, so several coexist — a caller
+        // can add its own before AddEbicoServer). Defaults: SEPA payments (CCT/CDD/CDB/CIP) — validate the
+        // pain payload and either file the pain.002 status report or park the order for distributed signing
+        // — and the VEU signature/cancellation orders (HVE/HVS) that sign/release/cancel a parked order.
+        services.AddSingleton<IUploadOrderProcessor, SepaPaymentUploadProcessor>();
+        services.AddSingleton<IUploadOrderProcessor, VeuSignatureUploadProcessor>();
+
+        // Open-VEU store (issue #42): the long-lived, partner-scoped store of orders awaiting distributed
+        // signatures (parked on upload, mutated by HVE/HVS, projected by HVU/HVZ/HVD/HVT). In-memory
+        // default, pluggable via TryAddSingleton.
+        services.TryAddSingleton<IOpenVeuStore, InMemoryOpenVeuStore>();
 
         // Transaction engine (issue #32): the upload transaction store and the two-phase engine the
         // pipeline routes FUL/BTU initialisations and every transfer-phase request to.
@@ -74,6 +83,9 @@ public static class EbicoServerServiceCollectionExtensions
         services.AddSingleton<IDownloadOrderProcessor, StatementDownloadProcessor>();
         services.AddSingleton<IDownloadOrderProcessor, SubscriberInfoDownloadProcessor>();
         services.AddSingleton<IDownloadOrderProcessor, CustomerProtocolDownloadProcessor>();
+        // Distributed electronic signature overview/detail (issue #42): HVU/HVZ/HVD/HVT projected from the
+        // open-VEU store.
+        services.AddSingleton<IDownloadOrderProcessor, VeuOverviewDownloadProcessor>();
         services.TryAddSingleton<IDownloadTransactionEngine, DownloadTransactionEngine>();
 
         // Transaction recovery/timeouts (issue #35): both engines double as transaction evictors. The

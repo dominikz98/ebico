@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
@@ -51,7 +52,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     private readonly IMasterDataManager _masterData;
     private readonly IServerBankKeyStore _bankKeyStore;
     private readonly IEventLog _eventLog;
-    private readonly IUploadOrderProcessor _orderProcessor;
+    private readonly IReadOnlyList<IUploadOrderProcessor> _orderProcessors;
     private readonly TimeProvider _timeProvider;
     private readonly EbicoServerOptions _options;
 
@@ -60,7 +61,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     /// <param name="masterData">The master-data manager used to resolve the subscriber.</param>
     /// <param name="bankKeyStore">The store providing the bank's key pair (its private encryption key decrypts the transaction key).</param>
     /// <param name="eventLog">The append-only event log (issue #69) the upload lifecycle events are written to.</param>
-    /// <param name="orderProcessor">The order-type-specific processor invoked once the order data is decoded (issue #39).</param>
+    /// <param name="orderProcessors">The order-type-specific processors invoked once the order data is decoded; the first whose <see cref="IUploadOrderProcessor.CanProcess"/> matches is used (SEPA payments #39, VEU signatures #42).</param>
     /// <param name="timeProvider">The clock used to stamp transaction creation.</param>
     /// <param name="options">The server options (segment/transaction limits).</param>
     /// <exception cref="ArgumentNullException">An argument is <see langword="null"/>.</exception>
@@ -69,7 +70,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         IMasterDataManager masterData,
         IServerBankKeyStore bankKeyStore,
         IEventLog eventLog,
-        IUploadOrderProcessor orderProcessor,
+        IEnumerable<IUploadOrderProcessor> orderProcessors,
         TimeProvider timeProvider,
         IOptions<EbicoServerOptions> options)
     {
@@ -77,7 +78,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         ArgumentNullException.ThrowIfNull(masterData);
         ArgumentNullException.ThrowIfNull(bankKeyStore);
         ArgumentNullException.ThrowIfNull(eventLog);
-        ArgumentNullException.ThrowIfNull(orderProcessor);
+        ArgumentNullException.ThrowIfNull(orderProcessors);
         ArgumentNullException.ThrowIfNull(timeProvider);
         ArgumentNullException.ThrowIfNull(options);
 
@@ -85,21 +86,24 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         _masterData = masterData;
         _bankKeyStore = bankKeyStore;
         _eventLog = eventLog;
-        _orderProcessor = orderProcessor;
+        _orderProcessors = orderProcessors.ToArray();
         _timeProvider = timeProvider;
         _options = options.Value;
     }
 
     /// <summary>
     /// Whether <paramref name="orderType"/> routes to the upload engine: the generic upload order types
-    /// (<see cref="FulOrderType"/> for H003/H004, <see cref="BtuOrderType"/> for H005) or a classical
+    /// (<see cref="FulOrderType"/> for H003/H004, <see cref="BtuOrderType"/> for H005), a classical
     /// upload order-type code submitted directly (e.g. <c>"CCT"</c>/<c>"CDD"</c>, via
-    /// <see cref="BtfOrderTypeCatalog.IsUploadOrderType"/>).
+    /// <see cref="BtfOrderTypeCatalog.IsUploadOrderType"/>) or a distributed-signature upload order
+    /// (HVE/HVS, via <see cref="VeuOrderTypes.IsVeuUploadOrderType"/>, issue #42).
     /// </summary>
     /// <param name="orderType">The extracted order type, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> for an upload order type; otherwise <see langword="false"/>.</returns>
     public static bool IsUploadOrderType(string? orderType)
-        => orderType is FulOrderType or BtuOrderType || BtfOrderTypeCatalog.IsUploadOrderType(orderType);
+        => orderType is FulOrderType or BtuOrderType
+            || BtfOrderTypeCatalog.IsUploadOrderType(orderType)
+            || VeuOrderTypes.IsVeuUploadOrderType(orderType);
 
     /// <inheritdoc />
     public async Task<UploadTransactionResult> BeginUploadAsync(EbicsRequestContext context, CancellationToken ct = default)
@@ -181,7 +185,9 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
             transactionKey,
             fields.SignatureData,
             _timeProvider.GetUtcNow(),
-            effectiveOrderType);
+            effectiveOrderType,
+            fields.DistributedSignature,
+            fields.OrderId);
 
         _store.Create(transaction);
 
@@ -350,17 +356,21 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
         }
 
         // Order-type-specific processing (issue #39): a payment upload (CCT/CDD/CDB/CIP) is validated and
-        // its pain.002 status report filed for later delivery here. Order types the processor does not
-        // handle keep the previous behaviour: retain the plaintext on the transaction, no processing.
-        if (transaction.EffectiveOrderType is { } effectiveOrderType && _orderProcessor.CanProcess(effectiveOrderType))
+        // its pain.002 status report filed for later delivery here; a distributed-signature order (HVE/HVS,
+        // issue #42) mutates the open-VEU store. The first processor whose CanProcess matches handles it;
+        // order types no processor handles keep the previous behaviour (retain the plaintext, no processing).
+        if (transaction.EffectiveOrderType is { } effectiveOrderType
+            && _orderProcessors.FirstOrDefault(p => p.CanProcess(effectiveOrderType)) is { } orderProcessor)
         {
-            var processing = await _orderProcessor.ProcessAsync(
+            var processing = await orderProcessor.ProcessAsync(
                 new UploadOrderContext(
                     transaction.Subscriber,
                     transaction.Version,
                     effectiveOrderType,
                     orderData,
-                    transaction.TransactionIdHex),
+                    transaction.TransactionIdHex,
+                    transaction.DistributedSignature,
+                    transaction.OrderId),
                 ct).ConfigureAwait(false);
 
             // A rejected payload is not completed/retained; the transfer step reports the rejection code.
@@ -383,7 +393,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     // --- Version-neutral field extraction (mirrors EbicsRequestPipeline.TryExtractOrderType) --------
 
     private readonly record struct InitFields(
-        string? HostId, string? PartnerId, string? UserId, ulong? NumSegments, byte[]? TransactionKey, byte[]? SignatureData, string? FileFormat);
+        string? HostId, string? PartnerId, string? UserId, ulong? NumSegments, byte[]? TransactionKey, byte[]? SignatureData, string? FileFormat, bool DistributedSignature, string? OrderId);
 
     private readonly record struct TransferFields(
         byte[]? TransactionId, ulong? SegmentNumber, bool LastSegment, byte[]? OrderData);
@@ -391,26 +401,57 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     private static InitFields ExtractInit(IEbicsRequestEnvelope envelope) => envelope switch
     {
         // H003/H004 carry the pain format in FULOrderParams/FileFormat (generic file upload); H005 carries
-        // the business identity in the BTF (context.Btf), so it has no FileFormat here.
+        // the business identity in the BTF (context.Btf), so it has no FileFormat here. The VEU trigger
+        // (issue #42) is version-specific: H003/H004 signal distributed signing via OrderAttribute=OZHNN,
+        // H005 via the presence of BTUOrderParams/SignatureFlag; the HVE/HVS target order id comes from the
+        // Hv[es]OrderParams.
         H003.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
             r.Body?.DataTransfer?.SignatureData?.Value,
-            (r.Header?.Static?.OrderDetails?.OrderParams as H003.FulOrderParamsType)?.FileFormat?.Value),
+            (r.Header?.Static?.OrderDetails?.OrderParams as H003.FulOrderParamsType)?.FileFormat?.Value,
+            r.Header?.Static?.OrderDetails?.OrderAttribute == H003.OrderAttributeType.Ozhnn,
+            VeuOrderIdH003(r.Header?.Static?.OrderDetails?.OrderParams)),
         H004.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
             r.Body?.DataTransfer?.SignatureData?.Value,
-            (r.Header?.Static?.OrderDetails?.OrderParams as H004.FulOrderParamsType)?.FileFormat?.Value),
+            (r.Header?.Static?.OrderDetails?.OrderParams as H004.FulOrderParamsType)?.FileFormat?.Value,
+            r.Header?.Static?.OrderDetails?.OrderAttribute == H004.OrderAttributeType.Ozhnn,
+            VeuOrderIdH004(r.Header?.Static?.OrderDetails?.OrderParams)),
         H005.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId, r.Header?.Static?.PartnerId, r.Header?.Static?.UserId,
             r.Header?.Static?.NumSegments,
             r.Body?.DataTransfer?.DataEncryptionInfo?.TransactionKey,
             r.Body?.DataTransfer?.SignatureData?.Value,
-            FileFormat: null),
+            FileFormat: null,
+            DistributedSignature: (r.Header?.Static?.OrderDetails?.OrderParams as H005.BtuParamsType)?.SignatureFlag is not null,
+            OrderId: VeuOrderIdH005(r.Header?.Static?.OrderDetails?.OrderParams)),
         _ => default,
+    };
+
+    // The referenced VEU order id from the HVE/HVS order params (issue #42), or null for other uploads.
+    private static string? VeuOrderIdH003(object? orderParams) => orderParams switch
+    {
+        H003.HveOrderParamsType p => p.OrderId,
+        H003.HvsOrderParamsType p => p.OrderId,
+        _ => null,
+    };
+
+    private static string? VeuOrderIdH004(object? orderParams) => orderParams switch
+    {
+        H004.HveOrderParamsType p => p.OrderId,
+        H004.HvsOrderParamsType p => p.OrderId,
+        _ => null,
+    };
+
+    private static string? VeuOrderIdH005(object? orderParams) => orderParams switch
+    {
+        H005.HveOrderParamsType p => p.OrderId,
+        H005.HvsOrderParamsType p => p.OrderId,
+        _ => null,
     };
 
     private static TransferFields ExtractTransfer(IEbicsRequestEnvelope envelope) => envelope switch

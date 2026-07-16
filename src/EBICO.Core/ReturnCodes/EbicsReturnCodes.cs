@@ -47,6 +47,7 @@ public static class EbicsReturnCodes
         EbicsReturnCode.MaxTransactionsExceeded,
         EbicsReturnCode.PartnerIdMismatch,
         EbicsReturnCode.IncompatibleOrderAttribute,
+        EbicsReturnCode.InvalidOrderIdentifier,
     ];
 
     /// <summary>All known return codes, technical (header) first, then business (body).</summary>

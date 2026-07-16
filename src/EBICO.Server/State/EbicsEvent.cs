@@ -108,6 +108,18 @@ public enum EbicsEventType
 
     /// <summary>An uploaded business order was rejected because its payload failed validation (issue #39).</summary>
     OrderRejected,
+
+    /// <summary>An uploaded order was parked in the distributed-signature unit awaiting further signatures (VEU, issue #42).</summary>
+    VeuPending,
+
+    /// <summary>A further electronic signature (HVE) was added to an order awaiting distributed signatures (issue #42).</summary>
+    VeuSigned,
+
+    /// <summary>An order awaiting distributed signatures reached the required number of signatures and was released (issue #42).</summary>
+    VeuReleased,
+
+    /// <summary>An order awaiting distributed signatures was cancelled/rejected (HVS, issue #42).</summary>
+    VeuCancelled,
 }
 
 /// <summary>The severity of an <see cref="EbicsEvent"/>.</summary>

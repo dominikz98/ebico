@@ -860,6 +860,8 @@ internal static class ServerTestHelpers
     /// <param name="btf">The optional H005 business transaction format placed in <c>BTUOrderParams/Service</c> (ignored for H003/H004).</param>
     /// <param name="orderType">The optional order type / admin order type to place in the header; defaults to <c>"FUL"</c> (H003/H004) / <c>"BTU"</c> (H005). Use this to submit a classical payment order type (e.g. <c>"CCT"</c>) directly.</param>
     /// <param name="fileFormat">The optional H003/H004 <c>FULOrderParams/FileFormat</c> value (e.g. <c>"pain.001.001.09"</c>); ignored for H005.</param>
+    /// <param name="distributedSignature">Whether the upload is submitted for distributed signing (EDS / VEU, issue #42): H003/H004 set <c>OrderAttribute=OZHNN</c>, H005 adds an empty <c>BTUOrderParams/SignatureFlag</c>. When <see langword="false"/> (the default) H003/H004 set <c>OrderAttribute=DZHNN</c>.</param>
+    /// <param name="orderParams">An optional version-specific <c>OrderParams</c> element to place verbatim (e.g. an <c>HVEOrderParams</c>/<c>HVSOrderParams</c> for issue #42), overriding the btf/fileFormat-derived one.</param>
     /// <returns>The initialisation XML and the ordered ciphertext segments.</returns>
     public static UploadRequest BuildUploadInitRequest(
         EbicsVersion version,
@@ -873,7 +875,9 @@ internal static class ServerTestHelpers
         byte[]? signatureData = null,
         BusinessTransactionFormat? btf = null,
         string? orderType = null,
-        string? fileFormat = null)
+        string? fileFormat = null,
+        bool distributedSignature = false,
+        object? orderParams = null)
     {
         var compressed = EbicsCompression.Compress(orderData);
         var encrypted = EncryptionE002.Encrypt(compressed, bankEncKey, bankEncVersion);
@@ -897,7 +901,8 @@ internal static class ServerTestHelpers
                         OrderDetails = new H003.StaticHeaderOrderDetailsType
                         {
                             OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
-                            OrderParams = fileFormat is null ? null : new H003.FulOrderParamsType { FileFormat = new H003.FileFormatType { Value = fileFormat } },
+                            OrderAttribute = distributedSignature ? H003.OrderAttributeType.Ozhnn : H003.OrderAttributeType.Dzhnn,
+                            OrderParams = orderParams ?? (fileFormat is null ? null : new H003.FulOrderParamsType { FileFormat = new H003.FileFormatType { Value = fileFormat } }),
                         },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
@@ -930,7 +935,8 @@ internal static class ServerTestHelpers
                         OrderDetails = new H004.StaticHeaderOrderDetailsType
                         {
                             OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
-                            OrderParams = fileFormat is null ? null : new H004.FulOrderParamsType { FileFormat = new H004.FileFormatType { Value = fileFormat } },
+                            OrderAttribute = distributedSignature ? H004.OrderAttributeType.Ozhnn : H004.OrderAttributeType.Dzhnn,
+                            OrderParams = orderParams ?? (fileFormat is null ? null : new H004.FulOrderParamsType { FileFormat = new H004.FileFormatType { Value = fileFormat } }),
                         },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
@@ -963,7 +969,13 @@ internal static class ServerTestHelpers
                         OrderDetails = new H005.StaticHeaderOrderDetailsType
                         {
                             AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType },
-                            OrderParams = btf is { } bu ? new H005.BtuParamsType { Service = bu.ToRestrictedServiceType() } : null,
+                            OrderParams = orderParams ?? (btf is { } bu
+                                ? new H005.BtuParamsType
+                                {
+                                    Service = bu.ToRestrictedServiceType(),
+                                    SignatureFlag = distributedSignature ? new H005.SignatureFlagType() : null,
+                                }
+                                : distributedSignature ? new H005.BtuParamsType { SignatureFlag = new H005.SignatureFlagType() } : null),
                         },
                         SecurityMedium = "0000",
                         NumSegments = numSegments,
@@ -1080,6 +1092,7 @@ internal static class ServerTestHelpers
     /// <param name="orderType">The optional order/admin-order type to place in the header; defaults to <c>"FDL"</c> (H003/H004) / <c>"BTD"</c> (H005). Use this to request a classical download order type (e.g. <c>"STA"</c>) directly.</param>
     /// <param name="fileFormat">The optional H003/H004 <c>FDLOrderParams/FileFormat</c> value (e.g. <c>"camt.053"</c>, <c>"mt940"</c>); ignored for H005.</param>
     /// <param name="dateRange">The optional reporting period placed in the order params (all versions); both bounds must be set.</param>
+    /// <param name="orderParams">An optional version-specific <c>OrderParams</c> element to place verbatim (e.g. an <c>HVDOrderParams</c>/<c>HVTOrderParams</c> for issue #42), overriding the btf/fileFormat/dateRange-derived one.</param>
     /// <returns>The serialized initialisation request XML.</returns>
     public static string BuildDownloadInitRequest(
         EbicsVersion version,
@@ -1089,7 +1102,8 @@ internal static class ServerTestHelpers
         BusinessTransactionFormat? btf = null,
         string? orderType = null,
         string? fileFormat = null,
-        DateRange? dateRange = null)
+        DateRange? dateRange = null,
+        object? orderParams = null)
     {
         orderType ??= version == EbicsVersion.H005 ? "BTD" : "FDL";
         return version switch
@@ -1107,7 +1121,7 @@ internal static class ServerTestHelpers
                         OrderDetails = new H003.StaticHeaderOrderDetailsType
                         {
                             OrderType = new H003.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
-                            OrderParams = BuildH003DownloadParams(fileFormat, dateRange),
+                            OrderParams = orderParams ?? BuildH003DownloadParams(fileFormat, dateRange),
                         },
                         SecurityMedium = "0000",
                     },
@@ -1127,7 +1141,7 @@ internal static class ServerTestHelpers
                         OrderDetails = new H004.StaticHeaderOrderDetailsType
                         {
                             OrderType = new H004.StaticHeaderOrderDetailsTypeOrderType { Value = orderType },
-                            OrderParams = BuildH004DownloadParams(fileFormat, dateRange),
+                            OrderParams = orderParams ?? BuildH004DownloadParams(fileFormat, dateRange),
                         },
                         SecurityMedium = "0000",
                     },
@@ -1147,7 +1161,7 @@ internal static class ServerTestHelpers
                         OrderDetails = new H005.StaticHeaderOrderDetailsType
                         {
                             AdminOrderType = new H005.StaticHeaderOrderDetailsTypeAdminOrderType { Value = orderType },
-                            OrderParams = BuildH005DownloadParams(btf, dateRange),
+                            OrderParams = orderParams ?? BuildH005DownloadParams(btf, dateRange),
                         },
                         SecurityMedium = "0000",
                     },

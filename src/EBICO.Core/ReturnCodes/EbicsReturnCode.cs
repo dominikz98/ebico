@@ -202,4 +202,12 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode IncompatibleOrderAttribute =
         new("091117", "EBICS_INCOMPATIBLE_ORDER_ATTRIBUTE", EbicsReturnCodeKind.Business);
+
+    /// <summary>
+    /// The order identifier referenced by a distributed-signature order (HVE/HVS/HVD/HVT) does not
+    /// identify an order currently awaiting signatures (<c>091121</c>, issue #42).
+    /// </summary>
+    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    public static readonly EbicsReturnCode InvalidOrderIdentifier =
+        new("091121", "EBICS_INVALID_ORDER_IDENTIFIER", EbicsReturnCodeKind.Business);
 }

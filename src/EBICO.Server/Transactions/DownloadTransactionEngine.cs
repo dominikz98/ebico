@@ -102,15 +102,17 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     /// Whether <paramref name="orderType"/> is a download order type handled by the engine: the generic
     /// <see cref="FdlOrderType"/> (H003/H004) or <see cref="BtdOrderType"/> (H005), a classical
     /// statement/report order type submitted directly (STA/VMK/C53/C52/C54, see
-    /// <see cref="BtfOrderTypeCatalog.IsDownloadOrderType"/>), or an administrative status/protocol order
-    /// type (HTD/HKD/HAA/HPD/HAC/PTK, see <see cref="StatusProtocolOrderTypes"/>, issue #41).
+    /// <see cref="BtfOrderTypeCatalog.IsDownloadOrderType"/>), an administrative status/protocol order
+    /// type (HTD/HKD/HAA/HPD/HAC/PTK, see <see cref="StatusProtocolOrderTypes"/>, issue #41), or a
+    /// distributed-signature download order (HVU/HVZ/HVD/HVT, see <see cref="VeuOrderTypes"/>, issue #42).
     /// </summary>
     /// <param name="orderType">The extracted order type, or <see langword="null"/>.</param>
     /// <returns><see langword="true"/> for a download order type; otherwise <see langword="false"/>.</returns>
     public static bool IsDownloadOrderType(string? orderType)
         => orderType is FdlOrderType or BtdOrderType
             || BtfOrderTypeCatalog.IsDownloadOrderType(orderType)
-            || StatusProtocolOrderTypes.IsStatusProtocolOrderType(orderType);
+            || StatusProtocolOrderTypes.IsStatusProtocolOrderType(orderType)
+            || VeuOrderTypes.IsVeuDownloadOrderType(orderType);
 
     /// <inheritdoc />
     public bool OwnsTransaction(byte[]? transactionId)
@@ -191,7 +193,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             {
                 queueKey = effectiveOrderType;
                 orderData = await processor
-                    .GenerateAsync(new DownloadOrderRequest(keyRef, context.Version, effectiveOrderType, fields.DateRange), ct)
+                    .GenerateAsync(new DownloadOrderRequest(keyRef, context.Version, effectiveOrderType, fields.DateRange, fields.OrderId), ct)
                     .ConfigureAwait(false);
             }
         }
@@ -449,7 +451,7 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
     // --- Version-neutral field extraction (mirrors UploadTransactionEngine) --------------------------
 
     private readonly record struct InitFields(
-        string? HostId, string? PartnerId, string? UserId, string? FileFormat, DateRange? DateRange);
+        string? HostId, string? PartnerId, string? UserId, string? FileFormat, DateRange? DateRange, string? OrderId);
 
     private readonly record struct TransferFields(byte[]? TransactionId, ulong? SegmentNumber, bool LastSegment);
 
@@ -462,20 +464,45 @@ public sealed class DownloadTransactionEngine : IDownloadTransactionEngine, ITra
             r.Header?.Static?.PartnerId,
             r.Header?.Static?.UserId,
             (r.Header?.Static?.OrderDetails?.OrderParams as H003.FdlOrderParamsType)?.FileFormat?.Value,
-            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams),
+            VeuOrderIdH003(r.Header?.Static?.OrderDetails?.OrderParams)),
         H004.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId,
             r.Header?.Static?.PartnerId,
             r.Header?.Static?.UserId,
             (r.Header?.Static?.OrderDetails?.OrderParams as H004.FdlOrderParamsType)?.FileFormat?.Value,
-            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams),
+            VeuOrderIdH004(r.Header?.Static?.OrderDetails?.OrderParams)),
         H005.EbicsRequest r => new InitFields(
             r.Header?.Static?.HostId,
             r.Header?.Static?.PartnerId,
             r.Header?.Static?.UserId,
             null,
-            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams)),
+            ExtractDateRange(r.Header?.Static?.OrderDetails?.OrderParams),
+            VeuOrderIdH005(r.Header?.Static?.OrderDetails?.OrderParams)),
         _ => default,
+    };
+
+    // The referenced VEU order id from the HVD/HVT order params (issue #42), or null for other downloads.
+    private static string? VeuOrderIdH003(object? orderParams) => orderParams switch
+    {
+        H003.HvdOrderParamsType p => p.OrderId,
+        H003.HvtOrderParamsType p => p.OrderId,
+        _ => null,
+    };
+
+    private static string? VeuOrderIdH004(object? orderParams) => orderParams switch
+    {
+        H004.HvdOrderParamsType p => p.OrderId,
+        H004.HvtOrderParamsType p => p.OrderId,
+        _ => null,
+    };
+
+    private static string? VeuOrderIdH005(object? orderParams) => orderParams switch
+    {
+        H005.HvdOrderParamsType p => p.OrderId,
+        H005.HvtOrderParamsType p => p.OrderId,
+        _ => null,
     };
 
     // Extracts the reporting period from the version-specific order-params element (FDLOrderParams or

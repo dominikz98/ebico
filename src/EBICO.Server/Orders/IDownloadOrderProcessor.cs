@@ -12,11 +12,13 @@ namespace EBICO.Server.Orders;
 /// <param name="Version">The protocol version the download runs under.</param>
 /// <param name="EffectiveOrderType">The resolved classical order-type code (e.g. <c>"C53"</c>), not the generic <c>FDL</c>/<c>BTD</c>.</param>
 /// <param name="DateRange">The requested reporting period, or <see langword="null"/> when the request left it open.</param>
+/// <param name="OrderId">The referenced VEU order id for the single-order detail downloads (HVD/HVT, issue #42), or <see langword="null"/> when the request carries none.</param>
 public readonly record struct DownloadOrderRequest(
     SubscriberKeyRef Subscriber,
     EbicsVersion Version,
     string EffectiveOrderType,
-    DateRange? DateRange);
+    DateRange? DateRange,
+    string? OrderId = null);
 
 /// <summary>
 /// Generates download content on demand for order types the emulator can synthesise (issue #40) — the

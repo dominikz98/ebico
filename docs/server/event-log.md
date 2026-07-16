@@ -14,7 +14,8 @@
 > Bewusst **noch nicht**: die zwei **Projektionen** selbst — **HAC** (Customer Protocol, M5) und der
 > **Suite-Inspektor** (M7) — konsumieren `IEventLog` nur, sind aber eigene Issues; eine **persistente**
 > Implementierung (SQLite o. ä., [ADR-0015](../adr/0015-ereignis-protokollspeicher.md)); Ereignisse aus
-> **Signatur/VEU** (die Verify-Stage ist ein No-Op, VEU existiert serverseitig noch nicht).
+> der **Signaturprüfung** (die Verify-Stage ist ein No-Op). VEU-Ereignisse
+> (`VeuPending`/`VeuSigned`/`VeuReleased`/`VeuCancelled`) sind seit #42 vorhanden (siehe [VEU-Orders](veu-orders.md)).
 
 ## Zweck
 
@@ -90,9 +91,11 @@ Teilnehmer-Bindung der Transaktion:
   Quittung `011000`), `ReceiptNegative` (negative Quittung `011001`, Daten wieder eingestellt).
 - Beide: `TransactionEvicted` beim Idle-Timeout-Sweep des
   [`TransactionCleanupService`](transaction-recovery.md) (`Internal`).
+- Order-Verarbeitung: `OrderAccepted`/`OrderRejected` (Zahlungsverkehr, #39) sowie
+  `VeuPending`/`VeuSigned`/`VeuReleased`/`VeuCancelled` ([verteilte elektronische Unterschrift](veu-orders.md), #42).
 
-> **Spec-Vorbehalt:** Signatur-/VEU-Ereignisse fehlen bewusst — die Verify-Stage ist ein No-Op und die
-> verteilte elektronische Unterschrift ist serverseitig noch nicht implementiert.
+> **Spec-Vorbehalt:** Ereignisse aus der ES-Prüfung fehlen bewusst — die Verify-Stage ist ein No-Op. Die
+> verteilte elektronische Unterschrift (VEU, #42) schreibt hingegen eigene Ereignisse (siehe oben).
 
 ## Zwei Projektionen
 
