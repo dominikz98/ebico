@@ -211,6 +211,7 @@ Server-Antworten baut ein Tier-A-Fake mit dem echten `EbicsResponseFactory`.
 - [Client-Kern & Konfiguration](client-core.md) — #46: Dispatch, Options/DI, Transport, Key-Store
 - [Upload-API (CCT/CDD/CDB/CIP)](upload.md) — #48: die Gegenrichtung
 - [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Voraussetzung (Teilnehmerschlüssel)
+- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: C53 als echter Round-Trip gegen den Server (statt gegen `FakeDownloadServer`)
 - [Server: Download-Transaktion](../server/download-transaction.md) — die Gegenseite (#33)
 - [Server: Kontoauszug-Orders](../server/statement-orders.md) — STA/VMK/C53/C52/C54-Erzeugung (#40)
 - [Server: Status-/Protokoll-Orders](../server/status-protocol-orders.md) — HAC/HTD/HKD/HAA/HPD/PTK (#41)

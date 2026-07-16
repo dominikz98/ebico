@@ -162,6 +162,7 @@ Die Server-Antworten baut ein Tier-A-Fake mit dem echten `EbicsResponseFactory`.
 - [Connector-Architektur](architecture.md) — Send-Pipeline, Transaktions-Skelett
 - [Client-Kern & Konfiguration](client-core.md) — #46: Dispatch, Options/DI, Transport, Key-Store
 - [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Voraussetzung (Bank-E002-Schlüssel)
+- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: CCT als echter Round-Trip gegen den Server (statt gegen `FakeUploadServer`)
 - [Server: Upload-Transaktion](../server/upload-transaction.md) — die Gegenseite (#32)
 - [Server: Zahlungsverkehrs-Orders](../server/payment-orders.md) — CCT/CDD/CDB/CIP-Verarbeitung (#39)
 - [Verschlüsselung E002](../protocol/encryption-e002.md) · [Banktechnische Signatur A005/A006](../protocol/bank-signature.md) · [Authentifikationssignatur X002](../protocol/auth-signature-x002.md)
