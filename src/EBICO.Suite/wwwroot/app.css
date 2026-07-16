@@ -53,6 +53,19 @@ a, .btn-link {
     font-size: 0.9rem;
 }
 
+/* Transaction inspector (issue #54): raw XML / order-data preview blocks. */
+.tx-xml {
+    max-height: 20rem;
+    overflow: auto;
+    padding: 0.5rem;
+    background-color: #f6f8fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
 .btn:focus, .btn:active:focus, .btn-link.nav-link:focus, .form-control:focus, .form-check-input:focus {
   box-shadow: 0 0 0 0.1rem white, 0 0 0 0.25rem #258cfb;
 }

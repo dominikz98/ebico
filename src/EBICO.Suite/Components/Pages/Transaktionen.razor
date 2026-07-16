@@ -4,7 +4,12 @@
 
 <h1>Transaktions-Inspektor</h1>
 
-<div class="alert alert-secondary" role="alert">
-    Der Transaktions-Inspektor wird in Issue&nbsp;#54 umgesetzt. Er zeigt künftig die
-    Upload-/Download-Transaktionen des Emulators mit Segmenten und Returncodes.
-</div>
+<p class="text-muted">
+    Laufende und abgeschlossene Upload-/Download-Transaktionen des Emulators mit Roh-XML,
+    entschlüsseltem OrderData und Returncodes — plus die globale, ungefilterte Protokollansicht über
+    alle Kunden (Betreiber-/Entwicklersicht, inklusive interner Ereignisse).
+</p>
+
+@* Static-SSR-Seite mit einer interaktiven Insel (ADR-0009: Render-Modus am Einbettungsort).
+   Die Insel liest in-process über den ITransactionInspectorProvider (EBICO.Server-Stores). *@
+<TransactionInspector @rendermode="InteractiveServer" />

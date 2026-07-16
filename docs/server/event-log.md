@@ -105,6 +105,8 @@ Teilnehmer-Bindung der Transaktion:
 - **Suite-Inspektor (M7):** liest **roh und global** über alle Kunden (ohne Sichtbarkeitsfilter), mit
   Live-Filtern (Kunde/Zeitraum/Typ/Severity) und Sprung Ereignis → Transaktion. Sieht auch die internen
   Details. Die Suite greift in-process auf den Store zu ([ADR-0009](../adr/0009-blazor-render-mode.md)).
+  **Umgesetzt in [#54](../suite/transaktions-inspektor.md)**; die Roh-XML je Transaktionsphase kommt
+  zusätzlich aus dem [Message-Capture-Store](../adr/0021-message-capture-store.md).
 
 ## Beispiel-Ereignisse
 

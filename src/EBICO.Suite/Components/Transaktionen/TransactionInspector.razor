@@ -1,0 +1,372 @@
+@inject ITransactionInspectorProvider Inspector
+
+@* Interactive island (issue #54): the transaction inspector and the global protocol view. All state
+   lives in this single component/circuit so "jump event → transaction" needs no cross-island wiring. *@
+
+<section class="mb-4">
+    <div class="d-flex justify-content-between align-items-center">
+        <h2 id="transactions-heading">Transaktionen</h2>
+        <button class="btn btn-outline-secondary btn-sm" id="tx-refresh" @onclick="ReloadAsync">Aktualisieren</button>
+    </div>
+
+    @if (_loading)
+    {
+        <p><em>Lade Transaktionen…</em></p>
+    }
+    else
+    {
+        <table class="table align-middle" id="tx-list">
+            <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>Richtung</th>
+                    <th>OrderType</th>
+                    <th>Kunde / Teilnehmer</th>
+                    <th>Segmente</th>
+                    <th>Transaktions-ID</th>
+                    <th>Letzter Returncode</th>
+                    <th class="text-end">Aktion</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var t in _transactions)
+                {
+                    <tr id="tx-row-@t.TransactionIdHex">
+                        <td><span class="badge @StatusBadgeCss(t.Status)">@t.Status</span></td>
+                        <td>@t.Kind</td>
+                        <td>@(t.OrderType ?? "—")</td>
+                        <td>@(t.PartnerLabel ?? "—") / @(t.UserLabel ?? "—")</td>
+                        <td>@(t.NumSegments?.ToString() ?? "—")</td>
+                        <td><code title="@t.TransactionIdHex">@ShortId(t.TransactionIdHex)</code></td>
+                        <td>@(t.LastReturnCode ?? "—")</td>
+                        <td class="text-end">
+                            <button class="btn btn-sm btn-outline-primary" @onclick="() => SelectAsync(t.TransactionIdHex)">Details</button>
+                        </td>
+                    </tr>
+                }
+                @if (_transactions.Count == 0)
+                {
+                    <tr><td colspan="8"><em>Keine Transaktionen erfasst.</em></td></tr>
+                }
+            </tbody>
+        </table>
+    }
+</section>
+
+@if (_detail is { } detail)
+{
+    <section class="mb-4" id="tx-detail">
+        <div class="card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <h3 class="h5">
+                        Transaktion <code>@ShortId(detail.Summary.TransactionIdHex)</code>
+                        <span class="badge @StatusBadgeCss(detail.Summary.Status)">@detail.Summary.Status</span>
+                    </h3>
+                    <button class="btn btn-sm btn-outline-secondary" id="tx-detail-close" @onclick="() => _selectedTxId = null">Schließen</button>
+                </div>
+                <p class="text-muted small mb-3">
+                    @detail.Summary.Kind · @(detail.Summary.OrderType ?? "—") ·
+                    @(detail.Summary.HostLabel ?? "—") / @(detail.Summary.PartnerLabel ?? "—") / @(detail.Summary.UserLabel ?? "—")
+                    · <span title="@detail.Summary.TransactionIdHex">@detail.Summary.TransactionIdHex</span>
+                </p>
+
+                <ul class="nav nav-tabs mb-3">
+                    <li class="nav-item">
+                        <button class="nav-link @TabCss(DetailTab.RawXml)" id="tab-rawxml" @onclick="() => _activeTab = DetailTab.RawXml">Roh-XML</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @TabCss(DetailTab.OrderData)" id="tab-orderdata" @onclick="() => _activeTab = DetailTab.OrderData">OrderData</button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link @TabCss(DetailTab.Events)" id="tab-events" @onclick="() => _activeTab = DetailTab.Events">Ereignisverlauf</button>
+                    </li>
+                </ul>
+
+                @if (_activeTab == DetailTab.RawXml)
+                {
+                    <div id="tab-panel-rawxml">
+                        @if (detail.Messages.Count == 0)
+                        {
+                            <p class="text-muted"><em>Keine Roh-XML erfasst (z. B. Key-Management-Order ohne Transaktionsbezug).</em></p>
+                        }
+                        else
+                        {
+                            @foreach (var m in detail.Messages)
+                            {
+                                <h4 class="h6">@m.Phase@(m.SegmentNumber is { } sn ? $" · Segment {sn}" : string.Empty)</h4>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="text-muted small">Request@(m.RequestTruncated ? " (gekürzt)" : string.Empty)</div>
+                                        <pre class="tx-xml">@m.RequestXml</pre>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="text-muted small">Response@(m.ResponseTruncated ? " (gekürzt)" : string.Empty)</div>
+                                        <pre class="tx-xml">@m.ResponseXml</pre>
+                                    </div>
+                                </div>
+                            }
+                        }
+                    </div>
+                }
+                else if (_activeTab == DetailTab.OrderData)
+                {
+                    <div id="tab-panel-orderdata">
+                        @if (detail.OrderData is { } od)
+                        {
+                            <p class="text-muted small">
+                                Länge: @od.ByteLength Byte@(od.Truncated ? " (Vorschau gekürzt)" : string.Empty) · entschlüsselt &amp; dekomprimiert
+                            </p>
+                            <div class="btn-group btn-group-sm mb-2" role="group">
+                                <button class="btn @(_orderDataHex ? "btn-outline-secondary" : "btn-secondary")"
+                                        id="orderdata-text" @onclick="() => _orderDataHex = false" disabled="@(!od.IsText)">Text</button>
+                                <button class="btn @(_orderDataHex ? "btn-secondary" : "btn-outline-secondary")"
+                                        id="orderdata-hex" @onclick="() => _orderDataHex = true">Hex</button>
+                            </div>
+                            <pre class="tx-xml">@(_orderDataHex || !od.IsText ? od.Hex : od.Text)</pre>
+                        }
+                        else
+                        {
+                            <p class="text-muted">
+                                <em>Kein entschlüsseltes OrderData verfügbar — die Transaktion ist nicht mehr resident
+                                    oder wurde noch nicht abgeschlossen.</em>
+                            </p>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <div id="tab-panel-events">
+                        <table class="table table-sm">
+                            <thead>
+                                <tr><th>Seq</th><th>Zeit</th><th>Typ</th><th>Severity</th><th>Returncode</th><th>Meldung</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var e in detail.Events)
+                                {
+                                    <tr>
+                                        <td>@e.Sequence</td>
+                                        <td>@FormatTime(e.Timestamp)</td>
+                                        <td>@e.Type</td>
+                                        <td><span class="badge @SeverityBadgeCss(e.Severity)">@e.Severity</span></td>
+                                        <td>@(e.ReturnCode ?? "—")</td>
+                                        <td>@e.Message</td>
+                                    </tr>
+                                }
+                                @if (detail.Events.Count == 0)
+                                {
+                                    <tr><td colspan="6"><em>Keine Ereignisse.</em></td></tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    </section>
+}
+
+<section class="mb-4">
+    <h2 id="event-log-heading">Globales Protokoll</h2>
+    <p class="text-muted small">Alle Kunden, roh und ungefiltert — auch betreiberinterne Ereignisse.</p>
+
+    <div class="row g-2 mb-3">
+        <div class="col-auto">
+            <label class="form-label small mb-0" for="filter-partner">Kunde</label>
+            <select class="form-select form-select-sm" id="filter-partner" @bind="_filterPartner" @bind:after="ApplyFilterAsync">
+                <option value="">Alle Kunden</option>
+                @foreach (var partner in _customerOptions)
+                {
+                    <option value="@partner">@partner</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small mb-0" for="filter-type">Typ</label>
+            <select class="form-select form-select-sm" id="filter-type" @bind="_filterType" @bind:after="ApplyFilterAsync">
+                <option value="">Alle Typen</option>
+                @foreach (var type in EventTypes)
+                {
+                    <option value="@type">@type</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small mb-0" for="filter-severity">Severity</label>
+            <select class="form-select form-select-sm" id="filter-severity" @bind="_filterSeverity" @bind:after="ApplyFilterAsync">
+                <option value="">Alle</option>
+                @foreach (var severity in Severities)
+                {
+                    <option value="@severity">@severity</option>
+                }
+            </select>
+        </div>
+        <div class="col-auto">
+            <label class="form-label small mb-0" for="filter-from">Von (UTC)</label>
+            <input type="datetime-local" class="form-control form-control-sm" id="filter-from" @bind="_filterFrom" @bind:after="ApplyFilterAsync" />
+        </div>
+        <div class="col-auto">
+            <label class="form-label small mb-0" for="filter-to">Bis (UTC)</label>
+            <input type="datetime-local" class="form-control form-control-sm" id="filter-to" @bind="_filterTo" @bind:after="ApplyFilterAsync" />
+        </div>
+    </div>
+
+    <table class="table table-sm align-middle" id="event-log">
+        <thead>
+            <tr>
+                <th>Seq</th>
+                <th>Zeit</th>
+                <th>Kunde / Teilnehmer</th>
+                <th>Typ</th>
+                <th>Severity</th>
+                <th>Sichtbarkeit</th>
+                <th>OrderType</th>
+                <th>Returncode</th>
+                <th>Transaktion</th>
+                <th>Meldung</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in _events)
+            {
+                <tr>
+                    <td>@e.Sequence</td>
+                    <td>@FormatTime(e.Timestamp)</td>
+                    <td>@(e.PartnerLabel ?? "—") / @(e.UserLabel ?? "—")</td>
+                    <td>@e.Type</td>
+                    <td><span class="badge @SeverityBadgeCss(e.Severity)">@e.Severity</span></td>
+                    <td>@e.Visibility</td>
+                    <td>@(e.OrderType ?? "—")</td>
+                    <td>@(e.ReturnCode ?? "—")</td>
+                    <td>
+                        @if (e.TransactionIdHex is { } txid)
+                        {
+                            <button class="btn btn-sm btn-outline-primary" id="event-jump-@e.Sequence"
+                                    @onclick="() => JumpToTransactionAsync(txid)">→ @ShortId(txid)</button>
+                        }
+                        else
+                        {
+                            <span class="text-muted">—</span>
+                        }
+                    </td>
+                    <td>@e.Message</td>
+                </tr>
+            }
+            @if (_events.Count == 0)
+            {
+                <tr><td colspan="10"><em>Keine Ereignisse für den aktuellen Filter.</em></td></tr>
+            }
+        </tbody>
+    </table>
+</section>
+
+@code {
+    private enum DetailTab
+    {
+        RawXml,
+        OrderData,
+        Events,
+    }
+
+    private static readonly EbicsEventType[] EventTypes = Enum.GetValues<EbicsEventType>();
+    private static readonly EbicsEventSeverity[] Severities = Enum.GetValues<EbicsEventSeverity>();
+
+    private bool _loading = true;
+    private IReadOnlyList<TransactionSummary> _transactions = [];
+    private IReadOnlyList<EventView> _events = [];
+    private IReadOnlyList<string> _customerOptions = [];
+
+    private string? _selectedTxId;
+    private TransactionDetail? _detail;
+    private DetailTab _activeTab = DetailTab.RawXml;
+    private bool _orderDataHex;
+
+    private string _filterPartner = string.Empty;
+    private string _filterType = string.Empty;
+    private string _filterSeverity = string.Empty;
+    private DateTime? _filterFrom;
+    private DateTime? _filterTo;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _customerOptions = await Inspector.GetCustomerOptionsAsync();
+        _transactions = await Inspector.GetTransactionsAsync();
+        _events = await Inspector.GetEventsAsync(new EventLogFilter());
+        _loading = false;
+    }
+
+    private async Task ReloadAsync()
+    {
+        _transactions = await Inspector.GetTransactionsAsync();
+        _customerOptions = await Inspector.GetCustomerOptionsAsync();
+        if (_selectedTxId is { } id)
+        {
+            _detail = await Inspector.GetTransactionAsync(id);
+        }
+    }
+
+    private async Task SelectAsync(string transactionIdHex)
+    {
+        if (string.Equals(_selectedTxId, transactionIdHex, StringComparison.Ordinal))
+        {
+            _selectedTxId = null;
+            _detail = null;
+            return;
+        }
+
+        await LoadDetailAsync(transactionIdHex);
+    }
+
+    private async Task JumpToTransactionAsync(string transactionIdHex)
+    {
+        await LoadDetailAsync(transactionIdHex);
+    }
+
+    private async Task LoadDetailAsync(string transactionIdHex)
+    {
+        _selectedTxId = transactionIdHex;
+        _activeTab = DetailTab.RawXml;
+        _orderDataHex = false;
+        _detail = await Inspector.GetTransactionAsync(transactionIdHex);
+    }
+
+    private async Task ApplyFilterAsync()
+    {
+        var filter = new EventLogFilter
+        {
+            Partner = string.IsNullOrEmpty(_filterPartner) ? null : _filterPartner,
+            Type = Enum.TryParse<EbicsEventType>(_filterType, out var type) ? type : null,
+            Severity = Enum.TryParse<EbicsEventSeverity>(_filterSeverity, out var severity) ? severity : null,
+            From = _filterFrom is { } from ? new DateTimeOffset(from, TimeSpan.Zero) : null,
+            To = _filterTo is { } to ? new DateTimeOffset(to, TimeSpan.Zero) : null,
+        };
+
+        _events = await Inspector.GetEventsAsync(filter);
+    }
+
+    private string TabCss(DetailTab tab) => _activeTab == tab ? "active" : string.Empty;
+
+    private static string StatusBadgeCss(TransactionStatus status) => status switch
+    {
+        TransactionStatus.Completed => "bg-success",
+        TransactionStatus.Running => "bg-secondary",
+        TransactionStatus.Failed => "bg-danger",
+        TransactionStatus.Evicted => "bg-warning text-dark",
+        _ => "bg-secondary",
+    };
+
+    private static string SeverityBadgeCss(EbicsEventSeverity severity) => severity switch
+    {
+        EbicsEventSeverity.Info => "bg-secondary",
+        EbicsEventSeverity.Warning => "bg-warning text-dark",
+        EbicsEventSeverity.Error => "bg-danger",
+        _ => "bg-secondary",
+    };
+
+    private static string ShortId(string transactionIdHex)
+        => transactionIdHex.Length <= 12 ? transactionIdHex : transactionIdHex[..12] + "…";
+
+    private static string FormatTime(DateTimeOffset timestamp)
+        => timestamp.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+}

@@ -89,6 +89,24 @@ public sealed class EbicoServerOptions
     public int MaxEventLogEntries { get; set; } = 10_000;
 
     /// <summary>
+    /// The maximum number of raw request/response captures the in-memory message capture store
+    /// (<c>IMessageCaptureStore</c>, issue #54) retains across <em>all</em> transactions. Defaults to
+    /// <c>200</c>. When the cap is reached the oldest capture is dropped as a new one is appended (ring
+    /// buffer), bounding memory. A value of <c>0</c> disables the bound. Consumed by
+    /// <c>InMemoryMessageCaptureStore</c>; ignored by a persistent capture-store implementation.
+    /// </summary>
+    public int MaxMessageCaptureEntries { get; set; } = 200;
+
+    /// <summary>
+    /// The maximum stored size, in characters, of a single captured request/response XML document
+    /// (<c>IMessageCaptureStore</c>, issue #54). Defaults to 256 KiB. Oversized XML is truncated for display
+    /// (with the capture's <c>*Truncated</c> flag set); the authoritative decrypted order data is read from
+    /// the transaction store, not from a truncated capture. A value of <c>0</c> disables truncation.
+    /// Consumed by <c>InMemoryMessageCaptureStore</c>.
+    /// </summary>
+    public int MaxCapturedMessageBytes { get; set; } = 256 * 1024;
+
+    /// <summary>
     /// The content types accepted on the EBICS endpoint. Defaults to <c>text/xml</c> and
     /// <c>application/xml</c>.
     /// </summary>
