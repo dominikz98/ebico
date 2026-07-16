@@ -333,8 +333,9 @@ gestellt (keine echten Netz-/Dateizugriffe).
 ## Bausteine: vorhanden vs. geplant
 
 Der Connector-**Kern** (Client, Dispatch, Konfiguration, Transport, Key-Store)
-ist mit **#46** angelegt; Onboarding (INI/HIA/HPB), Upload, Download und
-Segmentierung folgen in weiteren M6-Issues. Die folgende Tabelle ordnet die
+ist mit **#46** angelegt, das Onboarding (INI/HIA/HPB) mit **#47** und die
+**Upload-API** (CCT/CDD/CDB/CIP) mit **#48**; die Download-API folgt in einem
+weiteren M6-Issue. Die folgende Tabelle ordnet die
 [Send-Pipeline](#send-pipeline)-Stufen den vorhandenen Bausteinen zu — so ist der
 Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 
@@ -353,9 +354,10 @@ Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 | 4. X002-Authentifikationssignatur | `Core/Crypto/AuthenticationSignature` (im HPB-Flow verdrahtet) | ✅ #47 (HPB) |
 | Onboarding-Handler (INI/HIA/HPB) | `Connector/Onboarding` (Requests/Handler/Builder, `AddEbicoOnboarding`) | ✅ #47 |
 | Schlüsselgenerierung + INI-/HIA-Brief | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
+| 9. Segmentierung | `Core/Serialization/EbicsSegmentation` (im Upload verdrahtet) | ✅ #48 |
+| Upload-Handler (CCT/CDD/CDB/CIP) | `Connector/Upload` (Requests/Handler/Builder, `AddEbicoUpload`) | ✅ #48 |
 | 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
-| 9. Segmentierung | — | ⬜ geplant |
-| Upload-/Download-Handler | — | ⬜ geplant (M6) |
+| Download-Handler | — | ⬜ geplant (M6) |
 
 ## Verwandte Doku
 
