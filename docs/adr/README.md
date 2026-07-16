@@ -47,6 +47,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0018](0018-kontoauszug-download-orders.md) | Kontoauszug-/Report-Download-Orders (synthetische Generierung, camt.05x.001.08, ZIP-Container) | accepted |
 | [0019](0019-status-protokoll-orders.md) | Status- & Protokoll-Orders (Domänen-Erweiterung, HAC/PTK als IEventLog-Projektion) | accepted |
 | [0020](0020-veu-orders.md) | Verteilte elektronische Unterschrift (VEU-Speicher, Park-/Zeichnungs-Workflow) | accepted |
+| [0021](0021-message-capture-store.md) | Message-Capture-Store (`IMessageCaptureStore`, Roh-XML je Transaktion) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

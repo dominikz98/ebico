@@ -171,6 +171,16 @@ darüber liegt der `IMasterDataManager` (referentielle Integrität, kaskadierend
 Permission-/Lebenszyklus-Mutation) samt einer unauthentifizierten HTTP-Admin-API
 (`MapEbicoAdminApi`). Details: [Stammdatenverwaltung](master-data.md).
 
+### Roh-XML-Erfassung (`IMessageCaptureStore`, #54)
+
+Nach dem Serialisieren der Antwort schreibt die Pipeline die **Roh-XML** (Request und Response) einer
+Transaktionsnachricht in den `IMessageCaptureStore` — keyed nach Transaktions-ID, mit Phase und
+Returncode. Nur transaktionsbezogene Nachrichten werden erfasst (Key-Management ohne Transaktions-ID
+bleibt außen vor); der In-Memory-Default begrenzt Speicher per Ring-Puffer
+(`EbicoServerOptions.MaxMessageCaptureEntries`) und Kürzung je Dokument
+(`MaxCapturedMessageBytes`). Gelesen wird er ausschließlich vom
+[Suite-Transaktions-Inspektor](../suite/transaktions-inspektor.md) ([ADR-0021](../adr/0021-message-capture-store.md)).
+
 ## Tests
 
 `tests/EBICO.Tests/Server/` deckt ab (xUnit v3 + AwesomeAssertions; Request-XML wird aus

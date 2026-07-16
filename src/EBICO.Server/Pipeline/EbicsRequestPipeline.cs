@@ -1,3 +1,4 @@
+using System.Text;
 using EBICO.Core;
 using EBICO.Core.Btf;
 using EBICO.Core.Domain;
@@ -34,6 +35,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
     private readonly IEbicsErrorMapper _errorMapper;
     private readonly EbicsResponseFactory _responseFactory;
     private readonly IEventLog _eventLog;
+    private readonly IMessageCaptureStore _captureStore;
     private readonly EbicoServerOptions _options;
 
     /// <summary>Initializes the pipeline with its collaborators.</summary>
@@ -44,6 +46,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
     /// <param name="errorMapper">The exception-to-return-code mapper.</param>
     /// <param name="responseFactory">The response envelope factory.</param>
     /// <param name="eventLog">The append-only event log (issue #69) the central per-request event is written to.</param>
+    /// <param name="captureStore">The raw-message capture store (issue #54) each transaction message's request/response XML is written to.</param>
     /// <param name="options">The server options.</param>
     public EbicsRequestPipeline(
         IEbicsRequestVerifier verifier,
@@ -53,6 +56,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         IEbicsErrorMapper errorMapper,
         EbicsResponseFactory responseFactory,
         IEventLog eventLog,
+        IMessageCaptureStore captureStore,
         IOptions<EbicoServerOptions> options)
     {
         ArgumentNullException.ThrowIfNull(verifier);
@@ -62,6 +66,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         ArgumentNullException.ThrowIfNull(errorMapper);
         ArgumentNullException.ThrowIfNull(responseFactory);
         ArgumentNullException.ThrowIfNull(eventLog);
+        ArgumentNullException.ThrowIfNull(captureStore);
         ArgumentNullException.ThrowIfNull(options);
 
         _verifier = verifier;
@@ -71,6 +76,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         _errorMapper = errorMapper;
         _responseFactory = responseFactory;
         _eventLog = eventLog;
+        _captureStore = captureStore;
         _options = options.Value;
     }
 
@@ -180,6 +186,12 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         }
 
         var body = EbicsXmlSerializer.SerializeToUtf8Bytes(response);
+
+        // Raw-XML capture (issue #54): once the response is serialized, both the request and response XML
+        // (and the resolved transaction id/phase/return code) are known — the only point where they
+        // coexist. Feeds the Suite transaction inspector; skipped for non-transaction requests.
+        await AppendCaptureAsync(context, body, transaction, download, returnCode, ct).ConfigureAwait(false);
+
         return new EbicsPipelineResult(body, responseVersion);
     }
 
@@ -291,6 +303,50 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
                 TransactionId = transactionId is null ? null : Convert.ToHexString(transactionId),
                 ReturnCode = returnCode,
                 Message = $"{context?.OrderType ?? "request"} → {returnCode.SymbolicName}",
+            },
+            ct).ConfigureAwait(false);
+    }
+
+    // Writes the raw request/response XML capture for a transaction message (issue #54). Transaction-scoped:
+    // only captured when the request carries a transaction phase AND a transaction id is resolvable (from the
+    // request static header for transfer/receipt, or from the engine result for an initialisation). Key-
+    // management orders (INI/HIA/HPB) carry no transaction id and are intentionally skipped — they still show
+    // up in the event log, only without raw XML. The capture store bounds size (ring buffer + truncation).
+    private async Task AppendCaptureAsync(
+        EbicsRequestContext? context,
+        byte[] responseBody,
+        UploadTransactionResult? upload,
+        DownloadTransactionResult? download,
+        EbicsReturnCode returnCode,
+        CancellationToken ct)
+    {
+        if (context is null || context.TransactionPhase is not { } phase)
+        {
+            return;
+        }
+
+        var transactionId = context.TransactionId ?? upload?.TransactionId ?? download?.TransactionId;
+        if (transactionId is null)
+        {
+            return;
+        }
+
+        var (host, partner, user) = TryExtractSubscriber(context.Envelope);
+        var segmentNumber = upload?.SegmentNumber ?? download?.SegmentNumber;
+
+        await _captureStore.AppendAsync(
+            new CapturedMessage
+            {
+                TransactionIdHex = Convert.ToHexString(transactionId),
+                Phase = phase,
+                SegmentNumber = segmentNumber is { } sn ? (int)sn : null,
+                OrderType = context.OrderType,
+                HostId = host,
+                PartnerId = partner,
+                UserId = user,
+                RequestXml = context.RequestXml,
+                ResponseXml = Encoding.UTF8.GetString(responseBody),
+                ReturnCode = returnCode,
             },
             ct).ConfigureAwait(false);
     }

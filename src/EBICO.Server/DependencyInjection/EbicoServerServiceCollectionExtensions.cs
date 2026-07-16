@@ -42,6 +42,9 @@ public static class EbicoServerServiceCollectionExtensions
         // Shared append-only event/protocol log (issue #69): the source HAC (M5) and the Suite inspector
         // (M7) read from. In-memory default, pluggable via TryAddSingleton (SQLite is a follow-up, ADR-0015).
         services.TryAddSingleton<IEventLog, InMemoryEventLog>();
+        // Raw request/response XML capture store (issue #54): keyed by transaction id, read by the Suite
+        // transaction inspector to show the raw wire XML per phase. In-memory default, pluggable (ADR-0015).
+        services.TryAddSingleton<IMessageCaptureStore, InMemoryMessageCaptureStore>();
         services.TryAddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         services.TryAddSingleton<IMasterDataManager, MasterDataManager>();
         services.TryAddSingleton<IEbicsRequestVerifier, NoOpEbicsRequestVerifier>();

@@ -28,6 +28,7 @@ public class EbicoServerServiceCollectionExtensionsTests
         provider.GetRequiredService<IEbicsStateStore>().Should().BeOfType<InMemoryEbicsStateStore>();
         provider.GetRequiredService<IServerKeyStore>().Should().BeOfType<InMemoryServerKeyStore>();
         provider.GetRequiredService<IEventLog>().Should().BeOfType<InMemoryEventLog>();
+        provider.GetRequiredService<IMessageCaptureStore>().Should().BeOfType<InMemoryMessageCaptureStore>();
         provider.GetRequiredService<IServerBankKeyStore>().Should().BeOfType<InMemoryServerBankKeyStore>();
         provider.GetRequiredService<IMasterDataManager>().Should().BeOfType<MasterDataManager>();
         provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<NoOpEbicsRequestVerifier>();
