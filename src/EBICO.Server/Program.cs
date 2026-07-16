@@ -9,6 +9,9 @@ var builder = WebApplication.CreateBuilder(args);
 // pluggable in-memory state store. See docs/server/host.md.
 builder.Services.AddEbicoServer();
 
+// Liveness probe for container orchestration (docker-compose/Kubernetes) and external checks.
+builder.Services.AddHealthChecks();
+
 var app = builder.Build();
 
 var options = app.Services.GetRequiredService<IOptions<EbicoServerOptions>>().Value;
@@ -20,6 +23,10 @@ app.MapEbicsEndpoint(options.EndpointPath);
 // "/admin"). NOTE: this API is unauthenticated by design — it is meant for local/emulator use
 // only (like Azurite); do not expose it on an untrusted network.
 app.MapEbicoAdminApi(options.AdminApiPath);
+
+// Liveness endpoint at "/health" (returns 200 "Healthy"). Used by the docker-compose example and any
+// orchestrator readiness/liveness probe.
+app.MapHealthChecks("/health");
 
 app.Run();
 

@@ -5,7 +5,9 @@ using EBICO.Server.Pipeline;
 using EBICO.Server.ReturnCodes;
 using EBICO.Server.State;
 using EBICO.Server.Transactions;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Options;
 
 namespace Microsoft.Extensions.DependencyInjection;
 
@@ -32,6 +34,19 @@ public static class EbicoServerServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(services);
 
         var optionsBuilder = services.AddOptions<EbicoServerOptions>();
+
+        // Bind the "Ebico" configuration section when an IConfiguration is present (host/container
+        // scenario), so environment variables (Ebico__EndpointPath, Ebico__MaxRequestBodyBytes, …) and
+        // appsettings.json override the defaults. Resolved null-safely via GetService so unit tests that
+        // build a bare ServiceCollection without an IConfiguration keep working. Registered before the
+        // optional code delegate below, so an explicit configure(...) still wins over configuration.
+        services.AddSingleton<IConfigureOptions<EbicoServerOptions>>(sp =>
+            new ConfigureNamedOptions<EbicoServerOptions>(
+                name: string.Empty, // the default (unnamed) options instance
+                options => sp.GetService<IConfiguration>()
+                    ?.GetSection(EbicoServerOptions.ConfigurationSection)
+                    .Bind(options)));
+
         if (configure is not null)
         {
             optionsBuilder.Configure(configure);

@@ -48,6 +48,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0019](0019-status-protokoll-orders.md) | Status- & Protokoll-Orders (Domänen-Erweiterung, HAC/PTK als IEventLog-Projektion) | accepted |
 | [0020](0020-veu-orders.md) | Verteilte elektronische Unterschrift (VEU-Speicher, Park-/Zeichnungs-Workflow) | accepted |
 | [0021](0021-message-capture-store.md) | Message-Capture-Store (`IMessageCaptureStore`, Roh-XML je Transaktion) | accepted |
+| [0022](0022-container-image-und-konfiguration.md) | Container-Image & ENV-Konfiguration (Multi-Stage, `PROJECT`-Arg, `Ebico`-Config-Binding) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
