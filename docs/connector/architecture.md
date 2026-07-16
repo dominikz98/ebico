@@ -334,8 +334,8 @@ gestellt (keine echten Netz-/Dateizugriffe).
 
 Der Connector-**Kern** (Client, Dispatch, Konfiguration, Transport, Key-Store)
 ist mit **#46** angelegt, das Onboarding (INI/HIA/HPB) mit **#47** und die
-**Upload-API** (CCT/CDD/CDB/CIP) mit **#48**; die Download-API folgt in einem
-weiteren M6-Issue. Die folgende Tabelle ordnet die
+**Upload-API** (CCT/CDD/CDB/CIP) mit **#48** und die **Download-API**
+(STA/C53/VMK/C52/C54 sowie HAC/HTD/HKD/HAA/HPD/PTK) mit **#49**. Die folgende Tabelle ordnet die
 [Send-Pipeline](#send-pipeline)-Stufen den vorhandenen Bausteinen zu — so ist der
 Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 
@@ -357,7 +357,7 @@ Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 | 9. Segmentierung | `Core/Serialization/EbicsSegmentation` (im Upload verdrahtet) | ✅ #48 |
 | Upload-Handler (CCT/CDD/CDB/CIP) | `Connector/Upload` (Requests/Handler/Builder, `AddEbicoUpload`) | ✅ #48 |
 | 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
-| Download-Handler | — | ⬜ geplant (M6) |
+| Download-Handler (STA/VMK/C53/C52/C54, HAC/HTD/HKD/HAA/HPD/PTK) | `Connector/Download` (Requests/Handler/Builder, Receipt, Parse-Hooks, `AddEbicoDownload`) | ✅ #49 |
 
 ## Verwandte Doku
 
