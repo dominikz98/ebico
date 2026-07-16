@@ -72,6 +72,8 @@ public sealed class UploadTransaction
     /// <param name="signatureData">The raw order-signature (ES) blob from the initialisation, retained for later verification; may be <see langword="null"/>.</param>
     /// <param name="createdAt">The time the transaction was created.</param>
     /// <param name="effectiveOrderType">The resolved classical order-type code (e.g. <c>"CCT"</c>) the transfer-phase order processing dispatches on; captured at initialisation because the transfer requests carry no order type. May be <see langword="null"/> when the raw <paramref name="orderType"/> does not resolve to a business order.</param>
+    /// <param name="distributedSignature">Whether the upload was submitted for distributed signing (EDS / VEU, issue #42): the order is parked for further signatures rather than processed immediately. Captured at initialisation from the request's signature flag / order attribute.</param>
+    /// <param name="orderId">The referenced VEU order id for the signature/cancellation orders (HVE/HVS, issue #42), or <see langword="null"/> for ordinary uploads. Captured from the order params at initialisation.</param>
     /// <exception cref="ArgumentNullException"><paramref name="transactionId"/>, <paramref name="orderType"/> or <paramref name="transactionKey"/> is <see langword="null"/>.</exception>
     public UploadTransaction(
         byte[] transactionId,
@@ -82,7 +84,9 @@ public sealed class UploadTransaction
         byte[] transactionKey,
         byte[]? signatureData,
         DateTimeOffset createdAt,
-        string? effectiveOrderType = null)
+        string? effectiveOrderType = null,
+        bool distributedSignature = false,
+        string? orderId = null)
     {
         ArgumentNullException.ThrowIfNull(transactionId);
         ArgumentNullException.ThrowIfNull(orderType);
@@ -98,6 +102,8 @@ public sealed class UploadTransaction
         TransactionKey = transactionKey;
         SignatureData = signatureData;
         CreatedAt = createdAt;
+        DistributedSignature = distributedSignature;
+        OrderId = orderId;
         _lastActivityTicks = createdAt.UtcTicks;
     }
 
@@ -122,6 +128,19 @@ public sealed class UploadTransaction
     /// a business order. Used by the transfer-phase order processing, which no longer sees the order type.
     /// </summary>
     public string? EffectiveOrderType { get; }
+
+    /// <summary>
+    /// Whether the upload was submitted for distributed signing (EDS / VEU, issue #42). When
+    /// <see langword="true"/> the transfer-phase order processing parks the order for further signatures
+    /// instead of releasing it immediately. Captured at initialisation.
+    /// </summary>
+    public bool DistributedSignature { get; }
+
+    /// <summary>
+    /// The referenced VEU order id for the signature/cancellation orders (HVE/HVS, issue #42), or
+    /// <see langword="null"/> for ordinary uploads. Captured from the order params at initialisation.
+    /// </summary>
+    public string? OrderId { get; }
 
     /// <summary>The total number of segments announced for the transaction.</summary>
     public int NumSegments { get; }

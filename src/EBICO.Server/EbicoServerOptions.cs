@@ -103,4 +103,15 @@ public sealed class EbicoServerOptions
     /// the SEPA payment upload processor (<c>SepaPaymentUploadProcessor</c>).
     /// </summary>
     public string PaymentStatusReportOrderType { get; set; } = "PSR";
+
+    /// <summary>
+    /// The number of bank-technical signatures an order submitted for distributed signing (EDS / VEU,
+    /// issue #42) requires before it is released. Defaults to <c>2</c> (dual control). When a distributed
+    /// upload is submitted with the signature flag set, the server parks it in the open-VEU store and holds
+    /// it until this many signatures (counting the submitter's own bank-technical signature, if any) have
+    /// been collected via HVE. This is a <b>best-effort</b> approximation of the bank-side account signature
+    /// rules, which are out of scope. Consumed by the SEPA payment upload processor
+    /// (<c>SepaPaymentUploadProcessor</c>) and the VEU signature processor (<c>VeuSignatureUploadProcessor</c>).
+    /// </summary>
+    public int VeuRequiredSignatures { get; set; } = 2;
 }

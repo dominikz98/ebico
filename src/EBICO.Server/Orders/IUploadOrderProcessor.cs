@@ -13,12 +13,16 @@ namespace EBICO.Server.Orders;
 /// <param name="EffectiveOrderType">The resolved classical order-type code (e.g. <c>"CCT"</c>), not the generic <c>FUL</c>/<c>BTU</c>.</param>
 /// <param name="OrderData">The plaintext order data (the decoded pain payload).</param>
 /// <param name="TransactionIdHex">The hex transaction id, for correlating lifecycle events; may be <see langword="null"/>.</param>
+/// <param name="DistributedSignature">Whether the upload was submitted for distributed signing (EDS / VEU, issue #42): the order should be parked for further signatures rather than released immediately.</param>
+/// <param name="OrderId">The referenced VEU order id for a signature/cancellation order (HVE/HVS, issue #42), or <see langword="null"/> for ordinary uploads.</param>
 public readonly record struct UploadOrderContext(
     SubscriberKeyRef Subscriber,
     EbicsVersion Version,
     string EffectiveOrderType,
     byte[] OrderData,
-    string? TransactionIdHex);
+    string? TransactionIdHex,
+    bool DistributedSignature = false,
+    string? OrderId = null);
 
 /// <summary>
 /// The outcome of processing an uploaded order. Carries the EBICS return code the transfer response
