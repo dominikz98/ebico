@@ -7,6 +7,13 @@ namespace EBICO.Server;
 /// </summary>
 public sealed class EbicoServerOptions
 {
+    /// <summary>
+    /// The configuration section these options are bound from when an <c>IConfiguration</c> is present
+    /// (host/container scenario). Container environment variables use the double-underscore convention,
+    /// e.g. <c>Ebico__EndpointPath</c> or <c>Ebico__MaxRequestBodyBytes</c>. See <c>docs/deployment/container.md</c>.
+    /// </summary>
+    public const string ConfigurationSection = "Ebico";
+
     /// <summary>The HTTP path the EBICS endpoint is mapped to. Defaults to <c>/ebics</c>.</summary>
     public string EndpointPath { get; set; } = "/ebics";
 

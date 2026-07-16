@@ -15,6 +15,10 @@ verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 - [Test-Harness & Fixtures](development/testing.md) — xUnit v3, AwesomeAssertions, `CanonicalXmlComparer`, Fixtures
 - [GitHub MCP-Server (Claude Code)](development/github-mcp.md) — MCP-Anbindung an GitHub, `.mcp.json`, PAT-Setup (`GITHUB_MCP_PAT`), benötigte Permissions
 
+## Betrieb & Deployment
+
+- [Container-Image für EBICO.Server](deployment/container.md) — Multi-Stage-`Dockerfile` (parametrisiert via `PROJECT`-Build-Arg, Base-Images `sdk:10.0`/`aspnet:10.0`, nicht-root), **Konfiguration via ENV** (ASP.NET-Host-Variablen + Emulator-Optionen aus der `Ebico`-Config-Section, `Ebico__…`), Beispiel-`docker-compose` (Server + Suite, ohne geteilten Live-Zustand), Liveness-Endpoint `/health`, Sicherheitshinweise (unauthentifizierte Admin-API), CI-Container-Build-Job; ADR-0022
+
 ## Architektur-Entscheidungen
 
 - [ADR-Index](adr/README.md) — Architecture Decision Records (Solution-Layout, Test-Stack, Schemas, Multi-Version, Connector-Dispatch)

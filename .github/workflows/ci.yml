@@ -83,6 +83,18 @@ jobs:
           args: --offline --no-progress --verbose "**/*.md"
           fail: true
 
+  container-build:
+    name: Container Build (Server)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Baut das Server-Container-Image (Issue #61). Build-only: kein Registry-Login/Push (das
+      # gehört zur Publish-Pipeline, M9 / #62). Hält das Dockerfile grün, ohne Secrets zu brauchen.
+      - name: Build Server-Image (build-only)
+        run: docker build --build-arg PROJECT=EBICO.Server -t ebico-server:ci .
+
 # -----------------------------------------------------------------------------
 # Später (M9 / #62): Pack + Publish des Connector-NuGet-Pakets.
 # Bewusst noch deaktiviert, bis EBICO.Connector packbar ist.

@@ -1,0 +1,47 @@
+# Example compose stack for the EBICO emulator (issue #61): the EBICS server plus the Blazor Suite UI.
+# Both are built from the single root Dockerfile via the PROJECT build-arg. See docs/deployment/container.md.
+#
+#   docker compose up --build
+#     server -> http://localhost:5014   (EBICS endpoint /ebics, admin API /admin, liveness /health)
+#     suite  -> http://localhost:5267   (Blazor UI)
+#
+# NOTE: the Suite and the server do NOT share live state today — the Suite runs its own in-memory
+# store seeded with sample data and does not talk to the server over HTTP (cross-process live
+# inspection is a documented follow-up, ADR-0015). This stack simply runs both side by side.
+#
+# SECURITY: the EBICS endpoint is unsigned and the admin API is unauthenticated by design (local
+# emulator, like Azurite). Do not expose these ports on an untrusted network.
+
+name: ebico
+
+services:
+  server:
+    build:
+      context: .
+      args:
+        PROJECT: EBICO.Server
+    image: ebico-server:latest
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      # Override the emulator's own settings via the "Ebico" configuration section, e.g.:
+      # Ebico__EndpointPath: "/ebics"
+      # Ebico__AdminApiPath: "/admin"
+      # Ebico__MaxRequestBodyBytes: "2097152"
+    ports:
+      - "5014:8080"
+    # The image exposes a liveness endpoint at /health. A compose healthcheck is omitted because the
+    # aspnet runtime image ships no HTTP client (curl/wget); probe /health from the host or an
+    # orchestrator instead.
+
+  suite:
+    build:
+      context: .
+      args:
+        PROJECT: EBICO.Suite
+    image: ebico-suite:latest
+    # The default image CMD starts the server; select the Suite assembly for this service.
+    command: ["EBICO.Suite.dll"]
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+    ports:
+      - "5267:8080"

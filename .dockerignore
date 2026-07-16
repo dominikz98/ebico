@@ -1,0 +1,33 @@
+# Keep the build context small and reproducible: never ship local build output, VCS metadata, IDE
+# files or test/doc/schema trees into the image (the server/suite publish needs none of them). See
+# docs/deployment/container.md.
+
+# Build output
+**/bin/
+**/obj/
+artifacts/
+TestResults/
+**/coverage.cobertura.xml
+
+# VCS & CI
+.git/
+.gitignore
+.github/
+
+# IDE / editor
+.vs/
+.vscode/
+.idea/
+**/*.user
+
+# Not needed inside the image
+tests/
+docs/
+schemas/
+.claude/
+.config/
+.mcp.json
+Dockerfile
+.dockerignore
+docker-compose.yml
+**/*.md
