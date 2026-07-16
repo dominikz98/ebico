@@ -49,7 +49,8 @@ einen deterministischen Schlüssel (z. B. `"SCT:pain.001:COR"`) für Logging und
 
 `EBICO.Core.Btf.BtfOrderTypeCatalog` ist die statische Äquivalenztabelle klassischer OrderType ↔ BTF.
 Sie trägt einen **repräsentativen Best-Effort-Seed** der gängigen Zahlungs- und Kontoauszugs-Orders; die
-konkreten Orders (#39–#42) erweitern sie, #43 dokumentiert das Ergebnis als Abdeckungsmatrix.
+konkreten Orders (#39–#42) erweitern sie, #43 dokumentiert das Ergebnis als
+[Order-/BTF-Abdeckungsmatrix](order-coverage-matrix.md).
 
 | OrderType | Richtung | Service | Option | Container | MsgName | Beschreibung |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -164,6 +165,7 @@ aus committeten Core-Bindings, keine proprietären Fixtures):
 
 ## Verwandte Doku
 
+- [Order-/BTF-Abdeckungsmatrix](order-coverage-matrix.md) — konsolidierte Übersicht aller Auftragsarten × Version × Status (#43)
 - [Upload-Transaktion](upload-transaction.md) / [Download-Transaktion](download-transaction.md) — die Engines, in denen die Prüfung andockt
 - [Stammdatenverwaltung](master-data.md) — `SubscriberPermission`, Grant/Revoke, Admin-API
 - [Domänenmodell](../protocol/domain-model.md) — Subscriber-Aggregat, Signaturklassen
