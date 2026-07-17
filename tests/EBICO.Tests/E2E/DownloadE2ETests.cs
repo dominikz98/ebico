@@ -4,6 +4,7 @@ using System.Text;
 using AwesomeAssertions;
 using EBICO.Connector.Download;
 using EBICO.Core;
+using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -50,6 +51,24 @@ public class DownloadE2ETests : IClassFixture<WebApplicationFactory<ServerProgra
 
         var camt = Encoding.UTF8.GetString(result.Value.ParsedAs<byte[]>()!);
         camt.Should().Contain("camt.053.001.08").And.Contain("BkToCstmrStmt");
+    }
+
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public async Task C53Download_WithoutPermission_IsRejected(EbicsVersion version)
+    {
+        // Authorised for CCT only: the C53 download must fail regardless of how this version encodes it.
+        await using var harness = await EbicsE2EHarness.CreateAsync(
+            _factory, version, "C53NOAUTH", permissions: [new SubscriberPermission("CCT", SignatureClass.T)], ct: _ct);
+        (await harness.OnboardAsync(_ct)).ThrowIfFailed();
+
+        var result = await harness.Client.Send(new C53DownloadRequest(), _ct);
+
+        // The server rejects during the initialisation phase, before any data is dequeued, and authorises
+        // against the resolved classical code (C53) rather than the wire-level H003/H004 FDL+FileFormat or
+        // H005 BTF (BTD) identifier the connector actually sent.
+        result.IsSuccess.Should().BeFalse();
+        result.ReturnCode.Should().Be(EbicsReturnCode.AuthorisationOrderTypeFailed.Code);
     }
 
     private static byte[] Unzip(byte[] zip)

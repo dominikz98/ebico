@@ -58,6 +58,27 @@ ein `Program` hat, trägt die ProjectReference im Testprojekt `Aliases="global,E
 > gegen die `BaseAddress` des `HttpClient`. Die URL muss daher `http://localhost` + `EndpointPath`
 > lauten (`http://localhost/ebics`).
 
+Die Verdrahtung im Kern (aus `EbicsE2EHarness.CreateAsync`):
+
+```csharp
+var services = new ServiceCollection();
+services.AddEbicoConnector(o =>
+    {
+        // HttpClientTransport postet gegen die absolute Url, nicht gegen BaseAddress:
+        // Testhost-Origin + EbicoServerOptions.EndpointPath.
+        o.Url = "http://localhost/ebics";
+        o.HostId = hostId.Value;
+        o.PartnerId = partnerId.Value;
+        o.UserId = userId.Value;
+        o.Version = version; // H003 | H004 | H005
+    })
+    // Der echte HttpClientTransport bleibt im Spiel — nur der unterste Handler zeigt auf den Testhost.
+    .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
+services.AddEbicoOnboarding();
+services.AddEbicoUpload();
+services.AddEbicoDownload();
+```
+
 **Schlüssel (`E2EKeyPool`).** RSA-Generierung dominiert die Laufzeit, und
 `RsaKeyMaterial.MinKeySizeBits` (2048) ist eine **harte Untergrenze** — der Konstruktor lehnt kleinere
 Schlüssel ab. Der einzige Hebel ist deshalb **Wiederverwendung, nicht Verkleinerung**: der Pool erzeugt
@@ -85,7 +106,7 @@ RSA-Generierungen je Test und macht die HPB-Fingerprints vorab bekannt.
 | Upload CCT | ✅ | ✅ | ✅ | Server rekonstruiert die pain.001-Bytes, `EffectiveOrderType == "CCT"` |
 | Download C53 | ✅ | ✅ | ✅ | camt.053 im ZIP, Receipt → `011000` |
 
-6 Theories × 3 Versionen = **18 Round-Trips**.
+7 Theories × 3 Versionen = **21 Round-Trips**.
 
 Zwei Assertions tragen die Suite:
 
@@ -105,13 +126,14 @@ Zwei Assertions tragen die Suite:
 | Download C53 erfolgreich | **`011000`** `EBICS_DOWNLOAD_POSTPROCESS_DONE` |
 | HIA/HPB vor INI (Statusmaschine) | `091002` `EBICS_INVALID_USER_OR_USER_STATE` |
 | CCT ohne Berechtigung | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
+| C53 ohne Berechtigung | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
 | CCT mit ungültiger pain.001 | `090004` `EBICS_INVALID_ORDER_DATA_FORMAT` |
 
 > ⚠️ **`011000`, nicht `000000`.** Ein erfolgreicher Download endet mit dem Code des **positiven
 > Receipts**: beim Kombinieren der Returncodes gewinnt der Nicht-OK-Slot. `EbicsResult.IsSuccess` ist
 > trotzdem `true`.
 
-Die Negativfälle sind bewusst auf drei begrenzt — es sind jene, die **erst an dieser Nahtstelle**
+Die Negativfälle sind bewusst auf vier begrenzt — es sind jene, die **erst an dieser Nahtstelle**
 entstehen. Breite Negativ-/Sicherheitsfälle gehören zu Issue #58, Konformität gegen reale Clients zu
 Issue #59.
 
@@ -139,7 +161,39 @@ Issue #59.
 
 **Ein** Berechtigungssatz (`CCT`/`C53`) deckt alle drei Versionen ab: der Server autorisiert gegen den
 *aufgelösten* klassischen Code, nicht gegen den Wire-Identifier `BTU`/`BTD`/`FUL`/`FDL`. Genau das
-prüft `CctUpload_WithoutPermission_IsRejected` für jede Version.
+prüfen `CctUpload_WithoutPermission_IsRejected` und `C53Download_WithoutPermission_IsRejected` für jede
+Version (beide erwarten `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED`).
+
+Konkret unterscheiden sich die `OrderDetails` im `ebicsRequest` genau an dieser Stelle — hier für den
+CCT-Upload (vereinfachte Fragmente; Signatur, `DataEncryptionInfo` und Namespaces weggelassen):
+
+```xml
+<!-- H003/H004: klassischer Auftragstyp direkt (CctUploadRequest -> OrderType="CCT") -->
+<static>
+  <OrderDetails>
+    <OrderType>CCT</OrderType>
+    <OrderAttribute>DZHNN</OrderAttribute>
+  </OrderDetails>
+</static>
+```
+
+```xml
+<!-- H005: generischer BTU-Upload, die BTF (SCT/pain.001) trägt die Geschäftsidentität -->
+<static>
+  <OrderDetails>
+    <AdminOrderType>BTU</AdminOrderType>
+    <BTUOrderParams>
+      <Service>
+        <ServiceName>SCT</ServiceName>
+        <MsgName>pain.001</MsgName>
+      </Service>
+    </BTUOrderParams>
+  </OrderDetails>
+</static>
+```
+
+Der Server löst beide Konventionen über `BtfOrderTypeCatalog.ResolveUploadOrderType` auf denselben
+klassischen Code `CCT` auf — dagegen läuft dann Autorisierung und Verarbeitung.
 
 ## Tests
 
@@ -153,9 +207,9 @@ proprietären Fixtures):
 - `UploadE2ETests` — Happy Path mit serverseitiger Rückgewinnung der pain.001-Bytes und
   `EffectiveOrderType`-Prüfung; Negativfälle Berechtigung (`090003`) und ungültige pain.001 (`090004`).
 - `DownloadE2ETests` — Happy Path camt.053-im-ZIP über den `Parse`-Hook (läuft **vor** dem Receipt) und
-  Receipt-Returncode `011000`.
+  Receipt-Returncode `011000`; Negativfall Berechtigung (`090003`).
 
-Laufzeit: 18 Round-Trips in ≈1 s (drei Testklassen laufen als eigene xUnit-Collections parallel).
+Laufzeit: 21 Round-Trips in ≈1 s (drei Testklassen laufen als eigene xUnit-Collections parallel).
 
 ## Verwandte Doku
 
