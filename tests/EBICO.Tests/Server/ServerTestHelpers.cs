@@ -554,7 +554,8 @@ internal static class ServerTestHelpers
         RsaKeyMaterial? rsaAuthKey = null,
         RsaKeyMaterial? rsaEncKey = null,
         X509Certificate2? authCertificate = null,
-        X509Certificate2? encCertificate = null)
+        X509Certificate2? encCertificate = null,
+        RsaKeyMaterial? signWithAuthKey = null)
     {
         var orderData = version switch
         {
@@ -564,7 +565,8 @@ internal static class ServerTestHelpers
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
 
-        return BuildEncryptedRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HCA", bankEncKey, bankEncVersion);
+        var xml = BuildEncryptedRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HCA", bankEncKey, bankEncVersion);
+        return signWithAuthKey is null ? xml : SignRequestXml(version, xml, signWithAuthKey);
     }
 
     /// <summary>
@@ -603,7 +605,8 @@ internal static class ServerTestHelpers
         RsaKeyMaterial? rsaEncKey = null,
         X509Certificate2? sigCertificate = null,
         X509Certificate2? authCertificate = null,
-        X509Certificate2? encCertificate = null)
+        X509Certificate2? encCertificate = null,
+        RsaKeyMaterial? signWithAuthKey = null)
     {
         var orderData = version switch
         {
@@ -613,7 +616,8 @@ internal static class ServerTestHelpers
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
 
-        return BuildEncryptedRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HCS", bankEncKey, bankEncVersion);
+        var xml = BuildEncryptedRequestWithOrderData(version, hostId, partnerId, userId, EbicsCompression.Compress(orderData), "HCS", bankEncKey, bankEncVersion);
+        return signWithAuthKey is null ? xml : SignRequestXml(version, xml, signWithAuthKey);
     }
 
     /// <summary>
@@ -755,6 +759,26 @@ internal static class ServerTestHelpers
             }, EbicsVersion.H005),
             _ => throw new ArgumentOutOfRangeException(nameof(version), version, "Unsupported EBICS version."),
         };
+    }
+
+    /// <summary>
+    /// Signs an already-built <c>ebicsRequest</c> XML with an X002 authentication key and returns the
+    /// signed XML — the server-side mirror of the connector's request signing (<c>UploadExecutor.Sign</c>),
+    /// used by tests that must present a genuinely signed request now that the server verifies the X002
+    /// authentication signature (issue #58). Signs over the AuthSignature-free serialization, exactly as
+    /// a counterparty produces it.
+    /// </summary>
+    /// <param name="version">The protocol version (selects the default X002 authentication key version).</param>
+    /// <param name="requestXml">The unsigned <c>ebicsRequest</c> XML.</param>
+    /// <param name="authKey">The authentication key material (must contain a private key) to sign with.</param>
+    /// <returns>The request XML with a populated <c>AuthSignature</c>.</returns>
+    public static string SignRequestXml(EbicsVersion version, string requestXml, RsaKeyMaterial authKey)
+    {
+        var envelope = (IAuthSignedRequestEnvelope)EbicsXmlSerializer.DeserializeEnvelope(requestXml);
+        var unsignedXml = EbicsXmlSerializer.SerializeToString(envelope);
+        var authVersion = KeyVersions.Default(KeyPurpose.Authentication, version).Version;
+        envelope.AuthSignature = AuthenticationSignature.Sign(unsignedXml, authKey, authVersion);
+        return EbicsXmlSerializer.SerializeToString(envelope);
     }
 
     /// <summary>

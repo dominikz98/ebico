@@ -31,7 +31,8 @@ public class EbicoServerServiceCollectionExtensionsTests
         provider.GetRequiredService<IMessageCaptureStore>().Should().BeOfType<InMemoryMessageCaptureStore>();
         provider.GetRequiredService<IServerBankKeyStore>().Should().BeOfType<InMemoryServerBankKeyStore>();
         provider.GetRequiredService<IMasterDataManager>().Should().BeOfType<MasterDataManager>();
-        provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<NoOpEbicsRequestVerifier>();
+        // Since #58 the production default verifies the X002 authentication signature (was NoOp).
+        provider.GetRequiredService<IEbicsRequestVerifier>().Should().BeOfType<X002EbicsRequestVerifier>();
         provider.GetRequiredService<IEbicsErrorMapper>().Should().BeOfType<EbicsErrorMapper>();
         provider.GetRequiredService<IEbicsOrderHandlerResolver>().Should().BeOfType<EbicsOrderHandlerResolver>();
         provider.GetRequiredService<EbicsResponseFactory>().Should().NotBeNull();

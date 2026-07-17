@@ -62,7 +62,12 @@ public static class EbicoServerServiceCollectionExtensions
         services.TryAddSingleton<IMessageCaptureStore, InMemoryMessageCaptureStore>();
         services.TryAddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         services.TryAddSingleton<IMasterDataManager, MasterDataManager>();
-        services.TryAddSingleton<IEbicsRequestVerifier, NoOpEbicsRequestVerifier>();
+        // Request verification (issue #58): the production verifier checks the X002 authentication
+        // signature of every signed transaction ebicsRequest against the subscriber's stored auth key
+        // (a tampered/wrongly-signed request -> EBICS_AUTHENTICATION_FAILED). Verification only runs once
+        // an auth key is on file (post-HIA); the unsecured onboarding requests and HPB are skipped. Still
+        // pluggable via TryAdd, so a test can substitute NoOpEbicsRequestVerifier before AddEbicoServer.
+        services.TryAddSingleton<IEbicsRequestVerifier, X002EbicsRequestVerifier>();
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
         services.TryAddSingleton<EbicsResponseFactory>();
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();

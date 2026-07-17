@@ -15,6 +15,11 @@ Issue **#20** (Milestone M2), Krypto-Bibliothek:
 > E002 ([#21](encryption-e002.md)) abgegrenzt. Das automatische Setzen der `AuthSignature` im
 > Send-/Dispatch-Weg sowie die Interop-Verifikation gegen echte Bank-Beispiele gehören in
 > spätere Milestones (M3–M6) — hier bleibt X002 eine policy-freie Krypto-Primitive.
+>
+> **Anwendung:** Der Connector *setzt* die `AuthSignature` beim Senden; der Server *verifiziert* sie
+> seit **#58** für jeden signierten `ebicsRequest` (`X002EbicsRequestVerifier` →
+> [Negativ- & Sicherheitsfälle](../development/negative-security-cases.md)). Die Primitive hier bleibt
+> davon unberührt policy-frei.
 
 ## Bausteine
 

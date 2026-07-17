@@ -49,6 +49,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0020](0020-veu-orders.md) | Verteilte elektronische Unterschrift (VEU-Speicher, Park-/Zeichnungs-Workflow) | accepted |
 | [0021](0021-message-capture-store.md) | Message-Capture-Store (`IMessageCaptureStore`, Roh-XML je Transaktion) | accepted |
 | [0022](0022-container-image-und-konfiguration.md) | Container-Image & ENV-Konfiguration (Multi-Stage, `PROJECT`-Arg, `Ebico`-Config-Binding) | accepted |
+| [0023](0023-serverseitige-x002-verifikation.md) | Serverseitige X002-Authentifikationssignatur-Verifikation | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

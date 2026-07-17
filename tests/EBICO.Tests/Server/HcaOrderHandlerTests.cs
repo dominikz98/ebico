@@ -48,7 +48,9 @@ public class HcaOrderHandlerTests
         await keys.StoreAsync(keyRef, new StoredPublicKey(oldAuth.ToPublicOnly(), KeyVersion.Create("X002")), _ct);
         await keys.StoreAsync(keyRef, new StoredPublicKey(oldEnc.ToPublicOnly(), KeyVersion.Create("E002")), _ct);
 
-        var (xml, newAuth, newEnc) = BuildHcaRequest(version, bank);
+        // The server now verifies the X002 signature (#58): HCA is authenticated with the current auth key
+        // being replaced, so sign with the old auth key whose public part we just stored.
+        var (xml, newAuth, newEnc) = BuildHcaRequest(version, bank, signWith: oldAuth);
 
         var result = await pipeline.ProcessAsync(xml, _ct);
 
@@ -159,7 +161,8 @@ public class HcaOrderHandlerTests
 
     // Builds a valid HCA request for the version (order data encrypted for the bank's E002 key) and
     // returns it with the expected (public) new keys.
-    private static (string Xml, RsaKeyMaterial ExpectedAuth, RsaKeyMaterial ExpectedEnc) BuildHcaRequest(EbicsVersion version, BankKeyPair bank)
+    private static (string Xml, RsaKeyMaterial ExpectedAuth, RsaKeyMaterial ExpectedEnc) BuildHcaRequest(
+        EbicsVersion version, BankKeyPair bank, RsaKeyMaterial? signWith = null)
     {
         if (version == EbicsVersion.H005)
         {
@@ -169,7 +172,7 @@ public class HcaOrderHandlerTests
             var expectedEnc = RsaKeyImportExport.ImportPublicKeyFromCertificate(encCert);
             var xml = ServerTestHelpers.BuildEncryptedHcaRequest(
                 version, Host, Partner, User, bank.Encryption, bank.EncryptionVersion,
-                authCertificate: authCert, encCertificate: encCert);
+                authCertificate: authCert, encCertificate: encCert, signWithAuthKey: signWith);
             return (xml, expectedAuth, expectedEnc);
         }
 
@@ -177,7 +180,7 @@ public class HcaOrderHandlerTests
         var encKey = RsaKeyMaterial.Generate();
         var request = ServerTestHelpers.BuildEncryptedHcaRequest(
             version, Host, Partner, User, bank.Encryption, bank.EncryptionVersion,
-            rsaAuthKey: authKey, rsaEncKey: encKey);
+            rsaAuthKey: authKey, rsaEncKey: encKey, signWithAuthKey: signWith);
         return (request, authKey.ToPublicOnly(), encKey.ToPublicOnly());
     }
 

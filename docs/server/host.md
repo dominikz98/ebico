@@ -79,7 +79,7 @@ M3/M4-Features andocken:
 
 | Typ | Rolle | Skelett-Default |
 | --- | --- | --- |
-| `IEbicsRequestVerifier` | Signatur-/Zustandsprüfung (X002, HostID/User, Subscriber-State) | `NoOpEbicsRequestVerifier` (jeder Request besteht) |
+| `IEbicsRequestVerifier` | Signatur-/Zustandsprüfung (X002, HostID/User, Subscriber-State) | seit #58 `X002EbicsRequestVerifier` (prüft die X002-Signatur signierter `ebicsRequest`, [Details](../development/negative-security-cases.md)); das ursprüngliche Skelett war `NoOpEbicsRequestVerifier` |
 | `IEbicsOrderHandler` | Verarbeitung genau eines Order-Typs einer Version | *keine Registrierung* |
 | `IEbicsOrderHandlerResolver` | Auflösung `(Version, OrderType) → Handler` | `EbicsOrderHandlerResolver` über `IEnumerable<IEbicsOrderHandler>` (leer) |
 

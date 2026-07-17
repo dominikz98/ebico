@@ -50,7 +50,9 @@ public class HcsOrderHandlerTests
         await keys.StoreAsync(keyRef, new StoredPublicKey(oldAuth.ToPublicOnly(), KeyVersion.Create("X002")), _ct);
         await keys.StoreAsync(keyRef, new StoredPublicKey(oldEnc.ToPublicOnly(), KeyVersion.Create("E002")), _ct);
 
-        var (xml, newSig, newAuth, newEnc) = BuildHcsRequest(version, bank);
+        // The server now verifies the X002 signature (#58): HCS is authenticated with the current auth key
+        // being replaced, so sign with the old auth key whose public part we just stored.
+        var (xml, newSig, newAuth, newEnc) = BuildHcsRequest(version, bank, signWith: oldAuth);
 
         var result = await pipeline.ProcessAsync(xml, _ct);
 
@@ -124,7 +126,8 @@ public class HcsOrderHandlerTests
     }
 
     // Builds a valid HCS request for the version and returns it with the expected (public) new keys.
-    private static (string Xml, RsaKeyMaterial ExpectedSig, RsaKeyMaterial ExpectedAuth, RsaKeyMaterial ExpectedEnc) BuildHcsRequest(EbicsVersion version, BankKeyPair bank)
+    private static (string Xml, RsaKeyMaterial ExpectedSig, RsaKeyMaterial ExpectedAuth, RsaKeyMaterial ExpectedEnc) BuildHcsRequest(
+        EbicsVersion version, BankKeyPair bank, RsaKeyMaterial? signWith = null)
     {
         if (version == EbicsVersion.H005)
         {
@@ -136,7 +139,7 @@ public class HcsOrderHandlerTests
             var expectedEnc = RsaKeyImportExport.ImportPublicKeyFromCertificate(encCert);
             var xml = ServerTestHelpers.BuildEncryptedHcsRequest(
                 version, Host, Partner, User, bank.Encryption, bank.EncryptionVersion,
-                sigCertificate: sigCert, authCertificate: authCert, encCertificate: encCert);
+                sigCertificate: sigCert, authCertificate: authCert, encCertificate: encCert, signWithAuthKey: signWith);
             return (xml, expectedSig, expectedAuth, expectedEnc);
         }
 
@@ -145,7 +148,7 @@ public class HcsOrderHandlerTests
         var encKey = RsaKeyMaterial.Generate();
         var request = ServerTestHelpers.BuildEncryptedHcsRequest(
             version, Host, Partner, User, bank.Encryption, bank.EncryptionVersion,
-            rsaSigKey: sigKey, rsaAuthKey: authKey, rsaEncKey: encKey);
+            rsaSigKey: sigKey, rsaAuthKey: authKey, rsaEncKey: encKey, signWithAuthKey: signWith);
         return (request, sigKey.ToPublicOnly(), authKey.ToPublicOnly(), encKey.ToPublicOnly());
     }
 

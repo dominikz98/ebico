@@ -1,4 +1,5 @@
 extern alias EbicoServer;
+using System.Text;
 using AwesomeAssertions;
 using EBICO.Connector;
 using EBICO.Connector.Keys;
@@ -101,7 +102,8 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
         EbicsVersion version,
         HostId hostId,
         PartnerId partnerId,
-        UserId userId)
+        UserId userId,
+        RequestTamperingHandler? tampering)
     {
         _provider = provider;
         ServerServices = serverServices;
@@ -109,6 +111,7 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
         HostId = hostId;
         PartnerId = partnerId;
         UserId = userId;
+        Tampering = tampering;
     }
 
     /// <summary>The EBICS version this harness speaks.</summary>
@@ -125,6 +128,14 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
 
     /// <summary>The server's service provider, for asserting server-side state after a round-trip.</summary>
     public IServiceProvider ServerServices { get; }
+
+    /// <summary>
+    /// The wire-tampering handler injected into the connector's HTTP chain when the harness was created
+    /// with <c>installTamperingHandler: true</c>; otherwise <see langword="null"/>. Negative-case tests
+    /// set <see cref="RequestTamperingHandler.Tamper"/> <b>after</b> onboarding to corrupt the outgoing
+    /// request XML (the connector has already signed at that point, so this models MITM/corruption).
+    /// </summary>
+    public RequestTamperingHandler? Tampering { get; }
 
     /// <summary>The connector client under test.</summary>
     public IEbicsClient Client => _provider.GetRequiredService<IEbicsClient>();
@@ -157,6 +168,11 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
     /// Whether to pre-seed the subscriber keys from <see cref="E2EKeyPool"/>. Pass <see langword="false"/>
     /// when the test drives <see cref="EBICO.Connector.Onboarding.Keys.ISubscriberKeyGenerator"/> itself.
     /// </param>
+    /// <param name="installTamperingHandler">
+    /// Whether to inject a <see cref="RequestTamperingHandler"/> into the connector's HTTP chain, exposed
+    /// as <see cref="Tampering"/>. Used by the negative/security suite to corrupt the outgoing (already
+    /// signed) request XML on the wire.
+    /// </param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The initialized harness.</returns>
     public static async Task<EbicsE2EHarness> CreateAsync(
@@ -165,6 +181,7 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
         string scenario,
         IEnumerable<SubscriberPermission>? permissions = null,
         bool provisionKeys = true,
+        bool installTamperingHandler = false,
         CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(factory);
@@ -191,8 +208,10 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
         // key generations per test and lets HPB assert the exact keys back.
         await serverServices.GetRequiredService<IServerBankKeyStore>().SetAsync(hostId, E2EKeyPool.BankKeys(), ct);
 
+        var tampering = installTamperingHandler ? new RequestTamperingHandler() : null;
+
         var services = new ServiceCollection();
-        services.AddEbicoConnector(o =>
+        var httpClientBuilder = services.AddEbicoConnector(o =>
             {
                 // HttpClientTransport posts to the absolute connection URL rather than the client's
                 // BaseAddress, so this must be the test-server origin plus EbicoServerOptions.EndpointPath.
@@ -203,6 +222,12 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
                 o.Version = version;
             })
             .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
+        if (tampering is not null)
+        {
+            // Sits above the primary (TestServer) handler, so it sees the fully serialized+signed request.
+            httpClientBuilder.AddHttpMessageHandler(() => tampering);
+        }
+
         services.AddEbicoOnboarding();
         services.AddEbicoUpload();
         services.AddEbicoDownload();
@@ -217,7 +242,7 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
             }
         }
 
-        return new EbicsE2EHarness(provider, serverServices, version, hostId, partnerId, userId);
+        return new EbicsE2EHarness(provider, serverServices, version, hostId, partnerId, userId, tampering);
     }
 
     /// <summary>Reads the current server-side subscriber aggregate.</summary>
@@ -278,5 +303,40 @@ internal sealed record E2EOnboardingResults(
         Hia.IsSuccess.Should().BeTrue($"HIA must succeed (got {Hia.ReturnCode} {Hia.ReturnText})");
         Hpb.IsSuccess.Should().BeTrue($"HPB must succeed (got {Hpb.ReturnCode} {Hpb.ReturnText})");
         return this;
+    }
+}
+
+/// <summary>
+/// A connector-side <see cref="DelegatingHandler"/> that rewrites the outgoing EBICS request XML on the
+/// wire (issue #58). Because it sits above the transport's primary handler, the connector has already
+/// compressed, encrypted, segmented and <b>signed</b> the request by the time this runs — so a mutation
+/// here models an in-transit tamper/corruption against a genuinely signed message, exactly what the
+/// server's X002 verification must catch.
+/// </summary>
+/// <remarks>
+/// <see cref="Tamper"/> starts <see langword="null"/> (pass-through) so onboarding (INI/HIA/HPB) travels
+/// untouched; a test arms it after <see cref="EbicsE2EHarness.OnboardAsync"/> to affect only the order
+/// under test. The delegate receives the full request body and returns the body to send instead.
+/// </remarks>
+internal sealed class RequestTamperingHandler : DelegatingHandler
+{
+    /// <summary>The active mutation, or <see langword="null"/> to forward the request unchanged.</summary>
+    public Func<string, string>? Tamper { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    {
+        if (Tamper is { } mutate && request.Content is not null)
+        {
+            var body = await request.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+            var mediaType = request.Content.Headers.ContentType;
+            request.Content = new StringContent(mutate(body), Encoding.UTF8);
+            if (mediaType is not null)
+            {
+                request.Content.Headers.ContentType = mediaType;
+            }
+        }
+
+        return await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
     }
 }
