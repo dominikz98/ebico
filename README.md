@@ -39,7 +39,12 @@ Doku und Tests gehören in denselben PR (projektweite *Definition of Done*, sieh
 
 ## Lizenz / Hinweis
 
-Die EBICS-Schemas und -Spezifikationen sind **proprietäres Eigentum der EBICS SC**
-und werden **nicht** in dieses Repository eingecheckt. Sie werden lokal über
+Der **EBICO-Code** steht unter der **MIT-Lizenz** (siehe [`LICENSE`](LICENSE)). Die als
+NuGet veröffentlichten Bibliotheken `EBICO.Core` und `EBICO.Connector` tragen die
+Lizenz-Metadaten entsprechend; Details zum Paketieren in
+[docs/connector/packaging.md](docs/connector/packaging.md).
+
+Davon **unberührt**: Die EBICS-Schemas und -Spezifikationen sind **proprietäres Eigentum
+der EBICS SC** und werden **nicht** in dieses Repository eingecheckt. Sie werden lokal über
 [`scripts/fetch-schemas.sh`](scripts/fetch-schemas.sh) bezogen; siehe
 [docs/protocol/schema-sources.md](docs/protocol/schema-sources.md).

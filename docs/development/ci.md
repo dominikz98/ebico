@@ -37,6 +37,19 @@ Doku-Links (Docs-as-Code). Läuft bewusst **offline** (`--offline`): externe URL
 nicht geprüft, um flakige Netz-Requests zu vermeiden. Tote relative Links (etwa
 nach dem Verschieben einer Doku-Seite) lassen den Job fehlschlagen.
 
+### `pack`
+
+Packt (nach `build-test`) die veröffentlichten Bibliotheken **`EBICO.Core`** und
+**`EBICO.Connector`** in Release nach `./artifacts` und lädt `*.nupkg` + `*.snupkg`
+als Artefakt `nuget` hoch (Issue #50). Der Job validiert die echte **Packbarkeit**
+(README, XML-Doc, Symbole, SourceLink, Lizenz-Expression) — ein fehlendes
+Paket-README bräche ihn z. B. mit `NU5039`. Die CalVer-BUILD-Komponente kommt aus
+`github.run_number` (`-p:EbicoBuildNumber=…`), siehe
+[packaging.md](../connector/packaging.md) und
+[ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md). **Build-only:** kein
+Registry-Push — das gehört zur Publish-Pipeline (M9 / #62), analog zum
+`container-build`-Job.
+
 ## Reproduzierbarkeit ohne Lock-Files
 
 Es werden **keine** `packages.lock.json` verwendet. Reproduzierbare Restores
@@ -51,5 +64,7 @@ Maschinen mit unterschiedlichem SDK-Patch brechen (NU1004). Details:
 ## Später
 
 - **Externer Link-Check** als nicht-blockierender `schedule`-Job (nächtlich).
-- **Pack + Publish** des Connector-NuGet-Pakets (M9 / #62) — im Workflow bereits
-  als auskommentierter `pack-connector`-Job vorbereitet.
+- **Publish/Push** der NuGet-Pakete in einen Feed (M9 / #62). Das **Pack** selbst ist
+  seit #50 als build-only `pack`-Job aktiv (siehe oben); es fehlt nur noch der
+  authentifizierte Push (nuget.org bzw. GitHub Packages) mit den passenden Secrets
+  und erweiterten `permissions`.

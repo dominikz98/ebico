@@ -30,4 +30,43 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <!--
+    NuGet-Packaging der veröffentlichten Bibliotheken (Issue #50). Nur EBICO.Core +
+    EBICO.Connector sind packbar; die Apps (Server/Suite) und Tests bleiben es nicht.
+    Grundsatzentscheidung: docs/adr/0024-nuget-packaging-und-versionierung.md.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
+    <IsPackable>true</IsPackable>
+
+    <!--
+      CalVer {JAHR}.{MONAT}.{BUILD} (bewusst statt SemVer, siehe ADR-0024). NuGet/MSBuild
+      normalisieren Komponenten zu Integern — der Monat trägt keine führende Null (2026.07.1 → 2026.7.1).
+      BUILD kommt in der CI aus github.run_number (-p:EbicoBuildNumber=…), lokal Default 0.
+    -->
+    <EbicoBuildNumber Condition="'$(EbicoBuildNumber)' == ''">0</EbicoBuildNumber>
+    <VersionPrefix>$([System.DateTime]::UtcNow.Year).$([System.DateTime]::UtcNow.Month).$(EbicoBuildNumber)</VersionPrefix>
+
+    <!-- Paket-Metadaten (gemeinsam; Description/PackageTags stehen je Projekt in der .csproj). -->
+    <Authors>Dominik Zettl</Authors>
+    <Company>tecvia</Company>
+    <Copyright>© $([System.DateTime]::UtcNow.Year) tecvia</Copyright>
+    <PackageProjectUrl>https://github.com/dominikz98/ebico</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/dominikz98/ebico</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <!-- Symbols (snupkg) + SourceLink: Debugging bis in die Quellen des jeweiligen Commits. -->
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
+    <!-- Deterministische source_link.json in die Pakete (Version zentral in Directory.Packages.props). -->
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>

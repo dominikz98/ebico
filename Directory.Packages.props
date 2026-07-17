@@ -50,6 +50,14 @@
   </ItemGroup>
 
   <!--
+    NuGet-Packaging (Issue #50): SourceLink für EBICO.Core + EBICO.Connector. Build-only
+    (PrivateAssets=all in Directory.Build.props), fließt nicht als Laufzeit-Abhängigkeit ins Paket.
+  -->
+  <ItemGroup>
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+  </ItemGroup>
+
+  <!--
     Integrationstests des EBICO.Server-Hosts (WebApplicationFactory<Program>).
     Version an das installierte ASP.NET-Core-Shared-Framework (10.0.x) angleichen,
     falls der Restore meckert.
