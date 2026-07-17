@@ -7,8 +7,9 @@
 > gegen den in-process gehosteten Emulator; drei Negativfälle, die genau an dieser Nahtstelle
 > entstehen (Reihenfolge, Berechtigung, ungültige Nutzdaten).
 >
-> Bewusst **noch nicht**: Prüfung der Authentifikationssignatur X002 (siehe Abschnitt
-> *Spec-Vorbehalte*), reale Fremd-Clients (Issue #59), breite Negativ-/Sicherheitsfälle (Issue #58).
+> Seit **Issue #58** prüft der Server die Authentifikationssignatur X002; die breiten Negativ-/
+> Sicherheitsfälle liegen in [Negativ- & Sicherheitsfälle](negative-security-cases.md). Bewusst
+> **noch nicht**: reale Fremd-Clients (Issue #59), Signatur der Server-Antworten.
 
 ## Zweck
 
@@ -139,11 +140,11 @@ Issue #59.
 
 ### ⚠️ Spec-Vorbehalte
 
-- **X002 wird erzeugt, aber nicht geprüft.** Der Connector signiert jeden `ebicsRequest`, der Server
-  verifiziert jedoch nicht (Default ist `NoOpEbicsRequestVerifier`) und signiert seine Antworten nicht
-  (dokumentierter Spec-Vorbehalt M4). Der Connector prüft umgekehrt keine Antwortsignatur. Dieser E2E
-  belegt daher die **E002-/Kompressions-/Segmentierungs-Strecke**, **nicht** die
-  Authentifikationssignatur — in keiner Richtung.
+- **X002 wird seit #58 serverseitig geprüft; Antworten bleiben unsigniert.** Der Server verifiziert
+  die X002-Signatur jedes signierten `ebicsRequest` (`X002EbicsRequestVerifier`, siehe
+  [Negativ- & Sicherheitsfälle](negative-security-cases.md)) — diese Happy-Path-E2E belegen damit
+  auch den Sign→Verify-Roundtrip Connector→Server. Der Server signiert seine **Antworten** weiterhin
+  nicht, und der Connector prüft umgekehrt keine Antwortsignatur (offener Vorbehalt M4/M6).
 - **ES/A00x ungeprüft.** Die banktechnische Signatur der Order-Data wird serverseitig nicht verifiziert.
 - **C53-Daten sind synthetisch.** Der Server generiert den Auszug bei Bedarf
   (`StatementDownloadProcessor`); es ist kein reales Bankdatenmaterial.
