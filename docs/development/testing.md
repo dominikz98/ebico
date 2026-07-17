@@ -30,6 +30,7 @@ dotnet test --collect:"XPlat Code Coverage"   # mit Coverage (wie in der CI)
 ```
 tests/EBICO.Tests/
 ├── Core/                       # Tests zu EBICO.Core (z. B. EbicsVersion)
+├── E2E/                        # Connector ↔ Server Round-Trips (#57)
 ├── Infrastructure/             # Harness-Helfer + deren Tests
 │   ├── CanonicalXmlComparer.cs
 │   ├── TestCertificates.cs
@@ -38,6 +39,11 @@ tests/EBICO.Tests/
     ├── Xml/<VERSION>/<direction>/   # EBICS-Beispiel-XML (proprietär, nicht eingecheckt)
     └── Keys/                        # Schlüssel-Fixtures (in-process generiert)
 ```
+
+Die übrigen Ordner folgen dem **Prüfgegenstand** (`Connector/`, `Server/`, `Suite/`, `Schema/`, …).
+`E2E/` fällt bewusst in keine dieser Schichten: Prüfgegenstand ist dort die *Nahtstelle zwischen zwei*
+von ihnen — ein Fehler auf beiden Seiten lässt diese Tests rotlaufen. Der Name **`Conformance/`** bleibt
+für Issue #59 (Konformität gegen reale Fremd-Clients) reserviert.
 
 Der Ordner `Fixtures/**` wird in den Build-Output kopiert
 (`CopyToOutputDirectory`), damit die Helfer die Dateien zur Laufzeit relativ zum
@@ -78,6 +84,22 @@ Beispiele proprietär und **nicht eingecheckt** sind, liefert `TryLoad` bei
 fehlender Datei `false`; Tests überspringen sich dann via `Assert.Skip` — die
 Suite bleibt auch ohne Beispiele (z. B. in der CI) grün. Details:
 [Fixtures/Xml/README](../../tests/EBICO.Tests/Fixtures/Xml/README.md).
+
+## Gegenstelle: Fake vs. echt
+
+Quer zur bekannten Tier-A/Tier-B-Achse (*ohne* vs. *mit* proprietären Beispiel-XML, siehe
+[XSD-Bindings](../protocol/xsd-bindings.md)) gibt es seit #57 eine zweite Unterscheidung: **womit
+spricht die getestete Seite?**
+
+- **Fake-Gegenstelle** — der Regelfall. `OnboardingTestHarness`, `FakeUploadServer`,
+  `FakeDownloadServer` bauen die Bankantwort selbst; `ServerTestHelpers` baut umgekehrt das
+  Request-XML. Schnell und präzise steuerbar (Fehlerinjektion!), prüft aber jede Seite nur gegen ein
+  *Modell* der anderen.
+- **Echte Gegenstelle** — [`E2E/`](e2e-connector-server.md). Der echte Connector spricht gegen den
+  in-process gehosteten echten Server. Findet genau die Klasse von Fehlern, die Fakes bauartbedingt
+  verstecken: Annahmen, die beide Seiten konsistent, aber falsch teilen.
+
+Beides ist **Tier A** — es geht hier nicht um Lizenz/CI-Tauglichkeit, sondern um die Aussagekraft.
 
 ## Lizenz-Hinweis
 

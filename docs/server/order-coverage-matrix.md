@@ -167,7 +167,12 @@ Konsolidierte Liste der bewusst noch nicht abgedeckten Punkte (die zu markierend
 - **BTF-Katalog ist Best-Effort-Seed.** Nur die gängigen Zahlungs-/Auszugs-Orders sind gegen die
   proprietäre *BTF-Mapping / External Code List* verifiziert; große Teile der EBICS-BTF-Palette sind
   nicht modelliert.
-- **Conformance gegen reale Clients / Negativ-Sicherheitsfälle.** Kompletter Milestone **M8**, offen.
+- **Conformance gegen reale Clients / Negativ-Sicherheitsfälle.** Milestone **M8**, teilweise offen.
+  Die **E2E-Happy-Paths** Connector ↔ Server (INI/HIA/HPB, CCT, C53 — je H003/H004/H005) sind mit
+  **#57** abgedeckt, siehe [E2E: Connector ↔ Server](../development/e2e-connector-server.md); sie
+  belegen allerdings nur die Konsistenz beider EBICO-Seiten (X002 wird dabei nicht geprüft), nicht
+  Spec-Konformität. Offen bleiben **#58** (Negativ-/Sicherheitsfälle) und **#59** (Konformität gegen
+  reale Clients).
 
 ## EBICS-Versionsbezug
 

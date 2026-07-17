@@ -138,3 +138,7 @@ Verifier), Brief (Text-Assertions + PDF-Smoke), INI/HIA-Handler **je Version** (
 bauen → OrderData dekomprimieren/parsen → eingebetteter Schlüssel = Store-Schlüssel; OK-/Fehler-
 Returncode), HPB-Handler (Entschlüsselung + Ablage; **Hash-Mismatch → Exception, nichts gespeichert**;
 Fehler-Returncode → `Failure`). Der `FakeTransport` stellt die simulierten Bankantworten.
+
+Seit **#57** laufen INI/HIA/HPB zusätzlich als echter Round-Trip gegen den in-process gehosteten
+`EBICO.Server` — inkl. echter Statusmaschine (`New → Initialized → Ready`) und Bankschlüssel-Abruf:
+[E2E: Connector ↔ Server](../development/e2e-connector-server.md).
