@@ -6,8 +6,8 @@ Projektgerüst anlegen** (Milestone M0).
 
 ## Projekte
 
-Die Solution `EBICO.sln` enthält fünf Projekte, physisch getrennt nach `src/`
-(Produktivcode) und `tests/`:
+Die Solution `EBICO.sln` enthält die Produktivprojekte unter `src/`, das
+Testprojekt unter `tests/` und — seit #50 — ein Beispiel unter `samples/`:
 
 | Projekt | SDK | Zweck |
 | --- | --- | --- |
@@ -16,6 +16,7 @@ Die Solution `EBICO.sln` enthält fünf Projekte, physisch getrennt nach `src/`
 | `src/EBICO.Server` | `Microsoft.NET.Sdk.Web` | Der EBICS-Emulator (ASP.NET Core, hostbar) |
 | `src/EBICO.Suite` | `Microsoft.NET.Sdk.Web` | Blazor Web App (Interactive Server) — Admin/Inspektor-UI |
 | `tests/EBICO.Tests` | `Microsoft.NET.Sdk` | xUnit-v3-Testprojekt |
+| `samples/EBICO.Connector.Quickstart` | `Microsoft.NET.Sdk` (Exe, `IsPackable=false`) | Lauffähiger Connector-Quickstart (hostet den Server in-process) |
 
 ### Referenzgraph
 
@@ -24,11 +25,14 @@ EBICO.Core  ◄── EBICO.Connector
      ▲      ◄── EBICO.Server
      └────── ◄── EBICO.Suite
 
-EBICO.Tests ──► EBICO.Core, EBICO.Connector, EBICO.Server
+EBICO.Connector.Quickstart ──► EBICO.Connector, EBICO.Server, EBICO.Core
+EBICO.Tests ──► EBICO.Core, EBICO.Connector, EBICO.Server, EBICO.Suite, EBICO.Connector.Quickstart
 ```
 
-`EBICO.Suite → EBICO.Server` wird erst in M7 ergänzt, wenn die UI echte
-Server-Daten anbindet. Für M0 referenziert die Suite nur `EBICO.Core`.
+`EBICO.Suite → EBICO.Server` wird seit M7 genutzt (die UI bindet den Server-Zustand
+in-process an, ADR-0009). Der Quickstart-Sample (#50) referenziert Connector, Server
+und Core, damit `dotnet run` den vollen Rundlauf ohne externen Server zeigt; die Tests
+referenzieren ihn für den Smoke-Test.
 
 ## Build-Konventionen
 

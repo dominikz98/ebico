@@ -4,6 +4,16 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
+  <!-- NuGet-Paketmetadaten (Issue #50). Gemeinsame Felder stehen in Directory.Build.props. -->
+  <PropertyGroup>
+    <Description>Geteilte EBICS-Primitives (Schemas/Serialisierung, Krypto, BTF- und Order-Modelle) — die gemeinsame Basis von EBICO.Connector und dem EBICO-Server-Emulator. Unterstützt H003/H004/H005.</Description>
+    <PackageTags>ebics;banking;sepa;iso20022;camt;pain;crypto;emulator</PackageTags>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
   <!--
     XML-Canonicalization (C14N) für Signaturen (#15). Liefert die BCL-Transforms
     XmlDsigC14NTransform / XmlDsigExcC14NTransform. Version zentral in Directory.Packages.props.

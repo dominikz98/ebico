@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <!-- Ein Beispiel, kein veröffentlichtes Artefakt. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <!--
+    Der Quickstart hostet den EBICO.Server in-process (Kestrel), damit er ohne externen
+    Server läuft. Dafür braucht die Konsolenapp das ASP.NET-Core-Shared-Framework
+    (WebApplication); ProjectReferences flowen die FrameworkReference nicht automatisch.
+  -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\EBICO.Connector\EBICO.Connector.csproj" />
+    <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" />
+    <ProjectReference Include="..\..\src\EBICO.Core\EBICO.Core.csproj" />
+  </ItemGroup>
+
+</Project>
