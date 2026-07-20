@@ -123,3 +123,23 @@ Abrufbare Schritt-für-Schritt-Rezepte für die wiederkehrenden Abläufe:
 - `ebics-crypto` — EBICS-Krypto (A005/A006, X002, E002, Fingerprints, X.509).
 - `ebics-suite` — an der Blazor-Suite arbeiten (Seiten/Komponenten, Stammdaten, Inspektor, Schlüssel-Ansicht).
 - `ebics-connector` — am Connector-NuGet-Paket arbeiten (Send-Pipeline, DI, Sende-Validierung, Packaging).
+
+## Wartung von Kontext, Doku & Skills
+
+Diese Kontextdateien pflegen sich **nicht** selbst. Ihre Aktualisierung ist Teil der Definition
+of Done und gehört in **denselben PR** wie die auslösende Änderung:
+
+- **Doku (`docs/`):** neue/geänderte Features dokumentieren und in `docs/index.md` verlinken;
+  bei Auftragsarten `docs/server/order-coverage-matrix.md` nachziehen (Guard-Test erzwingt das).
+- **`CLAUDE.md`:** anpassen, sobald sich eine querschnittliche Konvention, die Projektstruktur
+  oder ein Spec-Vorbehalt ändert.
+- **Skills (`.claude/skills/`):** aktualisieren, wenn sich ein beschriebener Ablauf oder ein
+  referenziertes Symbol/Pfad ändert (z. B. Umbenennung eines Handlers, Interfaces oder einer
+  Doku-Seite). Die Skills verweisen bewusst auf konkrete Dateien/Typen und veralten sonst
+  **stillschweigend** — es gibt dafür keinen automatischen Wächter.
+
+Faustregel: Berührt ein PR ein Muster, das in `CLAUDE.md` oder einem Skill beschrieben ist,
+gehört die Aktualisierung dieses Textes in denselben PR. Die PR-Checkliste
+(`.github/PULL_REQUEST_TEMPLATE.md`) fragt „Docs/Skills aktualisiert?" explizit ab und verlangt
+eine Issue-Verlinkung (`Closes #<nr>`) — **jeder** PR referenziert genau ein Issue, auch reine
+Tooling-/Meta-Änderungen (z. B. an `.claude/` oder `CLAUDE.md` selbst).

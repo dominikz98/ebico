@@ -51,13 +51,22 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 
 ## 7. PR
 
-- Body nach `.github/PULL_REQUEST_TEMPLATE.md`, enthält **`Closes #<nr>`**.
+- Body nach `.github/PULL_REQUEST_TEMPLATE.md` (wird von GitHub automatisch vorbefüllt).
+- **Issue-Verlinkung ist Pflicht:** jeder PR enthält **`Closes #<nr>`** und referenziert genau
+  ein Issue — auch reine Tooling-/Doku-Änderungen.
+- Checkliste vollständig abhaken, insbesondere **„Docs/Skills aktualisiert?"** (siehe unten).
 - Code-Review durchführen.
+
+## Kontext-/Doku-Wartung (Teil der Definition of Done)
+
+Berührt der PR ein Muster, das in `docs/`, `CLAUDE.md` oder einem Skill beschrieben ist, gehört
+dessen Aktualisierung in **denselben** PR (siehe CLAUDE.md → „Wartung von Kontext, Doku & Skills").
+Skills verweisen auf konkrete Symbole/Pfade und veralten sonst stillschweigend.
 
 ## Meta-/Tooling-Änderungen
 
-Änderungen ohne Issue (z. B. an `.claude/`, `CLAUDE.md`) auf einem eigenen kleinen Branch bündeln,
-nicht in einen fachlichen Feature-Branch mischen.
+Auch Änderungen an `.claude/`, `CLAUDE.md` oder der CI bekommen **ein eigenes Issue** + einen
+eigenen kleinen Branch — nicht in einen fachlichen Feature-Branch mischen.
 
 ## Quellen
 
