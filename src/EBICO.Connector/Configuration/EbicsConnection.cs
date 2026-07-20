@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using EBICO.Core;
 using EBICO.Core.Domain;
 using EBICO.Core.Versioning;
@@ -17,7 +18,8 @@ public sealed class EbicsConnection
         PartnerId partnerId,
         UserId userId,
         EbicsVersion version,
-        EbicsVersionInfo versionInfo)
+        EbicsVersionInfo versionInfo,
+        IReadOnlySet<string> allowedOrderTypes)
     {
         Url = url;
         HostId = hostId;
@@ -25,6 +27,7 @@ public sealed class EbicsConnection
         UserId = userId;
         Version = version;
         VersionInfo = versionInfo;
+        AllowedOrderTypes = allowedOrderTypes;
     }
 
     /// <summary>The absolute EBICS server endpoint URL.</summary>
@@ -44,6 +47,14 @@ public sealed class EbicsConnection
 
     /// <summary>The metadata (code, namespace, envelope types) of the target <see cref="Version"/>.</summary>
     public EbicsVersionInfo VersionInfo { get; }
+
+    /// <summary>
+    /// The client-side allow-list of (classical) order-type codes the subscriber may submit, normalised
+    /// (trimmed, ordinal, without blank entries) from <see cref="EbicsConnectionOptions.AllowedOrderTypes"/>.
+    /// An <b>empty</b> set means no client-side authorisation check is performed and authorisation is
+    /// deferred to the server. Compared against the request's <em>effective classical order type</em>.
+    /// </summary>
+    public IReadOnlySet<string> AllowedOrderTypes { get; }
 
     /// <summary>
     /// Validates <paramref name="options"/> and builds the immutable connection. This is the
@@ -71,7 +82,13 @@ public sealed class EbicsConnection
         var userId = UserId.Create(options.UserId!);
         var versionInfo = EbicsVersions.Get(options.Version);
 
-        return new EbicsConnection(url, hostId, partnerId, userId, options.Version, versionInfo);
+        // Normalise the allow-list: trim, drop blank entries, ordinal comparison (matching BtfOrderTypeCatalog).
+        var allowedOrderTypes = options.AllowedOrderTypes
+            .Where(code => !string.IsNullOrWhiteSpace(code))
+            .Select(code => code.Trim())
+            .ToFrozenSet(StringComparer.Ordinal);
+
+        return new EbicsConnection(url, hostId, partnerId, userId, options.Version, versionInfo, allowedOrderTypes);
     }
 
     /// <summary>

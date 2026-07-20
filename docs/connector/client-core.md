@@ -48,6 +48,7 @@ Verbindungsparameter als bindebare Strings:
 | `PartnerId` | EBICS-`PartnerID` (Kunde) |
 | `UserId` | EBICS-`UserID` (Teilnehmer) |
 | `Version` | Ziel-Protokollversion (`EbicsVersion`, Default `H005`) |
+| `AllowedOrderTypes` | optionale clientseitige Allow-List erlaubter (klassischer) OrderType-Codes (z. B. `CCT`, `C53`); **leer = keine clientseitige Prüfung** (Server bleibt Autorität) |
 
 Vor der Nutzung werden die Optionen validiert und in die unveränderliche
 `EbicsConnection` überführt: die IDs werden über die validierten Core-Typen
@@ -140,6 +141,35 @@ Die Zielversion aus `o.Version` wird über die Core-`EbicsVersions`-Registry an
 ihre `EbicsVersionInfo` gebunden und im `EbicsContext.Version` bereitgestellt;
 darauf setzen Envelope-Namespaces und Header-Aufbau der Handler auf
 ([Versions-Dispatch](../protocol/version-dispatch.md)).
+
+## Clientseitige Validierung (Stufe 1)
+
+Bevor ein Upload/Download Schlüssel lädt, Krypto rechnet oder den Transport
+anfasst, läuft die **Send-Pipeline-Stufe 1** — der statische
+`RequestValidator` (Namespace `EBICO.Connector.Validation`), verdrahtet am Anfang
+von `UploadExecutor`/`DownloadExecutor`. Onboarding (INI/HIA/HPB) läuft **nicht**
+über die Executoren und wird daher nie hier validiert. Zwei Verantwortlichkeiten
+mit bewusst getrennter Fehlersemantik:
+
+- **Struktur/BTF (immer aktiv):** Die Order-Identität muss für Version und
+  Richtung auflösbar sein (H005 `BTU`/`BTD` + BTF, H003/H004 klassischer OrderType
+  oder `FUL`/`FDL` + FileFormat); ein im BTF-Katalog bekannter Code darf nicht in
+  die falsche Richtung genutzt werden (z. B. `STA` als Upload); die Upload-Payload
+  darf nicht leer und eine explizit gesetzte Segmentgröße muss positiv sein. Ein
+  Verstoß ist ein Programmier-/Konfigfehler → **`EbicsConfigurationException`**.
+- **Berechtigung (opt-in):** Ist `AllowedOrderTypes` gesetzt, wird ein Request,
+  dessen **effektiver klassischer** OrderType-Code nicht in der Liste steht, lokal
+  abgewiesen — ohne Server-Roundtrip (fail-fast) — als
+  `EbicsResult<T>.Failure("090003", …)` (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`),
+  genau wie es die Bank melden würde. Der Schlüssel ist der effektive klassische
+  Code (H005 `CCT` matcht `"CCT"`, **nicht** den Draht-Code `"BTU"`); administrative
+  Codes (HTD/…) unterliegen der Liste ebenfalls. Eine **leere** Liste (Default)
+  überspringt die Prüfung und überlässt die Autorisierung dem Server — die Bank
+  bleibt in jedem Fall die Autorität; die Allow-List ist nur eine Vorab-Absicherung.
+
+Grundsatzentscheidung (statischer Helfer, Fehlersemantik-Asymmetrie, bewusste
+Divergenz zur strikten Server-Durchsetzung aus ADR-0016):
+[ADR-0025](../adr/0025-clientseitige-sende-validierung.md).
 
 ## `EbicsResult<T>` — vorläufig
 

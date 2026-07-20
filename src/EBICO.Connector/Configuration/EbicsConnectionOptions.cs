@@ -25,4 +25,15 @@ public sealed class EbicsConnectionOptions
 
     /// <summary>The target EBICS protocol version. Defaults to <see cref="EbicsVersion.H005"/>.</summary>
     public EbicsVersion Version { get; set; } = EbicsVersion.H005;
+
+    /// <summary>
+    /// An optional client-side allow-list of the (classical) order-type codes the subscriber may submit
+    /// (e.g. <c>"CCT"</c>, <c>"C53"</c>). When non-empty, the connector rejects a request whose effective
+    /// order type is not listed <em>before</em> contacting the server (a fast-fail that saves a round-trip),
+    /// mirroring the return code the bank would report. An <b>empty</b> list (the default) disables the
+    /// client-side check and defers authorisation entirely to the server. This is a convenience guard, not
+    /// the authorisation authority — the bank remains authoritative. The property is get-only so it binds
+    /// via the standard options/configuration pattern; add entries with <c>o.AllowedOrderTypes.Add("CCT")</c>.
+    /// </summary>
+    public IList<string> AllowedOrderTypes { get; } = [];
 }

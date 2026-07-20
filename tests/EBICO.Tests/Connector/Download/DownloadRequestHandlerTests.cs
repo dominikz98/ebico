@@ -58,7 +58,7 @@ public class DownloadRequestHandlerTests
         var ct = TestContext.Current.CancellationToken;
         // A tiny segment size forces the encrypted ciphertext across several transfer messages.
         var options = new FakeDownloadServerOptions { SegmentSizeBytes = 16 };
-        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct);
+        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct: ct);
 
         var result = await harness.Client.Send(new C53DownloadRequest(), ct);
 
@@ -174,7 +174,7 @@ public class DownloadRequestHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
         var options = new FakeDownloadServerOptions { InitReturnCode = EbicsReturnCode.NoDownloadDataAvailable };
-        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct);
+        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct: ct);
 
         var result = await harness.Client.Send(new C53DownloadRequest(), ct);
 
@@ -191,7 +191,7 @@ public class DownloadRequestHandlerTests
         var ct = TestContext.Current.CancellationToken;
         // Tiny segments force a transfer phase; that transfer is rejected with an unknown transaction id.
         var options = new FakeDownloadServerOptions { SegmentSizeBytes = 16, TransferReturnCode = EbicsReturnCode.TxUnknownTxid };
-        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct);
+        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct: ct);
 
         var result = await harness.Client.Send(new C53DownloadRequest(), ct);
 
@@ -206,7 +206,7 @@ public class DownloadRequestHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
         var options = new FakeDownloadServerOptions { EncryptForWrongKey = true };
-        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct);
+        using var harness = await DownloadTestHarness.CreateAsync(version, SampleStatement, options, ct: ct);
 
         var act = async () => await harness.Client.Send(new C53DownloadRequest(), ct);
 

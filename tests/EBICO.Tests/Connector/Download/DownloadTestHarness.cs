@@ -333,10 +333,15 @@ internal sealed class DownloadTestHarness : IDisposable
     /// <param name="version">The EBICS version.</param>
     /// <param name="plaintext">The order-data plaintext the server delivers.</param>
     /// <param name="options">The fake-server failure-injection options, or <see langword="null"/> for the happy path.</param>
+    /// <param name="allowedOrderTypes">An optional client-side allow-list of order-type codes; <see langword="null"/> leaves it empty (no client-side check).</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The initialized harness.</returns>
     public static async Task<DownloadTestHarness> CreateAsync(
-        EbicsVersion version, byte[] plaintext, FakeDownloadServerOptions? options = null, CancellationToken ct = default)
+        EbicsVersion version,
+        byte[] plaintext,
+        FakeDownloadServerOptions? options = null,
+        IEnumerable<string>? allowedOrderTypes = null,
+        CancellationToken ct = default)
     {
         var encryptionVersion = KeyVersions.Default(KeyPurpose.Encryption, version).Version;
         var subscriberEncryptionKeyPair = RsaKeyMaterial.Generate();
@@ -352,6 +357,10 @@ internal sealed class DownloadTestHarness : IDisposable
             o.PartnerId = "PART";
             o.UserId = "USER";
             o.Version = version;
+            foreach (var code in allowedOrderTypes ?? [])
+            {
+                o.AllowedOrderTypes.Add(code);
+            }
         });
         services.AddEbicoDownload();
         services.RemoveAll<ITransport>();

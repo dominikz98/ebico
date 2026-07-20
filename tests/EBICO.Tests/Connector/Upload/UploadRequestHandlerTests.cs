@@ -132,7 +132,7 @@ public class UploadRequestHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
         var options = new FakeUploadServerOptions { InitReturnCode = EbicsReturnCode.AuthorisationOrderTypeFailed };
-        using var harness = await UploadTestHarness.CreateAsync(version, options, ct);
+        using var harness = await UploadTestHarness.CreateAsync(version, options, ct: ct);
 
         var result = await harness.Client.Send(new CctUploadRequest { Pain001 = SamplePain001 }, ct);
 
@@ -147,7 +147,7 @@ public class UploadRequestHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
         var options = new FakeUploadServerOptions { LastTransferReturnCode = EbicsReturnCode.InvalidOrderDataFormat };
-        using var harness = await UploadTestHarness.CreateAsync(version, options, ct);
+        using var harness = await UploadTestHarness.CreateAsync(version, options, ct: ct);
 
         var result = await harness.Client.Send(new CctUploadRequest { Pain001 = SamplePain001 }, ct);
 
@@ -161,7 +161,7 @@ public class UploadRequestHandlerTests
     {
         var ct = TestContext.Current.CancellationToken;
         var options = new FakeUploadServerOptions { LastTransferReturnCode = EbicsReturnCode.TxUnknownTxid };
-        using var harness = await UploadTestHarness.CreateAsync(version, options, ct);
+        using var harness = await UploadTestHarness.CreateAsync(version, options, ct: ct);
 
         var result = await harness.Client.Send(new CddUploadRequest { Pain008 = SamplePain008 }, ct);
 
