@@ -35,9 +35,14 @@ ersten interaktiven Komponenten der Suite.
 | Test-CA & Schlüssel-Werkzeuge | interaktives Werkzeug (Insel) | `RsaKeyMaterial.Generate`, `SelfSignedCertificateFactory`, `X509CertificateVerifier` |
 
 Datenanbindung wie bei Dashboard/Stammdaten über das Read-Model `IEmulatorStateProvider`, hier um
-`GetKeysAsync()` erweitert. Da der reale Server-Store (M3/M4) noch nicht existiert, liefert der
-`SampleEmulatorStateProvider` deterministische Beispielschlüssel (fest eingebettete 2048-Bit-Public-
-Keys); die Fingerprints werden per `PublicKeyFingerprint.Compute` vorberechnet.
+`GetKeysAsync()` erweitert. Die Schlüssel kommen aus den serverseitigen Key-Stores: die
+Teilnehmer-Schlüssel (A/E/X) aus `IServerKeyStore` (wie sie INI/HIA beim Onboarding ablegen) und das
+Bank-Keypaar (X/E) aus `IServerBankKeyStore` (wie es HPB zurückgibt) — in-process gebunden gemäß
+[ADR-0009](../adr/0009-blazor-render-mode.md). Da die Suite keine EBICS-Pipeline betreibt, füllt der
+`KeyStoreSeeder` diese Stores beim Start aus deterministischem Beispielmaterial (`KeyStoreSeedData`,
+fest eingebettete 2048-Bit-Public-Keys); die Fingerprints berechnet `KeyViewFactory` per
+`PublicKeyFingerprint.Compute` vor. Bank-Schlüssel werden nur für die geseedeten Hosts gelesen, damit
+das Rendern der Seite kein frisches (nicht-reproduzierbares) Bank-Keypaar erzeugt.
 
 Das neue DTO:
 
@@ -96,6 +101,12 @@ zielen auf H005 (EBICS 3.0), wo Schlüssel als Zertifikate ausgetauscht werden.
 
 - `SampleEmulatorStateProviderTests` — `GetKeysAsync` liefert die Beispielschlüssel; die
   Fingerprint-Texte stimmen mit der Core-Berechnung überein; stabil über Aufrufe.
+- `KeyStoreSeederTests` — der `KeyStoreSeeder` legt die Teilnehmer-Schlüssel (A006/E002/X002) im
+  `IServerKeyStore` und das Bank-Keypaar (X002/E002, public-only) im `IServerBankKeyStore` ab und ist
+  idempotent.
+- `EmulatorStateProviderTests` — `GetKeysAsync` liest genau die geseedeten Schlüssel aus den Stores
+  (fünf Einträge, erwartete Inhaber/Versionen, Fingerprint == Core-Berechnung); ein Teilnehmer ohne
+  hinterlegte Schlüssel bzw. eine nicht geseedete Bank erzeugt keinen Eintrag.
 - `FingerprintFormatTests` — Parsen von Hex mit Whitespace/Groß-Klein, Round-Trip gegen
   `ToLetterFormat`, Ablehnung ungültiger Eingaben.
 - `SchluesselPageTests` (bUnit) — die Seite rendert die Schlüssel-Fingerprints und den

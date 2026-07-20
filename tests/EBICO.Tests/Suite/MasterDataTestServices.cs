@@ -17,7 +17,8 @@ internal static class MasterDataTestServices
     {
         ctx.Services.AddSingleton<IEbicsStateStore, InMemoryEbicsStateStore>();
         ctx.Services.AddSingleton<IMasterDataManager, MasterDataManager>();
-        ctx.Services.AddSingleton<SampleEmulatorStateProvider>();
+        ctx.Services.AddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
+        ctx.Services.AddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         ctx.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>();
         return ctx.Services.GetRequiredService<IMasterDataManager>();
     }
