@@ -72,3 +72,74 @@ ein typisiertes `EbicsResult<T>`. Pipeline pro `Send`: Validierung → Serialisi
 → Komprimieren/E002/A00x → X002 → Transport (HttpClient hinter `ITransport`) →
 Verify/Entschlüsseln → Returncode → ggf. Segmente → Deserialisieren. Eigener
 Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
+
+## Doku-Landkarte (Einstiegspunkte)
+
+- `docs/index.md` — annotierter Gesamtindex; **immer zuerst** nachschlagen.
+- `docs/server/order-coverage-matrix.md` — **Source of Truth** für OrderType/BTF ×
+  Version × Status. Per Guard-Test (`OrderCoverageMatrixTests`) mit den Code-Katalogen
+  synchron gehalten; enthält einen eigenen Lücken-Abschnitt.
+- `docs/adr/README.md` — 25 ADRs (0001–0025, MADR-lite, alle `accepted`) + Backlog
+  offener/abgelöster Entscheidungen. Jede größere Designfrage ist hier begründet.
+- `docs/ticket-overview.md` — Milestones (M0–M9), Issues, Epics.
+- Feature-Doku liegt thematisch unter `docs/<bereich>/<name>.md`
+  (`protocol/`, `server/`, `connector/`, `suite/`, `development/`, `deployment/`, `legal/`).
+
+## Querschnittliche Code-Konventionen
+
+- **Multi-Version-Dispatch (H003/H004/H005):** durchgängiges Leitmotiv. Pro Feature eine
+  versionsagnostische Base-Klasse (`<Xxx>OrderHandlerBase`) + je Version eine Subklasse
+  (`H003<Xxx>OrderHandler` …). Tests spannen die Version×Fall-Matrix via `TheoryData`.
+- **DI-Registrierung (`AddEbicoServer` in `EbicoServerServiceCollectionExtensions.cs`):**
+  Infrastruktur-Dienste (Stores, Verifier, Resolver) mit `TryAddSingleton` (überschreibbar).
+  Mehrfach-Extension-Points dagegen mit `AddSingleton` (NICHT `TryAdd`), damit mehrere
+  koexistieren: Order-Handler (`IEbicsOrderHandler`, Auflösung via
+  `IEbicsOrderHandlerResolver` keyed nach `(Version, OrderType)`) sowie Upload-/Download-
+  Processoren (`IUploadOrderProcessor`/`IDownloadOrderProcessor`, Engine konsumiert das
+  ganze `IEnumerable<…>`, erster `CanProcess`-Match gewinnt).
+- **BTF/OrderType-Auflösung:** `BtfOrderTypeCatalog.Resolve{Upload,Download}OrderType`
+  bildet alle drei Konventionen ab (H005 BTU/BTD+BTF · H003/H004 direkter Code ·
+  H003/H004 FUL/FDL+FileFormat). Berechtigung: `Subscriber.HasPermissionFor` → `090003`.
+- **Guard-Tests halten Doku↔Code synchron:** ein neuer OrderType muss in Katalog **und**
+  Coverage-Matrix nachgezogen werden, sonst schlägt `OrderCoverageMatrixTests` fehl.
+- **Test-Setup:** xUnit v3 + AwesomeAssertions; `TestContext.Current.CancellationToken`
+  (Falle xUnit1051 unter `TreatWarningsAsErrors`); Server-Integrationstests via
+  `extern alias EbicoServer` + `WebApplicationFactory<Program>`; E2E über `EbicsE2EHarness`
+  + `E2EKeyPool` (RSA-2048 ist harte Untergrenze ⇒ Schlüssel-Wiederverwendung);
+  XML-Vergleich mit `CanonicalXmlComparer`; proprietäre Sample-XML „skip-if-missing".
+- **Spec-Vorbehalte (aktueller Stand):** serverseitige **X002-Verifikation ist aktiv**
+  (`X002EbicsRequestVerifier`, ADR-0023/#58, greift erst nach HIA). **ES/A00x-Signaturprüfung
+  der OrderData bleibt zurückgestellt**; kein Key-Gültigkeitsfenster; Server-Antworten
+  unsigniert. Teile der Architektur sind Design-Intent, noch nicht gegen die offiziellen
+  XSDs verifiziert (Schemas proprietär).
+
+## Verfügbare Skills (`.claude/skills/`)
+
+Abrufbare Schritt-für-Schritt-Rezepte für die wiederkehrenden Abläufe:
+
+- `ebics-order-handler` — neuen serverseitigen Order-Handler bzw. Upload-/Download-Processor anlegen.
+- `ebics-conformance-test` — E2E-/Conformance-Tests schreiben (Round-Trip, Wire-Shapes, Vendor-Captures, Tampering).
+- `ebics-feature-workflow` — kompletter Feature-/Bugfix-Ablauf inkl. Definition of Done (Branch → Doku → ADR → Tests → PR).
+- `ebics-crypto` — EBICS-Krypto (A005/A006, X002, E002, Fingerprints, X.509).
+- `ebics-suite` — an der Blazor-Suite arbeiten (Seiten/Komponenten, Stammdaten, Inspektor, Schlüssel-Ansicht).
+- `ebics-connector` — am Connector-NuGet-Paket arbeiten (Send-Pipeline, DI, Sende-Validierung, Packaging).
+
+## Wartung von Kontext, Doku & Skills
+
+Diese Kontextdateien pflegen sich **nicht** selbst. Ihre Aktualisierung ist Teil der Definition
+of Done und gehört in **denselben PR** wie die auslösende Änderung:
+
+- **Doku (`docs/`):** neue/geänderte Features dokumentieren und in `docs/index.md` verlinken;
+  bei Auftragsarten `docs/server/order-coverage-matrix.md` nachziehen (Guard-Test erzwingt das).
+- **`CLAUDE.md`:** anpassen, sobald sich eine querschnittliche Konvention, die Projektstruktur
+  oder ein Spec-Vorbehalt ändert.
+- **Skills (`.claude/skills/`):** aktualisieren, wenn sich ein beschriebener Ablauf oder ein
+  referenziertes Symbol/Pfad ändert (z. B. Umbenennung eines Handlers, Interfaces oder einer
+  Doku-Seite). Die Skills verweisen bewusst auf konkrete Dateien/Typen und veralten sonst
+  **stillschweigend** — es gibt dafür keinen automatischen Wächter.
+
+Faustregel: Berührt ein PR ein Muster, das in `CLAUDE.md` oder einem Skill beschrieben ist,
+gehört die Aktualisierung dieses Textes in denselben PR. Die PR-Checkliste
+(`.github/PULL_REQUEST_TEMPLATE.md`) fragt „Docs/Skills aktualisiert?" explizit ab und verlangt
+eine Issue-Verlinkung (`Closes #<nr>`) — **jeder** PR referenziert genau ein Issue, auch reine
+Tooling-/Meta-Änderungen (z. B. an `.claude/` oder `CLAUDE.md` selbst).
