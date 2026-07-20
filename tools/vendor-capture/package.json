@@ -1,0 +1,13 @@
+{
+  "name": "ebico-vendor-capture",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-off tool: captures real EBICS request XML from a third-party OSS client (ebics-client, MIT) for EBICO's conformance corpus. Not part of the build or CI.",
+  "license": "MIT",
+  "scripts": {
+    "capture": "node capture.js"
+  },
+  "dependencies": {
+    "ebics-client": "5.0.0"
+  }
+}

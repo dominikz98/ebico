@@ -104,7 +104,8 @@ gegen einen verify-übersprungenen Teilnehmer):
 - **C14N-Vorbehalt fort:** Der byte-genaue Kanonisierungs-/Reference-Detail von X002 ist weiterhin
   nicht gegen die offiziellen Annexe verifiziert (siehe [X002-Doku](../protocol/auth-signature-x002.md)).
   Der Connector↔Server-Roundtrip ist in sich konsistent (die Happy-Path-E2E belegen ihn), die
-  Interop gegen reale Banken bleibt Gegenstand von [#59](e2e-connector-server.md).
+  Interop gegen reale Clients ist Gegenstand von
+  [#59](conformance-real-clients.md).
 
 ## EBICS-Versionsbezug
 

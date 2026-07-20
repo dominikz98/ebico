@@ -149,7 +149,9 @@ Issue #59.
 - **C53-Daten sind synthetisch.** Der Server generiert den Auszug bei Bedarf
   (`StatementDownloadProcessor`); es ist kein reales Bankdatenmaterial.
 - **Die Gegenstelle ist der Emulator, nicht ein realer Client.** Ein grüner E2E belegt Konsistenz
-  zwischen EBICO-Connector und EBICO-Server — nicht Spec-Konformität. Das ist Gegenstand von Issue #59.
+  zwischen EBICO-Connector und EBICO-Server — nicht Spec-Konformität. Das ist Gegenstand von
+  [#59 (Konformität gegen reale Clients)](conformance-real-clients.md) — der dort dokumentierte
+  `xsi:type`-Fund zeigt genau eine solche geteilte Annahme, die ein realer Client nicht teilt.
 
 ## EBICS-Versionsbezug
 

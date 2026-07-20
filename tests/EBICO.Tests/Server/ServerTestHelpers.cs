@@ -773,11 +773,27 @@ internal static class ServerTestHelpers
     /// <param name="authKey">The authentication key material (must contain a private key) to sign with.</param>
     /// <returns>The request XML with a populated <c>AuthSignature</c>.</returns>
     public static string SignRequestXml(EbicsVersion version, string requestXml, RsaKeyMaterial authKey)
+        => SignRequestXml(version, requestXml, authKey, C14nMode.Inclusive);
+
+    /// <summary>
+    /// Signs an <c>ebicsRequest</c> like <see cref="SignRequestXml(EbicsVersion, string, RsaKeyMaterial)"/>
+    /// but with an explicit canonicalization variant. A third-party client may sign with exclusive C14N
+    /// instead of the inclusive default; the resulting <c>SignedInfo</c> declares its own algorithm URI,
+    /// which the server reads back (<c>C14nAlgorithms.FromAlgorithmUri</c>) rather than assuming one — the
+    /// conformance suite uses this to prove that algorithm-URI adaptivity.
+    /// </summary>
+    /// <param name="version">The protocol version (selects the default X002 authentication key version).</param>
+    /// <param name="requestXml">The unsigned <c>ebicsRequest</c> XML.</param>
+    /// <param name="authKey">The authentication key material (must contain a private key) to sign with.</param>
+    /// <param name="c14n">The canonicalization variant to sign with (e.g. <see cref="C14nMode.Exclusive"/>).</param>
+    /// <returns>The request XML with a populated <c>AuthSignature</c>.</returns>
+    public static string SignRequestXml(
+        EbicsVersion version, string requestXml, RsaKeyMaterial authKey, C14nMode c14n)
     {
         var envelope = (IAuthSignedRequestEnvelope)EbicsXmlSerializer.DeserializeEnvelope(requestXml);
         var unsignedXml = EbicsXmlSerializer.SerializeToString(envelope);
         var authVersion = KeyVersions.Default(KeyPurpose.Authentication, version).Version;
-        envelope.AuthSignature = AuthenticationSignature.Sign(unsignedXml, authKey, authVersion);
+        envelope.AuthSignature = AuthenticationSignature.Sign(unsignedXml, authKey, authVersion, c14n);
         return EbicsXmlSerializer.SerializeToString(envelope);
     }
 
