@@ -18,6 +18,13 @@ builder.Services.AddSingleton<IMasterDataManager, MasterDataManager>();
 builder.Services.AddSingleton<SampleEmulatorStateProvider>();
 builder.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>();
 
+// The subscriber public keys (INI/HIA) and the bank key pair (HPB) from EBICO.Server, read in-process
+// (ADR-0009) for the key/certificate view (#55). Registered manually — like the stores above — rather
+// than via AddEbicoServer(), which would also pull the whole request pipeline, order handlers and a
+// background TransactionCleanupService into the UI process. Seeded from KeyStoreSeedData below.
+builder.Services.AddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
+builder.Services.AddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
+
 // Transaction inspector (#54): the event log, transaction stores and raw-message capture store from
 // EBICO.Server, read in-process (ADR-0009). The Suite runs no live EBICS pipeline, so these are seeded
 // with sample transactions below; cross-process live inspection is a follow-up (persistence, ADR-0015).
@@ -34,6 +41,10 @@ var app = builder.Build();
 
 // The in-memory store starts empty; seed the sample master data so the UI has content to show.
 await EmulatorStateSeeder.SeedAsync(app.Services);
+
+// Seed the sample public keys into the server key stores so the key/certificate view (#55) shows real
+// store data (the Suite runs no INI/HIA/HPB pipeline that would otherwise populate them).
+await KeyStoreSeeder.SeedAsync(app.Services);
 
 // Seed sample transactions/events/captures so the inspector has content against the otherwise-empty store.
 await TransactionInspectorSeeder.SeedAsync(app.Services);

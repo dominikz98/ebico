@@ -6,8 +6,8 @@ using EBICO.Suite.Services;
 namespace EBICO.Tests.Suite;
 
 /// <summary>
-/// Tests for the placeholder <see cref="SampleEmulatorStateProvider"/> that backs the
-/// Suite UI grundgerüst (issue #52) until the real server store exists (M3/M4).
+/// Tests for the sample <see cref="SampleEmulatorStateProvider"/> that provides the deterministic
+/// sample master data and key catalogue (issues #52/#55) seeded into the server stores on start-up.
 /// </summary>
 public class SampleEmulatorStateProviderTests
 {
