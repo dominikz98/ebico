@@ -224,10 +224,14 @@ internal sealed class UploadTestHarness : IDisposable
     /// <summary>Builds a harness for <paramref name="version"/> with fully provisioned keys.</summary>
     /// <param name="version">The EBICS version.</param>
     /// <param name="options">The fake-server failure-injection options, or <see langword="null"/> for the happy path.</param>
+    /// <param name="allowedOrderTypes">An optional client-side allow-list of order-type codes; <see langword="null"/> leaves it empty (no client-side check).</param>
     /// <param name="ct">A cancellation token.</param>
     /// <returns>The initialized harness.</returns>
     public static async Task<UploadTestHarness> CreateAsync(
-        EbicsVersion version, FakeUploadServerOptions? options = null, CancellationToken ct = default)
+        EbicsVersion version,
+        FakeUploadServerOptions? options = null,
+        IEnumerable<string>? allowedOrderTypes = null,
+        CancellationToken ct = default)
     {
         var bankEncryptionKeyPair = RsaKeyMaterial.Generate();
         var server = new FakeUploadServer(version, options ?? new FakeUploadServerOptions());
@@ -241,6 +245,10 @@ internal sealed class UploadTestHarness : IDisposable
             o.PartnerId = "PART";
             o.UserId = "USER";
             o.Version = version;
+            foreach (var code in allowedOrderTypes ?? [])
+            {
+                o.AllowedOrderTypes.Add(code);
+            }
         });
         services.AddEbicoUpload();
         services.RemoveAll<ITransport>();

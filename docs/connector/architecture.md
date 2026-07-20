@@ -5,12 +5,14 @@ EBICS-Server (den Emulator `EBICO.Server` oder eine echte Bank). Sie ist
 fluent, testbar und DI-freundlich. Dieses Dokument beschreibt die tragende
 Architektur und die wichtigsten Designentscheidungen samt Trade-offs.
 
-> **Status:** Dieses Dokument beschreibt einen *begründeten Architektur-Vorschlag*
-> für den noch nicht implementierten `EBICO.Connector` (Milestone M6). Ablaufdetails
-> — etwa die Reihenfolge E002/A00x/X002 oder die Segmentschleife je Version — sind
-> gegen die offiziellen EBICS-XSDs/Annexe zu verifizieren, sobald die Schemas
-> vorliegen. Welche Bausteine bereits in `EBICO.Core` existieren und welche noch
-> offen sind, steht im Abschnitt **„Bausteine: vorhanden vs. geplant"** weiter unten.
+> **Status:** Der `EBICO.Connector` ist über die Issues #46–#50 implementiert
+> (Onboarding, Upload und Download für H003/H004/H005); mit der clientseitigen
+> Validierung (#44, Pipeline-Stufe 1) ist die Send-Pipeline vollständig verdrahtet.
+> Welche Bausteine wo liegen, zeigt der Abschnitt **„Bausteine: vorhanden vs.
+> geplant"** weiter unten. Ablaufdetails — etwa die Reihenfolge E002/A00x/X002 oder
+> die Segmentschleife je Version — sind weiterhin gegen die offiziellen
+> EBICS-XSDs/Annexe zu verifizieren, sobald die Schemas vorliegen (die jeweiligen
+> Spec-Vorbehalte stehen in den einzelnen Connector-Doku-Seiten).
 
 ## Leitidee: Mediator-Muster
 
@@ -335,7 +337,10 @@ gestellt (keine echten Netz-/Dateizugriffe).
 Der Connector-**Kern** (Client, Dispatch, Konfiguration, Transport, Key-Store)
 ist mit **#46** angelegt, das Onboarding (INI/HIA/HPB) mit **#47** und die
 **Upload-API** (CCT/CDD/CDB/CIP) mit **#48** und die **Download-API**
-(STA/C53/VMK/C52/C54 sowie HAC/HTD/HKD/HAA/HPD/PTK) mit **#49**. Die folgende Tabelle ordnet die
+(STA/C53/VMK/C52/C54 sowie HAC/HTD/HKD/HAA/HPD/PTK) mit **#49**. Die clientseitige
+**Validierungsstufe** (Berechtigung/BTF, Pipeline-Stufe 1) kam mit **#44** hinzu und
+schließt die Send-Pipeline ab (siehe [Client-Kern](client-core.md#clientseitige-validierung-stufe-1)).
+Die folgende Tabelle ordnet die
 [Send-Pipeline](#send-pipeline)-Stufen den vorhandenen Bausteinen zu — so ist der
 Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 
@@ -356,7 +361,7 @@ Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
 | Schlüsselgenerierung + INI-/HIA-Brief | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
 | 9. Segmentierung | `Core/Serialization/EbicsSegmentation` (im Upload verdrahtet) | ✅ #48 |
 | Upload-Handler (CCT/CDD/CDB/CIP) | `Connector/Upload` (Requests/Handler/Builder, `AddEbicoUpload`) | ✅ #48 |
-| 1. Validierung (Berechtigung, BTF) | — | ⬜ geplant |
+| 1. Validierung (Berechtigung, BTF) | `Connector/Validation/RequestValidator` (im Upload-/Download-Executor verdrahtet) | ✅ #44 |
 | Download-Handler (STA/VMK/C53/C52/C54, HAC/HTD/HKD/HAA/HPD/PTK) | `Connector/Download` (Requests/Handler/Builder, Receipt, Parse-Hooks, `AddEbicoDownload`) | ✅ #49 |
 
 ## Verwandte Doku

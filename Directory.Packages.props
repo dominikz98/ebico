@@ -27,6 +27,12 @@
   <!-- Blazor-Komponententests der EBICO.Suite (framework-agnostisch, mit xUnit v3 genutzt). -->
   <ItemGroup>
     <PackageVersion Include="bunit" Version="2.7.2" />
+    <!--
+      Transitiver Pin (CentralPackageTransitivePinningEnabled): bunit zieht AngleSharp 1.4.0, das die
+      Sicherheitslücke GHSA-pgww-w46g-26qg / CVE-2026-54570 (mXSS, < 1.5.0) hat und den NuGet-Audit unter
+      TreatWarningsAsErrors als NU1902 hart brechen lässt. Auf die gepatchte 1.5.x anheben (nur Test-Dep).
+    -->
+    <PackageVersion Include="AngleSharp" Version="1.5.2" />
   </ItemGroup>
 
   <!-- EBICO.Connector: DI/Options/HttpClient-Integration (IHttpClientFactory). -->

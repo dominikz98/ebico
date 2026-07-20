@@ -1,4 +1,5 @@
 using EBICO.Connector.Upload.Envelopes;
+using EBICO.Connector.Validation;
 using EBICO.Core;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
@@ -15,12 +16,6 @@ namespace EBICO.Connector.Upload;
 /// </summary>
 internal sealed class UploadExecutor
 {
-    /// <summary>The generic H003/H004 file-upload order type.</summary>
-    private const string FulOrderType = "FUL";
-
-    /// <summary>The generic H005 business-transaction-upload order type.</summary>
-    private const string BtuOrderType = "BTU";
-
     /// <summary>
     /// The default maximum raw (pre-base64) segment size. Kept below 1 MB so the base64-encoded segment
     /// stays within the EBICS 1 MB per-segment ceiling.
@@ -59,18 +54,20 @@ internal sealed class UploadExecutor
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
-        if (orderData.IsEmpty)
+        var connection = ctx.Connection;
+
+        // Pipeline stage 1: validate (structural/BTF always; authorisation opt-in) before any key I/O or
+        // crypto, so a malformed or unauthorised request fails fast without a server round-trip.
+        var validation = RequestValidator.ValidateUpload(
+            connection, orderData, maxSegmentSizeBytes, orderType, btf, fileFormat);
+        if (!validation.IsAuthorized)
         {
-            throw new EbicsConfigurationException("The upload order data must not be empty.");
+            return EbicsResult<UploadResult>.Failure(validation.ReturnCode, validation.ReturnText);
         }
+
+        var (headerOrderType, effectiveBtf, effectiveFileFormat, _) = validation.Identity;
 
         var segmentSize = maxSegmentSizeBytes ?? DefaultMaxSegmentSizeBytes;
-        if (segmentSize <= 0)
-        {
-            throw new EbicsConfigurationException("The maximum segment size must be a positive number of bytes.");
-        }
-
-        var connection = ctx.Connection;
         var version = connection.Version;
         var builder = _registry.Get(version);
 
@@ -81,8 +78,6 @@ internal sealed class UploadExecutor
         var bankEncKey = await UploadSupport.RequireBankKeyAsync(ctx, KeyPurpose.Encryption, ct).ConfigureAwait(false);
         var signatureKey = await UploadSupport.RequireSubscriberKeyAsync(ctx, KeyPurpose.Signature, ct).ConfigureAwait(false);
         var authKey = await UploadSupport.RequireSubscriberKeyAsync(ctx, KeyPurpose.Authentication, ct).ConfigureAwait(false);
-
-        var (headerOrderType, effectiveBtf, effectiveFileFormat) = NormalizeOrderIdentity(version, orderType, btf, fileFormat);
 
         // Synchronous crypto stage (kept in a non-async helper so the Span<byte> locals stay legal).
         var prepared = Prepare(
@@ -166,43 +161,6 @@ internal sealed class UploadExecutor
 
         var segmented = EbicsSegmentation.Split(encryptedOrderData, segmentSize);
         return new PreparedUpload(encryptedTransactionKey, encryptionDigest, signatureData, segmented);
-    }
-
-    // Resolves the version-specific order identity: H005 submits BTU + a BTF (resolved from the order type
-    // when not supplied); H003/H004 submit a classical order type directly, or FUL + a file format.
-    private static (string HeaderOrderType, BusinessTransactionFormat? Btf, string? FileFormat) NormalizeOrderIdentity(
-        EbicsVersion version, string? orderType, BusinessTransactionFormat? btf, string? fileFormat)
-    {
-        if (version == EbicsVersion.H005)
-        {
-            var resolvedBtf = btf;
-            if (resolvedBtf is null)
-            {
-                if (string.IsNullOrEmpty(orderType) || !BtfOrderTypeCatalog.TryGetBtf(orderType, out var mapped))
-                {
-                    throw new EbicsConfigurationException(
-                        $"H005 uploads require a business transaction format (BTF); none was supplied and " +
-                        $"order type '{orderType}' has no BTF mapping.");
-                }
-
-                resolvedBtf = mapped;
-            }
-
-            return (BtuOrderType, resolvedBtf, null);
-        }
-
-        if (!string.IsNullOrEmpty(fileFormat))
-        {
-            return (FulOrderType, null, fileFormat);
-        }
-
-        if (string.IsNullOrEmpty(orderType))
-        {
-            throw new EbicsConfigurationException(
-                "H003/H004 uploads require an order type (e.g. \"CCT\") or a file format for the generic FUL upload.");
-        }
-
-        return (orderType, null, null);
     }
 
     private static void Sign(IAuthSignedRequestEnvelope envelope, RsaKeyMaterial authKey, KeyVersion authVersion)

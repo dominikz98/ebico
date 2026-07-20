@@ -1,4 +1,5 @@
 using EBICO.Connector.Download.Envelopes;
+using EBICO.Connector.Validation;
 using EBICO.Core;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
@@ -16,12 +17,6 @@ namespace EBICO.Connector.Download;
 /// </summary>
 internal sealed class DownloadExecutor
 {
-    /// <summary>The generic H003/H004 download order type (file download).</summary>
-    private const string FdlOrderType = "FDL";
-
-    /// <summary>The generic H005 download order type (business transaction download).</summary>
-    private const string BtdOrderType = "BTD";
-
     private readonly IDownloadEnvelopeBuilderRegistry _registry;
 
     /// <summary>Initializes the executor.</summary>
@@ -56,6 +51,17 @@ internal sealed class DownloadExecutor
         ArgumentNullException.ThrowIfNull(ctx);
 
         var connection = ctx.Connection;
+
+        // Pipeline stage 1: validate (structural/BTF always; authorisation opt-in) before any key I/O or
+        // crypto, so a malformed or unauthorised request fails fast without a server round-trip.
+        var validation = RequestValidator.ValidateDownload(connection, orderType, btf, fileFormat);
+        if (!validation.IsAuthorized)
+        {
+            return EbicsResult<DownloadResult>.Failure(validation.ReturnCode, validation.ReturnText);
+        }
+
+        var (headerOrderType, effectiveBtf, effectiveFileFormat, _) = validation.Identity;
+
         var version = connection.Version;
         var builder = _registry.Get(version);
 
@@ -66,8 +72,6 @@ internal sealed class DownloadExecutor
         // encryption key (decrypted here with its private half) and the requests are X002-signed.
         var encKey = await DownloadSupport.RequireSubscriberKeyAsync(ctx, KeyPurpose.Encryption, ct).ConfigureAwait(false);
         var authKey = await DownloadSupport.RequireSubscriberKeyAsync(ctx, KeyPurpose.Authentication, ct).ConfigureAwait(false);
-
-        var (headerOrderType, effectiveBtf, effectiveFileFormat) = NormalizeOrderIdentity(version, orderType, btf, fileFormat);
 
         // Initialisation phase: request the download and receive NumSegments + segment 1 + the E002
         // encryption info.
@@ -206,49 +210,6 @@ internal sealed class DownloadExecutor
 
     /// <summary>The receipt code reporting a post-processing failure (the server re-provides the data).</summary>
     private const byte ReceiptCodeNegative = 1;
-
-    // Resolves the version-specific download order identity: H005 requests statements as BTD + a BTF
-    // (resolved from the order type when not supplied) and administrative orders (HTD/…) as their
-    // AdminOrderType directly; H003/H004 request a classical order type directly, or FDL + a file format.
-    private static (string HeaderOrderType, BusinessTransactionFormat? Btf, string? FileFormat) NormalizeOrderIdentity(
-        EbicsVersion version, string? orderType, BusinessTransactionFormat? btf, string? fileFormat)
-    {
-        if (version == EbicsVersion.H005)
-        {
-            if (btf is { } explicitBtf)
-            {
-                return (BtdOrderType, explicitBtf, null);
-            }
-
-            if (string.IsNullOrEmpty(orderType))
-            {
-                throw new EbicsConfigurationException(
-                    "H005 downloads require an order type (e.g. \"STA\") or a business transaction format (BTF).");
-            }
-
-            // Statement/report order types map to a BTF (BTD); administrative order types (HTD/HKD/…)
-            // are not BTF services and stay AdminOrderTypes.
-            if (BtfOrderTypeCatalog.TryGetBtf(orderType, out var mapped))
-            {
-                return (BtdOrderType, mapped, null);
-            }
-
-            return (orderType, null, null);
-        }
-
-        if (!string.IsNullOrEmpty(fileFormat))
-        {
-            return (FdlOrderType, null, fileFormat);
-        }
-
-        if (string.IsNullOrEmpty(orderType))
-        {
-            throw new EbicsConfigurationException(
-                "H003/H004 downloads require an order type (e.g. \"STA\") or a file format for the generic FDL download.");
-        }
-
-        return (orderType, null, null);
-    }
 
     private static void Sign(IAuthSignedRequestEnvelope envelope, RsaKeyMaterial authKey, KeyVersion authVersion)
     {
