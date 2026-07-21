@@ -33,7 +33,7 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 ## 4. ADR (bei Designentscheidungen)
 
 - Neue Datei `docs/adr/NNNN-<kebab-titel-deutsch>.md` mit der **nächsten freien Nummer** (aktuell endet
-  der Bestand bei 0025). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
+  der Bestand bei 0027). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
 - Im ADR-Index `docs/adr/README.md` eintragen.
 
 ## 5. Tests
@@ -48,6 +48,8 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 - `dotnet build` + `dotnet test` (Release), **keine neuen Warnungen**.
 - `docs-link-check` (lychee offline über `**/*.md`) — tote Links vermeiden.
 - Weitere CI-Jobs: `container-build` (Server-Image), `pack` (NuGet Core+Connector, CalVer, build-only).
+- Tag-getriggerter Release (`release.yml`, #62/ADR-0027): Publish nach nuget.org + GHCR, auto-Release-Notes
+  (nur auf `v*.*.*`-Tags; Runbook `docs/development/release.md`).
 
 ## 7. PR
 

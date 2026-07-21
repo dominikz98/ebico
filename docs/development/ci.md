@@ -50,6 +50,24 @@ Paket-README bräche ihn z. B. mit `NU5039`. Die CalVer-BUILD-Komponente kommt a
 Registry-Push — das gehört zur Publish-Pipeline (M9 / #62), analog zum
 `container-build`-Job.
 
+## Release-Workflow (`release.yml`)
+
+Der Push/Publish läuft **getrennt** von der CI in `.github/workflows/release.yml` (M9 / #62,
+[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Trigger ist **nicht** `main`/PR, sondern
+das Pushen eines **Tags `v*.*.*`** — die CI-Jobs oben bleiben davon unberührt. Der Job `release`:
+
+1. **Version aus dem Tag** ableiten und gegen das CalVer-Muster prüfen (`v2026.7.42` → `2026.7.42`).
+2. **Build + Test** in Release mit `-p:Version=<version>` (überschreibt die datumsbasierte CalVer-Zahl;
+   re-verifiziert die DoD).
+3. **Pack** `EBICO.Core` + `EBICO.Connector` mit derselben Version → `./artifacts`.
+4. **Push nach nuget.org** (`dotnet nuget push`, Secret `NUGET_API_KEY`, `--skip-duplicate`; `.snupkg`
+   automatisch mit).
+5. **GHCR-Container-Push** `ghcr.io/dominikz98/ebico-server:{VERSION}` + `:latest` (via `GITHUB_TOKEN`).
+6. **GitHub-Release** mit auto-generierten Notes und den NuGet-Artefakten (`gh release create --generate-notes`).
+
+Der Workflow ist **inert**, bis Maintainer das Secret `NUGET_API_KEY` setzen und einen Tag pushen — der
+bloße Merge publiziert nichts. Schritt-für-Schritt: [Release-Runbook](release.md).
+
 ## Reproduzierbarkeit ohne Lock-Files
 
 Es werden **keine** `packages.lock.json` verwendet. Reproduzierbare Restores
@@ -64,7 +82,8 @@ Maschinen mit unterschiedlichem SDK-Patch brechen (NU1004). Details:
 ## Später
 
 - **Externer Link-Check** als nicht-blockierender `schedule`-Job (nächtlich).
-- **Publish/Push** der NuGet-Pakete in einen Feed (M9 / #62). Das **Pack** selbst ist
-  seit #50 als build-only `pack`-Job aktiv (siehe oben); es fehlt nur noch der
-  authentifizierte Push (nuget.org bzw. GitHub Packages) mit den passenden Secrets
-  und erweiterten `permissions`.
+
+> **Erledigt (M9 / #62):** Der authentifizierte **Publish/Push** ist seit #62 im
+> [Release-Workflow](#release-workflow-releaseyml) umgesetzt (nuget.org + GHCR, tag-getrieben,
+> [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Der build-only `pack`-Job in `ci.yml`
+> bleibt als Regressionsschutz erhalten.

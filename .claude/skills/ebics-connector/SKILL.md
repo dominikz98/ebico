@@ -52,7 +52,9 @@ Mediator-Muster: die Anwendung kennt nur `IEbicsClient.Send(request)` und bekomm
   Paket-README (`src/EBICO.Connector/README.md`), MIT-Lizenz.
 - **XML-Doc-Pflicht** an öffentlichen APIs (nur Core + Connector; `GenerateDocumentationFile`).
 - Lauffähiges Beispiel: `samples/EBICO.Connector.Quickstart` (startet Server in-process,
-  Onboarding→Upload→Download). CI `pack` ist build-only; Publish/Push ist M9/#62.
+  Onboarding→Upload→Download). CI `pack` ist build-only (Regressionsschutz); der authentifizierte
+  **Publish/Push nach nuget.org** läuft tag-getrieben in `.github/workflows/release.yml`
+  (#62, ADR-0027, Runbook `docs/development/release.md`).
 
 ## Definition of Done
 
