@@ -30,7 +30,9 @@ dotnet test --collect:"XPlat Code Coverage"   # mit Coverage (wie in der CI)
 ```
 tests/EBICO.Tests/
 ├── Core/                       # Tests zu EBICO.Core (z. B. EbicsVersion)
-├── E2E/                        # Connector ↔ Server Round-Trips (#57)
+├── E2E/                        # Connector ↔ Server Round-Trips (#57, #58)
+├── Conformance/                # Konformität gegen reale Fremd-Clients (#59)
+│   └── Vendor/<client>/<VERSION>/request/  # committete OSS-Client-Captures (kein gitignore)
 ├── Infrastructure/             # Harness-Helfer + deren Tests
 │   ├── CanonicalXmlComparer.cs
 │   ├── TestCertificates.cs
@@ -42,8 +44,12 @@ tests/EBICO.Tests/
 
 Die übrigen Ordner folgen dem **Prüfgegenstand** (`Connector/`, `Server/`, `Suite/`, `Schema/`, …).
 `E2E/` fällt bewusst in keine dieser Schichten: Prüfgegenstand ist dort die *Nahtstelle zwischen zwei*
-von ihnen — ein Fehler auf beiden Seiten lässt diese Tests rotlaufen. Der Name **`Conformance/`** bleibt
-für Issue #59 (Konformität gegen reale Fremd-Clients) reserviert.
+von ihnen — ein Fehler auf beiden Seiten lässt diese Tests rotlaufen. **`Conformance/`** (Issue #59)
+prüft EBICO gegen **echte, fremde Clients**: committete **Vendor-Captures** unter
+`Conformance/Vendor/<client>/<version>/request/` (Output eines OSS-Clients, committbar — nicht
+`.gitignore`d, anders als `Fixtures/Xml/`), plus Parser-/Wire-Shape-Toleranz (`XmlShape`),
+C14N-Adaptivität und Known-Gap-Negativfälle. Siehe
+[Konformität gegen reale Clients](conformance-real-clients.md).
 
 Der Ordner `Fixtures/**` wird in den Build-Output kopiert
 (`CopyToOutputDirectory`), damit die Helfer die Dateien zur Laufzeit relativ zum

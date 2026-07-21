@@ -52,6 +52,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0023](0023-serverseitige-x002-verifikation.md) | Serverseitige X002-Authentifikationssignatur-Verifikation | accepted |
 | [0024](0024-nuget-packaging-und-versionierung.md) | NuGet-Packaging & Versionierung (CalVer) des Connectors | accepted |
 | [0025](0025-clientseitige-sende-validierung.md) | Clientseitige Sende-Validierung (Berechtigung/BTF) im Connector | accepted |
+| [0026](0026-konformitaet-gegen-reale-clients.md) | Konformität gegen reale Clients (Vendor-Captures, Test-Ebenen, Abweichungs-Politik) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

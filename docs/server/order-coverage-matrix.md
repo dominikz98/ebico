@@ -167,12 +167,15 @@ Konsolidierte Liste der bewusst noch nicht abgedeckten Punkte (die zu markierend
 - **BTF-Katalog ist Best-Effort-Seed.** Nur die gängigen Zahlungs-/Auszugs-Orders sind gegen die
   proprietäre *BTF-Mapping / External Code List* verifiziert; große Teile der EBICS-BTF-Palette sind
   nicht modelliert.
-- **Conformance gegen reale Clients / Negativ-Sicherheitsfälle.** Milestone **M8**, teilweise offen.
-  Die **E2E-Happy-Paths** Connector ↔ Server (INI/HIA/HPB, CCT, C53 — je H003/H004/H005) sind mit
-  **#57** abgedeckt, siehe [E2E: Connector ↔ Server](../development/e2e-connector-server.md); sie
-  belegen allerdings nur die Konsistenz beider EBICO-Seiten (X002 wird dabei nicht geprüft), nicht
-  Spec-Konformität. Offen bleiben **#58** (Negativ-/Sicherheitsfälle) und **#59** (Konformität gegen
-  reale Clients).
+- **Conformance gegen reale Clients / Negativ-Sicherheitsfälle.** Milestone **M8** — **abgeschlossen**
+  (Epic #56). Die **E2E-Happy-Paths** Connector ↔ Server (INI/HIA/HPB, CCT, C53 — je H003/H004/H005,
+  **#57**) belegen die Konsistenz beider EBICO-Seiten; **#58** ergänzt die serverseitige
+  X002-Verifikation + Wire-Tampering-Negativsuite; **#59** prüft gegen **echte Fremd-Clients**
+  ([Konformität gegen reale Clients](../development/conformance-real-clients.md)). Dabei aufgedeckt und
+  **noch offen als Folgearbeit**: EBICOs generiertes H004-Binding verlangt einen `xsi:type` auf
+  `OrderDetails`, den reale Clients (node-ebics-client) weglassen → deren Onboarding-Requests werden
+  abgelehnt (aktuell `061099`); sekundär `A006`/PSS auf H004. Spec-Konformität gegen die offiziellen
+  Annexe bleibt generell nur teilverifiziert (Schemas proprietär).
 
 ## EBICS-Versionsbezug
 

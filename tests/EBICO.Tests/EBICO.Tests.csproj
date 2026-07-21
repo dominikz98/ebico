@@ -40,6 +40,9 @@
   <!-- Fixtures (inkl. proprietärer, nicht eingecheckter Beispiel-XML) in den Output kopieren. -->
   <ItemGroup>
     <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
+    <!-- Vendor-Captures echter Fremd-Clients (#59): committet und in den Output kopiert, damit der
+         Conformance-Replay sie zur Laufzeit neben dem Test-Assembly findet. -->
+    <None Update="Conformance\Vendor\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
