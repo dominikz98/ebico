@@ -129,11 +129,22 @@ Der Server mappt einen Liveness-Endpoint **`/health`** (`AddHealthChecks()` /
 entfällt bewusst, weil das `aspnet`-Runtime-Image keinen HTTP-Client (`curl`/`wget`) mitbringt —
 die Probe erfolgt vom Host bzw. vom Orchestrator.
 
-## CI
+## CI & Registry-Push
 
-Die CI (`.github/workflows/ci.yml`) baut das Server-Image in einem eigenen Job `container-build`
-(**build-only**, kein Registry-Push), damit das `Dockerfile` nicht verrottet. Der Push in eine
-Registry ist Bestandteil der NuGet-/Publish-Pipeline (#62).
+Die CI (`.github/workflows/ci.yml`) baut das Server-Image bei jedem Push/PR in einem eigenen Job
+`container-build` (**build-only**, kein Registry-Push), damit das `Dockerfile` nicht verrottet.
+
+Der **Push nach GHCR** erfolgt in der tag-getriggerten **Release-Pipeline**
+(`.github/workflows/release.yml`, #62 / [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)):
+Beim Pushen eines Tags `vJAHR.MONAT.N` wird das Server-Image gebaut und als
+`ghcr.io/dominikz98/ebico-server:{VERSION}` **und** `:latest` nach GHCR gepusht — authentifiziert über
+das automatische `GITHUB_TOKEN` (kein externes Secret). Ablauf: [Release-Runbook](../development/release.md).
+
+```bash
+# Veröffentlichtes Image ziehen und starten:
+docker run --rm -p 5014:8080 ghcr.io/dominikz98/ebico-server:latest
+curl -i http://localhost:5014/health        # -> 200 "Healthy"
+```
 
 ## Tests
 

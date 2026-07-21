@@ -79,7 +79,7 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
 - `docs/server/order-coverage-matrix.md` — **Source of Truth** für OrderType/BTF ×
   Version × Status. Per Guard-Test (`OrderCoverageMatrixTests`) mit den Code-Katalogen
   synchron gehalten; enthält einen eigenen Lücken-Abschnitt.
-- `docs/adr/README.md` — 25 ADRs (0001–0025, MADR-lite, alle `accepted`) + Backlog
+- `docs/adr/README.md` — 27 ADRs (0001–0027, MADR-lite, alle `accepted`) + Backlog
   offener/abgelöster Entscheidungen. Jede größere Designfrage ist hier begründet.
 - `docs/ticket-overview.md` — Milestones (M0–M9), Issues, Epics.
 - Feature-Doku liegt thematisch unter `docs/<bereich>/<name>.md`

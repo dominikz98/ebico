@@ -1,0 +1,117 @@
+name: Release
+
+# Tag-getriggerte Veröffentlichung (M9 / #62, ADR-0027). Der Tag trägt die CalVer-Version
+# (v{JAHR}.{MONAT}.{BUILD}, z. B. v2026.7.42); Paket- und Image-Version werden daraus
+# abgeleitet. Feuert NUR auf v*.*.*-Tags — normale main-Pushes/PRs laufen weiter über ci.yml.
+# Ohne das Secret NUGET_API_KEY (nuget.org) passiert beim NuGet-Push nichts; der GHCR-Push
+# nutzt das automatische GITHUB_TOKEN. Der Merge dieses Workflows publiziert also nichts.
+on:
+  push:
+    tags: ['v*.*.*']
+
+# Least privilege: GitHub-Release erstellen (contents) + GHCR-Image pushen (packages).
+# Der NuGet-Push braucht keine GITHUB-Permission, sondern das NUGET_API_KEY-Secret.
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    name: Publish (NuGet + Container)
+    runs-on: ubuntu-latest
+    env:
+      NUGET_FEED: https://api.nuget.org/v3/index.json
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # volle Historie für auto-generierte Release-Notes & SourceLink
+
+      - name: Setup .NET (aus global.json)
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Packages.props') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      # Version aus dem Tag: v2026.7.42 -> 2026.7.42. Muss dem CalVer-Muster
+      # {JAHR}.{MONAT}.{BUILD} entsprechen (ADR-0024/0027), sonst Abbruch.
+      - name: Version aus Tag ableiten
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' ergibt keine gültige CalVer-Version ('$version'); erwartet vJAHR.MONAT.BUILD (z. B. v2026.7.42)."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Release-Version: $version"
+
+      - name: Restore
+        run: dotnet restore EBICO.sln
+
+      # Version-aus-Tag überschreibt die datumsbasierte CalVer-Berechnung aus
+      # Directory.Build.props (dort kommt BUILD sonst aus github.run_number). Build/Test
+      # re-verifizieren die DoD (keine neuen Warnungen wegen TreatWarningsAsErrors).
+      - name: Build (Release, keine neuen Warnungen)
+        run: dotnet build EBICO.sln -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Test (Release)
+        run: dotnet test EBICO.sln -c Release --no-build
+
+      # Packt EBICO.Core + EBICO.Connector aus dem bereits gebauten Output (--no-build);
+      # -p:Version hält nuspec- und Assembly-Version deckungsgleich mit dem Build oben.
+      - name: Pack EBICO.Core (Release)
+        run: >-
+          dotnet pack src/EBICO.Core/EBICO.Core.csproj
+          -c Release --no-build -o ./artifacts
+          -p:Version=${{ steps.version.outputs.version }}
+
+      - name: Pack EBICO.Connector (Release)
+        run: >-
+          dotnet pack src/EBICO.Connector/EBICO.Connector.csproj
+          -c Release --no-build -o ./artifacts
+          -p:Version=${{ steps.version.outputs.version }}
+
+      # Push nach nuget.org. Die .snupkg-Symbolpakete werden von 'dotnet nuget push'
+      # automatisch mit publiziert. --skip-duplicate macht erneute Läufe idempotent.
+      - name: Push NuGet-Pakete (nuget.org)
+        run: >-
+          dotnet nuget push "./artifacts/*.nupkg"
+          --source "$NUGET_FEED"
+          --api-key "${{ secrets.NUGET_API_KEY }}"
+          --skip-duplicate
+
+      # Container-Push nach GHCR (ADR-0022 verweist den Push auf diese Pipeline). Baut das
+      # Server-Image wie der container-build-Job in ci.yml und pusht :VERSION + :latest.
+      - name: Login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build & Push Server-Image (GHCR)
+        run: |
+          image="ghcr.io/${{ github.repository_owner }}/ebico-server"
+          version="${{ steps.version.outputs.version }}"
+          docker build --build-arg PROJECT=EBICO.Server -t "$image:$version" -t "$image:latest" .
+          docker push "$image:$version"
+          docker push "$image:latest"
+
+      # GitHub-Release mit automatisch generierten Notes (aus den PRs/Commits seit dem
+      # letzten Tag) und den NuGet-Artefakten als Anhang.
+      - name: GitHub-Release erstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          --title "$GITHUB_REF_NAME"
+          --generate-notes
+          ./artifacts/*.nupkg ./artifacts/*.snupkg

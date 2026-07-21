@@ -120,14 +120,19 @@ werden vom CI-`pack`-Job validiert — ein fehlerhaftes README-Wiring bräche `d
 
 ## CI / Publish
 
-Der [`pack`-Job](../development/ci.md) baut nach `build-test` beide Pakete (`*.nupkg` + `*.snupkg`) nach
-`./artifacts` und lädt sie als Artefakt hoch — **build-only, kein Registry-Push** (analog zum
-`container-build`-Job). Der authentifizierte **Push** in einen Feed (nuget.org / GitHub Packages) folgt
-mit der Publish-Pipeline in **M9 / #62**.
+Der [`pack`-Job](../development/ci.md) baut bei jedem Push/PR nach `build-test` beide Pakete
+(`*.nupkg` + `*.snupkg`) nach `./artifacts` und lädt sie als Artefakt hoch — **build-only, kein
+Registry-Push** (Regressionsschutz, analog zum `container-build`-Job).
+
+Der authentifizierte **Push nach nuget.org** erfolgt seit **M9 / #62** in der tag-getriggerten
+[Release-Pipeline](../development/release.md) (`.github/workflows/release.yml`,
+[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)): Ein Tag `vJAHR.MONAT.N` leitet die
+Version ab, packt Core + Connector mit dieser Version und pusht sie (inkl. `.snupkg`-Symbole) nach
+nuget.org (Secret `NUGET_API_KEY`, `--skip-duplicate`); zusätzlich entsteht ein GitHub-Release mit
+auto-generierten Notes. Der bloße Merge publiziert nichts — der Push feuert nur beim Tag.
 
 ## Offene Punkte
 
-- **Publish/Push** (Feed, Secrets, `permissions`, ggf. Tag-getriggerter Release) — M9 / #62.
 - `Authors`/`Company` sind Platzhalter; bei einem offiziellen Release ggf. auf die endgültige
   Herausgeber-/Firmenbezeichnung anpassen.
 
@@ -137,7 +142,9 @@ mit der Publish-Pipeline in **M9 / #62**.
 - [Client-Kern & Konfiguration](client-core.md) — #46: `AddEbicoConnector`, Options/DI
 - [Onboarding](onboarding.md) · [Upload](upload.md) · [Download](download.md) — die im Sample genutzten Flows
 - [CI-Pipeline](../development/ci.md) — der `pack`-Job (build-only)
+- [Release-Runbook](../development/release.md) — Tag setzen → nuget.org-/GHCR-Push (#62)
 - [ADR-0024 — NuGet-Packaging & Versionierung](../adr/0024-nuget-packaging-und-versionierung.md)
+- [ADR-0027 — NuGet-Publish- & Release-Pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
 - [Lizenz & Repo-Policy](../legal/ebics-licensing.md) — proprietäre EBICS-Schemas (nicht Teil der Pakete)
 
 ---
