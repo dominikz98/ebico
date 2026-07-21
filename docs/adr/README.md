@@ -54,6 +54,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0025](0025-clientseitige-sende-validierung.md) | Clientseitige Sende-Validierung (Berechtigung/BTF) im Connector | accepted |
 | [0026](0026-konformitaet-gegen-reale-clients.md) | Konformität gegen reale Clients (Vendor-Captures, Test-Ebenen, Abweichungs-Politik) | accepted |
 | [0027](0027-nuget-publish-und-release-pipeline.md) | NuGet-Publish- & Release-Pipeline (nuget.org, tag-getrieben, GHCR-Container-Push) | accepted |
+| [0028](0028-branch-protection-main.md) | Branch-Protection für `main`: CI als durchgesetztes Merge-Gate (Required Checks, `enforce_admins`, keine Review-Pflicht) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 
