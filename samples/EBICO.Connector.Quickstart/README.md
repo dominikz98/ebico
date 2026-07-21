@@ -30,6 +30,21 @@ Quickstart erfolgreich abgeschlossen.
 
 Der Prozess endet mit Exit-Code `0`, wenn jeder Schritt fachlich erfolgreich war (praktisch für CI/Skripte).
 
+## EBICS-Version wählen (H003 / H004 / H005)
+
+Der Rundlauf läuft für alle drei unterstützten Versionen. Default ist **H005**; umschalten per Argument
+(hinter `--`) oder Umgebungsvariable:
+
+```bash
+dotnet run --project samples/EBICO.Connector.Quickstart -- --version H004
+dotnet run --project samples/EBICO.Connector.Quickstart -- H003          # positional
+EBICO_QUICKSTART_VERSION=H004 dotnet run --project samples/EBICO.Connector.Quickstart
+```
+
+Im Code ist das nur die eine Zeile `o.Version = …` im `AddEbicoConnector`-Setup (siehe
+`QuickstartRunner.cs`); der Rest der Pipeline ist versionsagnostisch. Ungültige/fehlende Angaben fallen
+auf H005 zurück.
+
 ## Aufbau
 
 - `Program.cs` — Einstiegspunkt, ruft `QuickstartRunner.RunAsync`.

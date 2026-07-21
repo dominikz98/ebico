@@ -34,16 +34,19 @@ public static class QuickstartRunner
     private const string Host = "EBICOHOST";
     private const string Partner = "PARTNER01";
     private const string User = "USER01";
-    private const EbicsVersion Version = EbicsVersion.H005;
 
     /// <summary>
     /// Runs the complete quickstart flow and returns a summary of each step.
     /// </summary>
     /// <param name="log">Where human-readable progress is written (e.g. <see cref="Console.Out"/>).</param>
+    /// <param name="version">The EBICS protocol version to drive the round-trip with (H003/H004/H005). Defaults to <see cref="EbicsVersion.H005"/>.</param>
     /// <param name="ct">A token to cancel the run.</param>
     /// <returns>The per-step outcome; <see cref="QuickstartResult.Success"/> is <see langword="true"/> only when every step succeeded.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="log"/> is <see langword="null"/>.</exception>
-    public static async Task<QuickstartResult> RunAsync(TextWriter log, CancellationToken ct = default)
+    public static async Task<QuickstartResult> RunAsync(
+        TextWriter log,
+        EbicsVersion version = EbicsVersion.H005,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(log);
 
@@ -63,7 +66,7 @@ public static class QuickstartRunner
             var baseUrl = app.Services.GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()!.Addresses.First();
             var endpointUrl = baseUrl.TrimEnd('/') + serverOptions.EndpointPath;
-            log.WriteLine($"EBICO.Server läuft auf {baseUrl} (EBICS-Endpoint {endpointUrl}).");
+            log.WriteLine($"EBICO.Server läuft auf {baseUrl} (EBICS-Endpoint {endpointUrl}, Version {version}).");
 
             // 2) Stammdaten + Bank-Keypair serverseitig seeden. Der Subscriber startet in 'New';
             //    das echte INI/HIA treibt ihn nach Initialized/Ready.
@@ -85,9 +88,9 @@ public static class QuickstartRunner
             // Bekanntes Bank-Keypair seeden, damit HPB die zurückgelieferten Fingerprints prüfen kann.
             var bankKeys = new BankKeyPair(
                 RsaKeyMaterial.Generate(),
-                KeyVersions.Default(KeyPurpose.Authentication, Version).Version,
+                KeyVersions.Default(KeyPurpose.Authentication, version).Version,
                 RsaKeyMaterial.Generate(),
-                KeyVersions.Default(KeyPurpose.Encryption, Version).Version);
+                KeyVersions.Default(KeyPurpose.Encryption, version).Version);
             await app.Services.GetRequiredService<IServerBankKeyStore>().SetAsync(hostId, bankKeys, ct);
 
             // 3) Connector-DI gegen den laufenden Server aufbauen.
@@ -98,7 +101,7 @@ public static class QuickstartRunner
                 o.HostId = Host;
                 o.PartnerId = Partner;
                 o.UserId = User;
-                o.Version = Version;
+                o.Version = version;
             });
             services.AddEbicoOnboarding();
             services.AddEbicoUpload();
