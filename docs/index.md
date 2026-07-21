@@ -3,6 +3,10 @@
 Zentraler Einstieg in die EBICO-Doku. **Docs-as-Code:** Jedes Feature wird hier
 verlinkt; Doku gehört in denselben PR wie der Code (Definition of Done).
 
+## Erste Schritte
+
+- [Erste Schritte — In 5 Minuten zum laufenden Emulator](getting-started.md) — Emulator via `docker compose`/`dotnet run` starten, den Quickstart-Sample fahren (Onboarding→Upload→Download), Version H003/H004/H005 umschalten, Schemas/Lizenz-Hinweis (#63)
+
 ## Überblick & Planung
 
 - [Ticket-Übersicht](ticket-overview.md) — alle Milestones (M0–M9), Issues und Epics

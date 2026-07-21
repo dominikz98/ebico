@@ -14,14 +14,24 @@ aber für EBICS statt Azure Storage: ein hostbarer **Server-Emulator** plus ein
 | `EBICO.Suite` | Blazor-UI (Admin/Inspektor) für den Server |
 | `EBICO.Tests` | Unit-/Integration-/Conformance-Tests (xUnit v3) |
 
-## Schnellstart (Entwicklung)
+## Schnellstart
+
+**In 5 Minuten zum laufenden Emulator** — Emulator starten und einen ersten End-to-End-Rundlauf mit dem
+Client fahren: **[docs/getting-started.md](docs/getting-started.md)**. Kurzform:
+
+```bash
+docker compose up --build                              # Emulator (Server :5014 + Suite :5267)
+dotnet run --project samples/EBICO.Connector.Quickstart   # voller Rundlauf Onboarding->Upload->Download
+```
+
+**Entwicklung** (Build & Tests):
 
 ```bash
 dotnet build EBICO.sln          # baut alle Projekte (Warnings = Errors)
 dotnet test                     # führt die Test-Suite aus
 ```
 
-Voraussetzung: .NET SDK gemäß [`global.json`](global.json).
+Voraussetzung: Docker **oder** das .NET SDK gemäß [`global.json`](global.json).
 
 ## Dokumentation
 

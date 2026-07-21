@@ -1,21 +1,27 @@
 using AwesomeAssertions;
 using EBICO.Connector.Quickstart;
+using EBICO.Core;
 using EBICO.Core.ReturnCodes;
 
 namespace EBICO.Tests.Packaging;
 
 /// <summary>
-/// Smoke test for the quickstart sample (issue #50): runs <see cref="QuickstartRunner.RunAsync"/>, which
-/// hosts the EBICO.Server in-process and drives the connector through key generation, onboarding
-/// (INI/HIA/HPB), a CCT upload and a C53 download. Proves the documented quickstart actually works
-/// end-to-end, so a regression in the sample or the packaged API surface fails the build.
+/// Smoke test for the quickstart sample (issue #50, version matrix #63): runs
+/// <see cref="QuickstartRunner.RunAsync"/>, which hosts the EBICO.Server in-process and drives the
+/// connector through key generation, onboarding (INI/HIA/HPB), a CCT upload and a C53 download. Proves
+/// the documented quickstart actually works end-to-end for every supported EBICS version, so a
+/// regression in the sample or the packaged API surface fails the build.
 /// </summary>
 public sealed class QuickstartSampleTests
 {
-    [Fact]
-    public async Task Quickstart_runs_full_round_trip_successfully()
+    public static TheoryData<EbicsVersion> Versions =>
+        new() { EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005 };
+
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public async Task Quickstart_runs_full_round_trip_successfully(EbicsVersion version)
     {
-        var result = await QuickstartRunner.RunAsync(TextWriter.Null, TestContext.Current.CancellationToken);
+        var result = await QuickstartRunner.RunAsync(TextWriter.Null, version, TestContext.Current.CancellationToken);
 
         result.Success.Should().BeTrue();
         result.IniReturnCode.Should().Be(EbicsReturnCode.OkCode);
