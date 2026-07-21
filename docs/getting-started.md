@@ -17,8 +17,7 @@ docker compose up --build
 #   suite  -> http://localhost:5267   (Blazor-Admin-/Inspektor-UI)
 ```
 
-Alternativ nur das veröffentlichte Server-Image (nach dem ersten Release, siehe
-[Release-Runbook](development/release.md)):
+Alternativ nur das veröffentlichte Server-Image (verfügbar nach dem ersten getaggten Release, #62):
 
 ```bash
 docker run --rm -p 5014:8080 ghcr.io/dominikz98/ebico-server:latest
