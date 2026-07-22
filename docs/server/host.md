@@ -61,7 +61,7 @@ Der Endpoint-Handler bleibt dünn: Er liest den Body transport-sicher und delegi
 
 | Stufe | Umsetzung | Fehlerpfad → Returncode |
 | --- | --- | --- |
-| **Parse** | `EbicsXmlSerializer.DeserializeEnvelope(xml)` (Core) | malformed/leer → `091010` |
+| **Parse** | `EbicsXmlSerializer.DeserializeEnvelope(xml)` (Core) | malformed/leer **oder wohlgeformt-aber-nicht-abbildbar** (#117) → `091010` |
 | **Version-Dispatch** | Root-Namespace → Version, Root-Element → Envelope-Typ; Cast auf `IEbicsRequestEnvelope` | nicht unterstützte Version / kein Request-Envelope → `061002` |
 | **Verify** | `IEbicsRequestVerifier.VerifyAsync` (Default: No-Op → Erfolg) | Fehlschlag → `061001` |
 | **Handle** | `IEbicsOrderHandlerResolver.Resolve(version, orderType)` (Skelett: kein Handler) | kein Handler → `091006`; leerer/unbek. Order-Typ → `091005` |

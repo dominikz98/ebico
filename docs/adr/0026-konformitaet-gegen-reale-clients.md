@@ -49,9 +49,11 @@ Folgearbeit beschrieben.
   bauartbedingt nicht sehen können: EBICOs generiertes H004-Binding typisiert `OrderDetails` **abstrakt**
   und verlangt einen `xsi:type`-Diskriminator, den EBICOs eigener Connector emittiert, ein realer Client
   (node-ebics-client) aber weglässt. Folge: **alle** Onboarding-Requests des realen Clients werden
-  abgelehnt (aktuell als `061099`, also fälschlich als Server- statt Client-Fehler). Das ist als
+  abgelehnt (damals als `061099`, also fälschlich als Server- statt Client-Fehler). Das war als
   Charakterisierungstest festgehalten und als Folgearbeit benannt (Binding konkret typisieren; und
-  nicht-deserialisierbares Client-XML auf einen Client-Fehlercode mappen).
+  nicht-deserialisierbares Client-XML auf einen Client-Fehlercode mappen) — **erledigt in
+  [ADR-0029](0029-interop-fixes-reale-clients.md) / Issue #117**, zusammen mit zwei weiteren Defekten,
+  die erst dahinter sichtbar wurden (`A006` auf H004, Modulus mit ASN.1-Vorzeichen-Byte).
 - Der Corpus ist **erweiterbar**: weitere Clients/Versionen werden per Verzeichnis + `PROVENANCE.md` +
   Replay ergänzt; fehlt der Corpus, skippen die Replays und die CI bleibt grün.
 - Der Doku-Guard `ConformanceMatrixTests` hält die Kompatibilitätsmatrix-Seite mit ihren Pflicht-
@@ -69,5 +71,8 @@ Folgearbeit beschrieben.
 - **Die gefundene `OrderDetails`/`xsi:type`-Abweichung sofort im Binding fixen:** verworfen für #59 —
   betrifft generierte Bindings und EBICOs eigenes Wire-Format (breiter Blast-Radius) und ist ohne die
   offiziellen XSDs nicht verifizierbar. Gehört als eigene, spec-gestützte Folgearbeit dokumentiert.
+  → Nachgeholt in **[ADR-0029](0029-interop-fixes-reale-clients.md)** (Issue #117): Binding konkret,
+  Fehlklassifikation behoben, `A006` auf H004, Modulus-Normalisierung — der Vendor-Replay ist damit
+  vom Charakterisierungs- zum Konformitätstest geworden.
 - **Nur EBICO-eigenes XML umformen (keine Vendor-Captures):** verworfen — beweist nur Parser-Toleranz,
   nicht Konformität gegen einen fremden Emittenten.

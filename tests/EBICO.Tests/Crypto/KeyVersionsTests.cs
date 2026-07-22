@@ -50,8 +50,9 @@ public class KeyVersionsTests
     [InlineData("A004", EbicsVersion.H005, false)]
     [InlineData("A005", EbicsVersion.H003, true)]
     [InlineData("A005", EbicsVersion.H005, true)]
+    // A006/PSS: EBICS 2.5 (H004) onwards — see the Spec-Vorbehalt on KeyVersions (issue #117).
     [InlineData("A006", EbicsVersion.H003, false)]
-    [InlineData("A006", EbicsVersion.H004, false)]
+    [InlineData("A006", EbicsVersion.H004, true)]
     [InlineData("A006", EbicsVersion.H005, true)]
     [InlineData("E001", EbicsVersion.H005, false)]
     [InlineData("E002", EbicsVersion.H003, true)]
@@ -100,9 +101,16 @@ public class KeyVersionsTests
     }
 
     [Fact]
-    public void PermittedFor_SignatureH004_IncludesA004A005ExcludesA006()
+    public void PermittedFor_SignatureH004_IncludesLegacyAndA006()
     {
         KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H004)
+            .Select(i => i.Code).Should().Equal("A004", "A005", "A006");
+    }
+
+    [Fact]
+    public void PermittedFor_SignatureH003_ExcludesA006()
+    {
+        KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H003)
             .Select(i => i.Code).Should().Equal("A004", "A005");
     }
 

@@ -102,6 +102,12 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
   H003/H004 FUL/FDL+FileFormat). Berechtigung: `Subscriber.HasPermissionFor` → `090003`.
 - **Guard-Tests halten Doku↔Code synchron:** ein neuer OrderType muss in Katalog **und**
   Coverage-Matrix nachgezogen werden, sonst schlägt `OrderCoverageMatrixTests` fehl.
+- **Generierte Bindings + dokumentierte Fixups:** `scripts/generate-bindings.sh` ist kein reiner
+  Generator — `apply_binding_fixups()` korrigiert nach jedem Lauf, was xscgen nicht abbilden kann
+  (aktuell: `abstract` aus `OrderDetailsType` streichen, sonst verlangt der `XmlSerializer` einen
+  `xsi:type`, den reale Clients nicht senden — ADR-0029). Fixups gehören **ins Skript** (nicht nur
+  ins committete `.cs`), brauchen einen Guard-Test und einen Eintrag in
+  `docs/protocol/xsd-bindings.md`; fehlt das Muster, bricht das Skript ab.
 - **Test-Setup:** xUnit v3 + AwesomeAssertions; `TestContext.Current.CancellationToken`
   (Falle xUnit1051 unter `TreatWarningsAsErrors`); Server-Integrationstests via
   `extern alias EbicoServer` + `WebApplicationFactory<Program>`; E2E über `EbicsE2EHarness`
@@ -111,7 +117,9 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
   (`X002EbicsRequestVerifier`, ADR-0023/#58, greift erst nach HIA). **ES/A00x-Signaturprüfung
   der OrderData bleibt zurückgestellt**; kein Key-Gültigkeitsfenster; Server-Antworten
   unsigniert. Teile der Architektur sind Design-Intent, noch nicht gegen die offiziellen
-  XSDs verifiziert (Schemas proprietär).
+  XSDs verifiziert (Schemas proprietär). Zwei Entscheidungen sind gegen einen **realen Client**
+  belegt, nicht gegen die Annexe (#117/ADR-0029): `OrderDetails` ohne `xsi:type` und `A006`/PSS
+  ab H004 (H003 ausgeschlossen).
 
 ## Verfügbare Skills (`.claude/skills/`)
 

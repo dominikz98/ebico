@@ -150,6 +150,36 @@ public class EbicsXmlSerializerTests
         act.Should().Throw<EbicsVersionNotSupportedException>();
     }
 
+    /// <summary>
+    /// Issue #117: a recognized root whose <em>content</em> the binding cannot map is the client's
+    /// invalid XML, not a server fault. <see cref="EbicsXmlSerializer.DeserializeEnvelope"/> therefore
+    /// translates the <c>XmlSerializer</c>'s mapping failures into
+    /// <see cref="EbicsEnvelopeFormatException"/>, which the server maps to <c>091010</c> instead of
+    /// letting a raw <c>InvalidOperationException</c> fall through to <c>061099</c>.
+    /// </summary>
+    /// <param name="version">The protocol version.</param>
+    /// <param name="namespaceUri">That version's protocol namespace.</param>
+    [Theory]
+    [MemberData(nameof(VersionNamespaceCases))]
+    public void DeserializeEnvelope_WellFormedButUnmappableContent_ThrowsEnvelopeFormat(
+        EbicsVersion version, string namespaceUri)
+    {
+        // "keindatum" is not an xs:dateTime, so the generated reader throws a FormatException wrapped
+        // in InvalidOperationException — a failure mode the old InnerException-is-XmlException rule in
+        // the server's error mapper did not catch.
+        var act = () => EbicsXmlSerializer.DeserializeEnvelope(
+            $"""
+             <ebicsNoPubKeyDigestsRequest xmlns="{namespaceUri}" Version="{version}">
+               <header authenticate="true"><static><HostID>EBICOHOST</HostID>
+                 <Timestamp>keindatum</Timestamp>
+               </static><mutable/></header><body/>
+             </ebicsNoPubKeyDigestsRequest>
+             """);
+
+        act.Should().Throw<EbicsEnvelopeFormatException>()
+            .WithInnerException<Exception>("the underlying serializer failure is preserved as the cause");
+    }
+
     [Fact]
     public void SerializeToUtf8Bytes_OnNullEnvelope_Throws()
     {

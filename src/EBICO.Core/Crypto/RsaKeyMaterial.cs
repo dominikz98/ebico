@@ -44,7 +44,16 @@ public sealed class RsaKeyMaterial
                 $"RSA key size {KeySizeBits} bits is below the minimum of {MinKeySizeBits} bits.");
         }
 
-        _parameters = Clone(parameters);
+        // Import from the *canonical* modulus/exponent, not from the bytes as supplied (issue #117).
+        // XML-DSig CryptoBinary carries no leading zero byte, but real clients (node-ebics-client and
+        // anything else emitting an ASN.1 INTEGER) prefix one whenever the high bit is set. Passing
+        // those 257 bytes straight to RSA.ImportParameters yields a 2056-bit key whose OAEP/PKCS#1
+        // operations then fail — while KeySizeBits and the fingerprint bytes, which are computed off
+        // the trimmed form, claim 2048. Normalizing here keeps the two views consistent.
+        var canonical = Clone(parameters);
+        canonical.Modulus = CopyOf(_modulus);
+        canonical.Exponent = CopyOf(_exponent);
+        _parameters = canonical;
         HasPrivateKey = hasPrivateKey;
     }
 

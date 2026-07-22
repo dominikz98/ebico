@@ -78,7 +78,10 @@ internal sealed class H003OnboardingEnvelopeBuilder : OnboardingEnvelopeBuilderB
                     PartnerId = ctx.PartnerId,
                     UserId = ctx.UserId,
                     SystemId = ctx.SystemId,
-                    OrderDetails = new H.UnsecuredReqOrderDetailsType
+                    // The base type, not UnsecuredReqOrderDetailsType: a derived instance would make
+                    // the serializer emit an xsi:type discriminator real clients neither send nor
+                    // expect (issue #117, ADR-0029). The restriction adds no members either way.
+                    OrderDetails = new H.OrderDetailsType
                     {
                         OrderType = orderType,
                         OrderAttribute = OrderAttributeUnsecured,
@@ -113,7 +116,8 @@ internal sealed class H003OnboardingEnvelopeBuilder : OnboardingEnvelopeBuilderB
                     PartnerId = ctx.PartnerId,
                     UserId = ctx.UserId,
                     SystemId = ctx.SystemId,
-                    OrderDetails = new H.NoPubKeyDigestsReqOrderDetailsType
+                    // Base type, see BuildUnsecuredEnvelope above (issue #117, ADR-0029).
+                    OrderDetails = new H.OrderDetailsType
                     {
                         OrderType = OrderTypeHpb,
                         OrderAttribute = OrderAttributeHpb,

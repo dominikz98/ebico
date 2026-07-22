@@ -111,6 +111,13 @@ eindeutig, unabhängig von der Ursache.
 > Serverfehler, kein Client-Datenfehler. Der Decode-Schritt der Handler (`OrderDataFault.Wrap`)
 > übersetzt genau die dort erwarteten Low-Level-Fehler in `EbicsOrderDataException`, sodass die
 > Kontextabhängigkeit erhalten bleibt (Order-Data-XML → `090004`, Envelope-XML → `091010`).
+>
+> Genau dieselbe Kontextabhängigkeit erledigt seit **#117** die Envelope-Grenze selbst:
+> `EbicsXmlSerializer.DeserializeEnvelope` übersetzt die Abbildungsfehler des `XmlSerializer`
+> (wohlgeformtes, aber nicht schemakonformes Client-XML) in `EbicsEnvelopeFormatException` → `091010`,
+> statt sie als blankes `InvalidOperationException` auf `061099` durchfallen zu lassen. Der Mapper
+> musste dafür **nicht** aufgeweicht werden — nur die Stelle, die weiß, wessen Bytes das sind, trifft
+> die Zuordnung ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md)).
 
 ## EBICS-Versionsbezug
 

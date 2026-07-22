@@ -62,23 +62,28 @@ EBICS-Protokollversion erlaubt ist (analog zur `EbicsVersions`-Registry).
 |---|---|---|---|---|
 | A004 | Signatur | ja | Pkcs1V15 | H003, H004 |
 | A005 | Signatur | nein | Pkcs1V15 | H003, H004, H005 |
-| A006 | Signatur | nein | Pss | H005 |
+| A006 | Signatur | nein | Pss | H004, H005 |
 | E001 | Enc | ja | Pkcs1V15Encryption | H003, H004 |
 | E002 | Enc | nein | Oaep | H003, H004, H005 |
 | X001 | Auth | ja | Pkcs1V15 | H003, H004 |
 | X002 | Auth | nein | Pkcs1V15 | H003, H004, H005 |
 
 ```csharp
-KeyVersions.IsPermitted(KeyVersion.Create("A006"), EbicsVersion.H003);   // false
-KeyVersions.EnsurePermitted(KeyVersion.Create("A006"), EbicsVersion.H005); // ok
-KeyVersions.Default(KeyPurpose.Signature, EbicsVersion.H005).Code;        // "A005" (A006 ist Opt-in)
-KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H005);        // A005, A006
+KeyVersions.IsPermitted(KeyVersion.Create("A006"), EbicsVersion.H003);     // false
+KeyVersions.EnsurePermitted(KeyVersion.Create("A006"), EbicsVersion.H004); // ok (seit #117)
+KeyVersions.Default(KeyPurpose.Signature, EbicsVersion.H005).Code;         // "A005" (A006 ist Opt-in)
+KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H005);         // A005, A006
 ```
 
-> **⚠️ Spec-Vorbehalt:** Diese Tabelle (Legacy-Versionen in 3.0 zurückgezogen, A006 erst ab
-> H005, Default A005) folgt der gängigen Lesart und ist **noch nicht gegen die offiziellen
-> EBICS-XSDs/Annexe verifiziert** (vgl. CLAUDE.md). Sie wird bei Vorliegen der Schemas an
-> dieser einen Stelle (`KeyVersions`) nachgezogen.
+> **⚠️ Spec-Vorbehalt:** Diese Tabelle (Legacy-Versionen in 3.0 zurückgezogen, A006 ab
+> EBICS 2.5/H004, Default A005) folgt der gängigen Lesart und ist **noch nicht gegen die
+> offiziellen EBICS-XSDs/Annexe verifiziert** (vgl. CLAUDE.md). Sie wird bei Vorliegen der
+> Schemas an dieser einen Stelle (`KeyVersions`) nachgezogen.
+>
+> Für **A006 auf H004** gibt es immerhin harte Evidenz aus der Praxis: der reale OSS-Client
+> node-ebics-client signiert seine H004-INI-Order-Data per Default mit A006 (Vendor-Capture,
+> siehe [Konformität gegen reale Clients](../development/conformance-real-clients.md) und
+> [ADR-0029](../adr/0029-interop-fixes-reale-clients.md)). H003 bleibt bewusst ausgeschlossen.
 
 ## Schlüsselmaterial: `RsaKeyMaterial`
 
@@ -92,6 +97,14 @@ spätere Fingerprints (#22) und die Order-Data-Schicht dieselben Bytes sehen.
 - `HasPrivateKey`, `KeySizeBits`, `ToPublicOnly()`
 - **Mindestschlüsselgröße:** `MinKeySizeBits = 2048` (EBICS erlaubt 1536–4096; revidierbare
   Policy). Kleinere Schlüssel werden beim Import mit `KeyMaterialException` abgelehnt.
+
+> **Kanonisierung gilt auch für den Import (#117).** Die Normalisierung greift nicht nur für die
+> nach außen sichtbaren Bytes, sondern auch für die `RSAParameters`, die `CreateRsa()` importiert.
+> Grund: `ds:Modulus` ist per XML-DSig ein `CryptoBinary` **ohne** führende Null, reale Clients
+> senden bei gesetztem höchsten Bit aber die 257-Byte-ASN.1-INTEGER-Form. Wurde die roh importiert,
+> entstand eine **2056-Bit**-RSA-Instanz, deren OAEP-/PKCS#1-Operationen scheiterten — während
+> `KeySizeBits` und der Fingerprint 2048 meldeten. EBICO ist beim Empfang also bewusst tolerant
+> (Postel) und intern konsistent; emittiert wird weiterhin die kanonische Form.
 
 ## Import / Export — `RsaKeyImportExport`
 

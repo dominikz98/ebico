@@ -29,6 +29,10 @@
 #     Shared/Signature/S001/            EBICS-Signatur S001 (H003+H004)
 #     Shared/Signature/S002/            EBICS-Signatur S002 (H005)
 #
+# NACHBEARBEITUNG: nach jedem Lauf wird apply_binding_fixups() angewendet (ein
+#   dokumentierter Eingriff in die generierten Typen, Issue #117 / ADR-0029 —
+#   siehe Kommentar an der Funktion und docs/protocol/xsd-bindings.md).
+#
 # LIZENZ: Schemas/Specs sind proprietaer (EBICS SC). Die generierten Bindings
 #   sind abgeleitete Artefakte; siehe docs/legal/ebics-licensing.md und ADR-0006.
 ###############################################################################
@@ -111,6 +115,56 @@ place () {
   cp -r "$src/." "$dst/"
 }
 
+###############################################################################
+# NACHBEARBEITUNG DER GENERIERTEN BINDINGS (Issue #117, ADR-0029)
+#
+# xscgen uebersetzt eine XSD-<restriction>, die ein Element neu (konkreter)
+# typisiert, NICHT: `OrderDetails` bleibt im Static-Header auf dem abstrakten
+# `OrderDetailsType` stehen. Der XmlSerializer verlangt dann einen
+# xsi:type-Diskriminator, den reale Fremd-Clients nicht senden -> deren
+# INI/HIA/HPB werden abgelehnt. Die konkreten Sub-Typen tragen in allen drei
+# Versionen keine eigenen Member; `abstract` zu streichen kostet also nichts und
+# macht das Binding beidseitig xsi:type-frei (Empfang bleibt tolerant, weil die
+# [XmlInclude]-Attribute stehen bleiben).
+#
+# Der Eingriff MUSS hier stehen und nicht nur im committeten .cs, sonst ist er
+# nach der naechsten Regenerierung still verschwunden. Faellt das erwartete
+# Muster weg (neuer xscgen-/Schemastand), bricht das Skript hart ab.
+###############################################################################
+apply_binding_fixups () {
+  local ver="$1"
+  local file="${OUT_ROOT}/${ver}/OrderDetailsType.cs"
+  local tmp
+
+  [[ -f "$file" ]] || { echo "Fixup-Fehler: $file fehlt." >&2; return 1; }
+
+  # \r?$ und das mitgefuehrte eol halten CRLF-Checkouts (Windows) unveraendert.
+  tmp="$(mktemp)"
+  awk '
+    /^    public abstract partial class OrderDetailsType\r?$/ {
+      eol = (/\r$/ ? "\r" : "")
+      printf "%s%s\n", "    // EBICO fixup (issue #117, ADR-0029) - applied by scripts/generate-bindings.sh:", eol
+      printf "%s%s\n", "    // the generated type is `abstract`, which makes the XmlSerializer demand an", eol
+      printf "%s%s\n", "    // xsi:type discriminator on <OrderDetails>. Real third-party clients follow the", eol
+      printf "%s%s\n", "    // concrete schema type and omit it. The [XmlInclude]s above stay, so a request", eol
+      printf "%s%s\n", "    // that does carry the discriminator still deserializes.", eol
+      printf "%s%s\n", "    public partial class OrderDetailsType", eol
+      patched = 1
+      next
+    }
+    { print }
+    END { if (!patched) exit 3 }
+  ' "$file" > "$tmp" || {
+    rm -f "$tmp"
+    echo "Fixup-Fehler ($ver): 'public abstract partial class OrderDetailsType' nicht gefunden." >&2
+    echo "  -> Generator-/Schemastand hat sich geaendert. Fixup pruefen (ADR-0029), nicht ignorieren." >&2
+    return 1
+  }
+
+  mv "$tmp" "$file"
+  echo "   Fixup angewendet: ${file#${REPO_ROOT}/}"
+}
+
 declare -A STAGES=()
 cleanup () { for d in "${STAGES[@]:-}"; do [[ -n "$d" ]] && rm -rf "$d"; done; }
 trap cleanup EXIT
@@ -126,9 +180,10 @@ for ver in "${TARGETS[@]}"; do
   generate_to_staging "$ver" "$st"
 done
 
-# 2) Versionsspezifische Typen platzieren
+# 2) Versionsspezifische Typen platzieren + Fixups anwenden
 for ver in "${TARGETS[@]}"; do
   place "${STAGES[$ver]}/EBICO/Core/Schema/${ver}" "${OUT_ROOT}/${ver}"
+  apply_binding_fixups "$ver"
 done
 
 # 3) Geteilte Namespaces einmal platzieren (deterministische Quelle je Namespace)

@@ -56,8 +56,14 @@ public class EbicsVersionNotSupportedException : EbicsVersionException
 
 /// <summary>
 /// Raised when an envelope is not well-formed enough to determine its version (not
-/// XML, empty, truncated, or missing a root element).
+/// XML, empty, truncated, or missing a root element), its root element is not a recognized EBICS
+/// envelope, or it is well-formed but cannot be mapped onto the version's binding (a schema-invalid
+/// document — see <see cref="Serialization.EbicsXmlSerializer.DeserializeEnvelope"/>).
 /// </summary>
+/// <remarks>
+/// All of these are faults of the <em>inbound</em> document, so the server maps this exception to
+/// <c>091010 EBICS_INVALID_XML</c> rather than to an internal error (issue #117).
+/// </remarks>
 public class EbicsEnvelopeFormatException : EbicsVersionException
 {
     /// <summary>Initializes a new instance of the <see cref="EbicsEnvelopeFormatException"/> class.</summary>

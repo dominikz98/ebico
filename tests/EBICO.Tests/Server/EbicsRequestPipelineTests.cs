@@ -110,6 +110,28 @@ public class EbicsRequestPipelineTests
     }
 
     [Fact]
+    public async Task ProcessAsync_WellFormedButSchemaInvalidBody_ReturnsInvalidXml()
+    {
+        // Issue #117: well-formed XML whose *content* the binding cannot map (here: a Timestamp that is
+        // no xs:dateTime) used to fall through the error mapper as 061099 EBICS_INTERNAL_ERROR — i.e.
+        // EBICO blamed itself for the client's document. The real-world instance of this was a foreign
+        // client's <OrderDetails> without an xsi:type discriminator; that specific case is fixed in the
+        // binding, so this pins the remaining, general class of mapping failures.
+        const string xml = """
+                           <ebicsNoPubKeyDigestsRequest xmlns="urn:org:ebics:H004" Version="H004">
+                             <header authenticate="true"><static><HostID>EBICOHOST</HostID>
+                               <Timestamp>keindatum</Timestamp>
+                             </static><mutable/></header><body/>
+                           </ebicsNoPubKeyDigestsRequest>
+                           """;
+
+        var result = await BuildPipeline().ProcessAsync(xml, _ct);
+
+        result.Version.Should().Be(EbicsVersion.H004);
+        ReadCodes(result).BodyCode.Should().Be("091010");
+    }
+
+    [Fact]
     public async Task ProcessAsync_VerifierFails_ReturnsVerifierFailureCode()
     {
         var pipeline = BuildPipeline(s =>

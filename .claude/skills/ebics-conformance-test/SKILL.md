@@ -44,6 +44,11 @@ Zuerst `docs/development/testing.md`, `docs/development/e2e-connector-server.md`
 - **`VendorCaptureCorpus`** (`Conformance/VendorCaptureCorpus.cs`): lädt committete Vendor-Captures aus
   `Conformance/Vendor/<client>/<version>/<direction>/`. OSS-Client-Output ist committfähig; fehlt das
   Korpus, degradiert der Test graceful (kein Hard-Fail).
+- **`VendorCaptureConformanceTests`**: seit #117 ein **sequenzieller** Positivtest (ein `[Fact]`, kein
+  `[Theory]`) — die Captures sind eine Kette INI → HIA → HPB und jeder Schritt ist Vorbedingung des
+  nächsten. Vorher die im Capture verwendeten IDs als Stammdaten seeden
+  (`IMasterDataManager` aus `factory.Services`; Subscriber in `SubscriberState.New` lassen, das
+  Onboarding treibt ihn nach `Ready`) — **keine** Schlüssel vorseeden, die kommen aus den Captures.
 
 ## Negativ-/Tampering-Fälle
 
