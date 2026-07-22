@@ -33,7 +33,7 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 ## 4. ADR (bei Designentscheidungen)
 
 - Neue Datei `docs/adr/NNNN-<kebab-titel-deutsch>.md` mit der **nächsten freien Nummer** (aktuell endet
-  der Bestand bei 0027). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
+  der Bestand bei 0028). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
 - Im ADR-Index `docs/adr/README.md` eintragen.
 
 ## 5. Tests
@@ -50,6 +50,10 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 - Weitere CI-Jobs: `container-build` (Server-Image), `pack` (NuGet Core+Connector, CalVer, build-only).
 - Tag-getriggerter Release (`release.yml`, #62/ADR-0027): Publish nach nuget.org + GHCR, auto-Release-Notes
   (nur auf `v*.*.*`-Tags; Runbook `docs/development/release.md`).
+- **`main` ist geschützt** (#3/ADR-0028): alle vier `ci.yml`-Jobs sind Required Checks (`strict`),
+  `enforce_admins` ist an. Direkter Push auf `main` und Merge mit roter CI sind blockiert — auch für
+  Admins. Wird ein CI-Job umbenannt/ergänzt, müssen die Liste in `docs/development/ci.md`
+  (Guard-Test `BranchProtectionDocTests`) **und** die Repo-Einstellung nachgezogen werden.
 
 ## 7. PR
 

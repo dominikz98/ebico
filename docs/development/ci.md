@@ -68,6 +68,60 @@ das Pushen eines **Tags `v*.*.*`** — die CI-Jobs oben bleiben davon unberührt
 Der Workflow ist **inert**, bis Maintainer das Secret `NUGET_API_KEY` setzen und einen Tag pushen — der
 bloße Merge publiziert nichts. Schritt-für-Schritt: [Release-Runbook](release.md).
 
+## Branch-Protection für `main`
+
+Die CI-Jobs oben sind erst dann ein echtes **Gate**, wenn GitHub den Merge blockiert,
+solange sie nicht grün sind. Ohne Schutzregel ist ein roter PR mergebar und ein direkter
+Push auf `main` möglich — die Definition of Done („CI grün") wäre allein durch Disziplin
+abgesichert. Deshalb ist `main` per **Branch-Protection-Regel** geschützt (Issue #3,
+[ADR-0028](../adr/0028-branch-protection-main.md)).
+
+Die Regel lebt in den **Repo-Settings**, nicht im Repo-Inhalt — sie ist per Definition
+nicht versionierbar. Dieser Abschnitt ist daher die maßgebliche Beschreibung des
+Soll-Zustands; ein Guard-Test (`BranchProtectionDocTests`) hält wenigstens die Liste der
+Required Checks mit `ci.yml` synchron.
+
+### Required Status Checks
+
+Genau die Jobs aus `ci.yml` — sie laufen auf jedem `pull_request`:
+
+<!-- required-checks:start -->
+- `Build & Test`
+- `Docs Link Check`
+- `Container Build (Server)`
+- `Pack (NuGet, build-only)`
+<!-- required-checks:end -->
+
+Als Check-Kontext zählt der **Anzeigename** (`name:`) des Jobs, nicht der YAML-Schlüssel.
+Wird ein Job umbenannt, hinzugefügt oder entfernt, muss die Liste hier **und** die
+Repo-Einstellung nachgezogen werden.
+
+> **Nicht** aufgenommen: der Job `Publish (NuGet + Container)` aus
+> [`release.yml`](#release-workflow-releaseyml). Er feuert ausschließlich auf `v*.*.*`-Tags
+> und würde als Required Check auf jedem PR ewig als „Expected — Waiting for status" hängen
+> und den Merge dauerhaft blockieren.
+
+### Weitere Einstellungen
+
+| Einstellung | Wert | Warum |
+| --- | --- | --- |
+| `strict` (Branch muss aktuell sein) | **an** | Verhindert das semantische Merge-Loch: zwei PRs, je einzeln grün, können sich gegenseitig brechen. |
+| Direkte Pushes auf `main` | **blockiert** | Änderungen laufen ausnahmslos über einen PR (siehe Workflow-Konvention „ein Issue → ein Branch → ein PR"). |
+| `enforce_admins` | **an** | EBICO ist faktisch ein Solo-Repo; ohne Admin-Bindung wäre die Regel für den einzigen Committer wirkungslos. |
+| Required approving reviews | **aus** | Ein Solo-Repo kann den eigenen PR nicht selbst approven — die Regel würde jeden Merge blockieren. Die Review-Pflicht bleibt als DoD-Punkt in der PR-Checkliste. |
+| Force-Push / Branch löschen | **blockiert** | Historie von `main` bleibt linear und nachvollziehbar. |
+
+Setzen bzw. prüfen lässt sich der Zustand über die API:
+
+```bash
+gh api repos/:owner/:repo/branches/main/protection            # Ist-Zustand
+gh api repos/:owner/:repo/branches/main/protection --method PUT --input protection.json
+```
+
+**Bei rotem Gate:** Lässt ein defekter oder hängender Check keinen Merge mehr zu, ist der
+Weg *nicht* der Force-Push, sondern die Regel in den Settings kurz zu deaktivieren, den
+Fix zu mergen und sie sofort wieder zu aktivieren.
+
 ## Reproduzierbarkeit ohne Lock-Files
 
 Es werden **keine** `packages.lock.json` verwendet. Reproduzierbare Restores
