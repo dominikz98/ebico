@@ -122,13 +122,35 @@ public class IniOrderHandlerTests
     {
         var (pipeline, master, _) = BuildServer();
         await SeedSubscriberAsync(master, SubscriberState.New);
-        // A006 (PSS) is only permitted on H005, not on H004.
+        // A006 (PSS) starts with EBICS 2.5/H004; on H003 it is still rejected (issue #117).
+        var xml = ServerTestHelpers.BuildUnsecuredIniRequest(
+            EbicsVersion.H003, Host, Partner, User, signatureVersion: "A006", rsaKey: RsaKeyMaterial.Generate());
+
+        var result = await pipeline.ProcessAsync(xml, _ct);
+
+        ServerTestHelpers.ReadReturnCodes(Deserialize(result)).BodyCode.Should().Be("090004");
+    }
+
+    /// <summary>
+    /// Issue #117: the mirror case. A real third-party client (node-ebics-client) signs its H004 INI
+    /// order data with A006, which EBICO used to reject as "not permitted for this protocol version".
+    /// </summary>
+    [Fact]
+    public async Task Ini_WithA006OnH004_IsAcceptedAndStoresThePssKey()
+    {
+        var (pipeline, master, keys) = BuildServer();
+        await SeedSubscriberAsync(master, SubscriberState.New);
         var xml = ServerTestHelpers.BuildUnsecuredIniRequest(
             EbicsVersion.H004, Host, Partner, User, signatureVersion: "A006", rsaKey: RsaKeyMaterial.Generate());
 
         var result = await pipeline.ProcessAsync(xml, _ct);
 
-        ServerTestHelpers.ReadReturnCodes(Deserialize(result)).BodyCode.Should().Be("090004");
+        var (headerCode, bodyCode) = ServerTestHelpers.ReadReturnCodes(Deserialize(result));
+        headerCode.Should().Be("000000");
+        bodyCode.Should().Be("000000");
+
+        var keyRef = new SubscriberKeyRef(HostId.Create(Host), PartnerId.Create(Partner), UserId.Create(User));
+        (await keys.GetAsync(keyRef, KeyPurpose.Signature, _ct))!.Version.Value.Should().Be("A006");
     }
 
     [Fact]

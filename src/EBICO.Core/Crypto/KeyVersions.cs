@@ -8,16 +8,26 @@ namespace EBICO.Core.Crypto;
 /// which EBICS protocol version. Mirrors the <c>EbicsVersions</c> registry style.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The per-protocol-version permission table reflects the common reading (legacy A004/E001/X001
-/// retired in EBICS 3.0/H005, the PSS signature version A006 introduced with H005). Per the
+/// retired in EBICS 3.0/H005, the PSS signature version A006 introduced with EBICS 2.5/H004). Per the
 /// project's conventions this is to be verified against the official EBICS XSDs/Annexe once
 /// available, and adjusted here in one place if needed.
+/// </para>
+/// <para>
+/// <b>⚠️ Spec-Vorbehalt (issue #117):</b> A006 is permitted for <b>H004 and H005</b>. EBICS 2.5
+/// Annex 1 lists both A005 and A006, and a real third-party client (node-ebics-client) signs its
+/// H004 INI order data with A006 by default — the captured evidence behind the change (see
+/// <c>docs/development/conformance-real-clients.md</c>, ADR-0029). It is <em>not</em> verified
+/// against the official Annex, which is proprietary and not in the repo. H003 (EBICS 2.4) stays
+/// excluded.
+/// </para>
 /// </remarks>
 public static class KeyVersions
 {
     private static readonly EbicsVersion[] H003H004 = [EbicsVersion.H003, EbicsVersion.H004];
     private static readonly EbicsVersion[] AllProtocolVersions = [EbicsVersion.H003, EbicsVersion.H004, EbicsVersion.H005];
-    private static readonly EbicsVersion[] H005Only = [EbicsVersion.H005];
+    private static readonly EbicsVersion[] H004H005 = [EbicsVersion.H004, EbicsVersion.H005];
 
     private static readonly KeyVersionInfo A004Info = new(
         KeyVersion.Create("A004"), KeyPurpose.Signature, isLegacy: true, RsaPaddingScheme.Pkcs1V15, H003H004);
@@ -26,7 +36,7 @@ public static class KeyVersions
         KeyVersion.Create("A005"), KeyPurpose.Signature, isLegacy: false, RsaPaddingScheme.Pkcs1V15, AllProtocolVersions);
 
     private static readonly KeyVersionInfo A006Info = new(
-        KeyVersion.Create("A006"), KeyPurpose.Signature, isLegacy: false, RsaPaddingScheme.Pss, H005Only);
+        KeyVersion.Create("A006"), KeyPurpose.Signature, isLegacy: false, RsaPaddingScheme.Pss, H004H005);
 
     private static readonly KeyVersionInfo E001Info = new(
         KeyVersion.Create("E001"), KeyPurpose.Encryption, isLegacy: true, RsaPaddingScheme.Pkcs1V15Encryption, H003H004);

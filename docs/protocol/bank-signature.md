@@ -83,7 +83,8 @@ exakt dieselben Bytes verwenden (gleiche Begründung wie der kanonische Modulus/
 ## EBICS-Versionsbezug
 
 Das Verfahren (SHA-256-Order-Hash + RSA-Signatur) ist über H003/H004/H005 identisch; nur die
-**zulässigen Versionen** unterscheiden sich (A006 erst ab H005) und liegen zentral in
+**zulässigen Versionen** unterscheiden sich (A006 ab EBICS 2.5/H004, siehe #117 und
+[ADR-0029](../adr/0029-interop-fixes-reale-clients.md)) und liegen zentral in
 [`KeyVersions`](key-representation.md). A004 (Legacy) ist über dasselbe PKCS1-v1.5-Mapping
 abgedeckt, ist aber nicht Ziel dieses Issues.
 

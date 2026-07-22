@@ -55,6 +55,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0026](0026-konformitaet-gegen-reale-clients.md) | Konformität gegen reale Clients (Vendor-Captures, Test-Ebenen, Abweichungs-Politik) | accepted |
 | [0027](0027-nuget-publish-und-release-pipeline.md) | NuGet-Publish- & Release-Pipeline (nuget.org, tag-getrieben, GHCR-Container-Push) | accepted |
 | [0028](0028-branch-protection-main.md) | Branch-Protection für `main`: CI als durchgesetztes Merge-Gate (Required Checks, `enforce_admins`, keine Review-Pflicht) | accepted |
+| [0029](0029-interop-fixes-reale-clients.md) | Interop-Fixes für reale Clients (`OrderDetails` ohne `xsi:type`, `A006` auf H004, Modulus-Normalisierung) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

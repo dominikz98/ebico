@@ -48,7 +48,10 @@ public sealed class EbicsErrorMapper : IEbicsErrorMapper
             InvalidSubscriberStateTransitionException => EbicsReturnCode.InvalidUserOrUserState,
             MasterDataException => EbicsReturnCode.InvalidUserOrUserState,
 
-            // Not well-formed / empty / prohibited DTD / unrecognized root element.
+            // Not well-formed / empty / prohibited DTD / unrecognized root element — and, since #117,
+            // also a well-formed envelope the version's binding cannot map (DeserializeEnvelope
+            // translates the XmlSerializer's mapping failures into this type, so a schema-invalid
+            // client document surfaces as a client error rather than as InternalError).
             EbicsEnvelopeFormatException => EbicsReturnCode.InvalidXml,
 
             // Root namespace belongs to no supported version, or strict version mismatch.
@@ -56,10 +59,9 @@ public sealed class EbicsErrorMapper : IEbicsErrorMapper
             EbicsVersionNotSupportedException => EbicsReturnCode.InvalidRequest,
             EbicsVersionMismatchException => EbicsReturnCode.InvalidRequest,
 
-            // A well-formed root can still hide a malformed body: DeserializeEnvelope detects the
-            // version from the root element but the deeper XmlSerializer.Deserialize then throws an
-            // XmlException (wrapped in InvalidOperationException). That is the client's invalid XML,
-            // not a server fault.
+            // Belt and braces for raw parser failures raised outside DeserializeEnvelope (which now
+            // translates its own into EbicsEnvelopeFormatException above): still the client's invalid
+            // XML, not a server fault.
             XmlException => EbicsReturnCode.InvalidXml,
             InvalidOperationException { InnerException: XmlException } => EbicsReturnCode.InvalidXml,
 

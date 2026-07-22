@@ -170,8 +170,9 @@ public static class EbicsXmlSerializer
     /// <returns>The deserialized envelope as an <see cref="IEbicsEnvelope"/>.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="xml"/> is <see langword="null"/>.</exception>
     /// <exception cref="EbicsEnvelopeFormatException">
-    /// <paramref name="xml"/> is empty/malformed, contains a prohibited <c>&lt;!DOCTYPE&gt;</c>, or its
-    /// root element is not one of the six recognized EBICS envelopes.
+    /// <paramref name="xml"/> is empty/malformed, contains a prohibited <c>&lt;!DOCTYPE&gt;</c>, its
+    /// root element is not one of the six recognized EBICS envelopes, or the document is well-formed
+    /// but cannot be mapped onto the version's binding.
     /// </exception>
     /// <exception cref="EbicsVersionNotSupportedException">
     /// The root namespace does not belong to any supported version.
@@ -183,7 +184,28 @@ public static class EbicsXmlSerializer
         var info = EbicsVersionDetector.Detect(xml);
         var rootLocalName = ReadRootLocalName(xml);
         var rootType = ResolveEnvelopeType(info, rootLocalName);
-        return (IEbicsEnvelope)DeserializeCore(rootType, xml);
+
+        try
+        {
+            return (IEbicsEnvelope)DeserializeCore(rootType, xml);
+        }
+        catch (Exception ex) when (ex is InvalidOperationException or XmlException)
+        {
+            // At this boundary the octets are, by definition, inbound client input: a recognized root
+            // element whose content the XmlSerializer cannot map (an unparsable dateTime/hexBinary, a
+            // missing xsi:type discriminator on an abstract binding, …) is the client's invalid XML,
+            // never a server fault. Translating it here — rather than widening the server's error
+            // mapper — keeps the classification at the only place that knows whose bytes these are,
+            // and makes it EBICS_INVALID_XML instead of EBICS_INTERNAL_ERROR (issue #117).
+            //
+            // Deliberately *not* in DeserializeCore: the Deserialize<T> overloads also decode order
+            // data, where the server's OrderDataFault already maps InvalidOperationException to
+            // EBICS_INVALID_ORDER_DATA_FORMAT — a translation here would override that mapping.
+            throw new EbicsEnvelopeFormatException(
+                $"The EBICS {info.Code} '{rootLocalName}' envelope is well-formed but does not match the "
+                + "expected schema.",
+                ex);
+        }
     }
 
     // --- Internals ----------------------------------------------------------

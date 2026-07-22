@@ -40,6 +40,12 @@ Spec-Vorbehalten gegen die Annexe.
 - **Versionsrepräsentation** (`docs/protocol/key-representation.md`): H003/H004 transportieren Schlüssel als
   `RSAKeyValue`, H005 als X.509. Schlüsselrollen A (Signatur) / E (Enc, E002) / X (Auth, X002).
   RSA-Container über `RsaKeyMaterial` (RSA-2048 als praktische Untergrenze in Tests).
+- **Kanonische Modulus-Form gilt auch beim Import** (#117, ADR-0029): `ds:Modulus` ist ein
+  `CryptoBinary` ohne führende Null, reale Clients senden trotzdem die ASN.1-INTEGER-Form mit
+  Vorzeichen-Byte. `RsaKeyMaterial` trimmt vor dem Import — sonst entsteht eine 2056-Bit-RSA-Instanz,
+  deren Padding-Operationen scheitern. Beim Anfassen von Schlüssel-Import/-Export nicht rückbauen.
+- **Versions-Permission-Tabelle** (`KeyVersions`) ist die einzige Stelle für „welche Schlüsselversion
+  in welcher Protokollversion" — `A006`/PSS gilt für **H004 und H005**, nicht für H003.
 - **Determinismus/C14N:** serialisierte Ausgabe muss stabil sein (`docs/protocol/serialization-c14n.md`),
   da Signatur/Digest darauf beruhen.
 

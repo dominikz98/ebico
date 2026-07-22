@@ -171,11 +171,12 @@ Konsolidierte Liste der bewusst noch nicht abgedeckten Punkte (die zu markierend
   (Epic #56). Die **E2E-Happy-Paths** Connector ↔ Server (INI/HIA/HPB, CCT, C53 — je H003/H004/H005,
   **#57**) belegen die Konsistenz beider EBICO-Seiten; **#58** ergänzt die serverseitige
   X002-Verifikation + Wire-Tampering-Negativsuite; **#59** prüft gegen **echte Fremd-Clients**
-  ([Konformität gegen reale Clients](../development/conformance-real-clients.md)). Dabei aufgedeckt und
-  **noch offen als Folgearbeit**: EBICOs generiertes H004-Binding verlangt einen `xsi:type` auf
-  `OrderDetails`, den reale Clients (node-ebics-client) weglassen → deren Onboarding-Requests werden
-  abgelehnt (aktuell `061099`); sekundär `A006`/PSS auf H004. Spec-Konformität gegen die offiziellen
-  Annexe bleibt generell nur teilverifiziert (Schemas proprietär).
+  ([Konformität gegen reale Clients](../development/conformance-real-clients.md)). Die dort aufgedeckten
+  Abweichungen (`xsi:type` auf `OrderDetails`, Fehlklassifikation als `061099`, `A006`/PSS auf H004,
+  Modulus mit ASN.1-Vorzeichen-Byte) sind mit **#117** behoben
+  ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md)); der Vendor-Replay treibt die Onboarding-Kette
+  eines realen Clients jetzt bis `Ready` durch. Spec-Konformität gegen die offiziellen Annexe bleibt
+  generell nur teilverifiziert (Schemas proprietär).
 
 ## EBICS-Versionsbezug
 

@@ -19,7 +19,12 @@ namespace EBICO.Core.Schema.H004
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(NoPubKeyDigestsReqOrderDetailsType))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(UnsecuredReqOrderDetailsType))]
     [System.Xml.Serialization.XmlIncludeAttribute(typeof(UnsignedReqOrderDetailsType))]
-    public abstract partial class OrderDetailsType
+    // EBICO fixup (issue #117, ADR-0029) - applied by scripts/generate-bindings.sh:
+    // the generated type is `abstract`, which makes the XmlSerializer demand an
+    // xsi:type discriminator on <OrderDetails>. Real third-party clients follow the
+    // concrete schema type and omit it. The [XmlInclude]s above stay, so a request
+    // that does carry the discriminator still deserializes.
+    public partial class OrderDetailsType
     {
         
         /// <summary>
