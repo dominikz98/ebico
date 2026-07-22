@@ -21,7 +21,16 @@
 
   <!-- Test-Hilfsmittel: kanonischer XML-Vergleich (C14N) für Protokolltests. -->
   <ItemGroup>
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.9" />
+    <!--
+      Mindestens 10.0.10: 10.0.9 hat vier High-Severity-Advisories (2026-07-20), die den
+      NuGet-Audit unter TreatWarningsAsErrors als NU1903 hart brechen lassen —
+      GHSA-cvvh-rhrc-wg4q / CVE-2026-47302 (DoS), GHSA-g8r8-53c2-pm3f / CVE-2026-47304
+      (Security Feature Bypass), GHSA-8q5v-6pqq-x66h / CVE-2026-50525 (DoS) und
+      GHSA-23rf-6693-g89p / CVE-2026-50648 (DoS). Betroffen <= 10.0.9, gepatcht in 10.0.10.
+      Nicht nur ein CI-Ärgernis: ein Signature-Bypass ausgerechnet in der XML-Signatur-
+      Bibliothek ist für ein EBICS-Projekt inhaltlich relevant. Siehe #121.
+    -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
   </ItemGroup>
 
   <!-- Blazor-Komponententests der EBICO.Suite (framework-agnostisch, mit xUnit v3 genutzt). -->
