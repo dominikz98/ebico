@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Serialization;
 
 namespace EBICO.Server;
 
@@ -33,13 +34,20 @@ public sealed class EbicoServerOptions
     public long MaxRequestBodyBytes { get; set; } = 1 * 1024 * 1024;
 
     /// <summary>
-    /// The maximum raw (pre-base64) size in bytes of a single order-data segment. Defaults to 512 KiB.
-    /// The base64 wire size is roughly 4/3 of this (512 KiB &#8594; ~683 KiB), leaving headroom for the
-    /// envelope under <see cref="MaxRequestBodyBytes"/> (1 MiB); the hard ceiling that keeps a segment's
-    /// base64 form at or below 1 MiB is 768 KiB raw. Consumed by <c>EbicsSegmentation.Split</c> once the
-    /// transaction engine (M4 upload/download, issues #32/#33) wires it in.
+    /// The maximum raw (pre-base64) size in bytes of a single order-data segment. Defaults to the shared
+    /// EBICO default <see cref="EbicsSegmentation.DefaultSegmentSizeBytes"/> (512 KiB), which the
+    /// connector's upload pipeline uses as well. The base64 wire size is roughly 4/3 of this
+    /// (512 KiB &#8594; ~683 KiB), leaving headroom for the envelope under
+    /// <see cref="MaxRequestBodyBytes"/> (1 MiB). Consumed by <c>EbicsSegmentation.Split</c> in the
+    /// transaction engine (M4 upload/download, issues #32/#33).
     /// </summary>
-    public int SegmentSizeBytes { get; set; } = 512 * 1024;
+    /// <remarks>
+    /// Raising this without raising <see cref="MaxRequestBodyBytes"/> makes full segments unsendable:
+    /// 768 KiB raw already base64-encodes to exactly 1 MiB and leaves nothing for the envelope, so the
+    /// request is rejected with HTTP 413 before the pipeline sees it (#124). Use
+    /// <see cref="EbicsSegmentation.MaxSegmentSizeForRequestBody"/> to derive a safe pair.
+    /// </remarks>
+    public int SegmentSizeBytes { get; set; } = EbicsSegmentation.DefaultSegmentSizeBytes;
 
     /// <summary>
     /// The maximum number of segments a single upload transaction may announce (<c>NumSegments</c>).

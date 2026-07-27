@@ -114,6 +114,66 @@ internal static class PainSamples
             """;
     }
 
+    /// <summary>
+    /// Builds a valid <c>pain.001</c> whose creditor names carry deterministic pseudo-random base64, so
+    /// the payload resists compression and a large message actually produces several transport segments
+    /// (issue #124). A normal sample is so repetitive that even ten megabytes deflate into a single
+    /// segment, which is why the multi-segment gap went unnoticed.
+    /// </summary>
+    /// <remarks>
+    /// Base64 rather than hex on purpose: hex carries only four bits per character and still halves under
+    /// deflate, so a hex-padded sample of this size compressed back below one segment.
+    /// </remarks>
+    /// <param name="transactionCount">The number of transactions to emit (at least one).</param>
+    /// <param name="seed">The seed for the deterministic noise, so the payload is reproducible.</param>
+    /// <returns>The pain.001 XML as a string.</returns>
+    public static string IncompressibleCreditTransfer(int transactionCount, int seed = 20260727)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(transactionCount, 1);
+
+        var random = new Random(seed);
+        var noise = new byte[128];
+        var transactions = new StringBuilder();
+        for (var i = 0; i < transactionCount; i++)
+        {
+            random.NextBytes(noise);
+            // Base64 is XML-text-safe (no <, > or &) and near-incompressible.
+            var text = Convert.ToBase64String(noise);
+            transactions.Append(
+                $"""
+                    <CdtTrfTxInf>
+                      <PmtId><EndToEndId>E{i + 1}</EndToEndId></PmtId>
+                      <Amt><InstdAmt Ccy="EUR">1.00</InstdAmt></Amt>
+                      <Cdtr><Nm>{text}</Nm></Cdtr>
+                      <CdtrAcct><Id><IBAN>DE02120300000000202051</IBAN></Id></CdtrAcct>
+                    </CdtTrfTxInf>
+                """);
+        }
+
+        return $"""
+            <?xml version="1.0" encoding="UTF-8"?>
+            <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
+              <CstmrCdtTrfInitn>
+                <GrpHdr>
+                  <MsgId>MSG-CCT-MULTISEGMENT</MsgId>
+                  <CreDtTm>2026-07-14T10:00:00</CreDtTm>
+                  <NbOfTxs>{transactionCount}</NbOfTxs>
+                  <CtrlSum>{Format(transactionCount * 1.00m)}</CtrlSum>
+                  <InitgPty><Nm>EBICO Test</Nm></InitgPty>
+                </GrpHdr>
+                <PmtInf>
+                  <PmtInfId>PMT-1</PmtInfId>
+                  <PmtMtd>TRF</PmtMtd>
+                  <Dbtr><Nm>Debtor</Nm></Dbtr>
+                  <DbtrAcct><Id><IBAN>DE89370400440532013000</IBAN></Id></DbtrAcct>
+                  <DbtrAgt><FinInstnId><BICFI>COBADEFFXXX</BICFI></FinInstnId></DbtrAgt>
+            {transactions}
+                </PmtInf>
+              </CstmrCdtTrfInitn>
+            </Document>
+            """;
+    }
+
     private static (int Count, decimal Sum) Totals(decimal[] amounts)
     {
         var sum = 0m;

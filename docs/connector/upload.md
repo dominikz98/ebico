@@ -87,9 +87,22 @@ await client.Send(new UploadRequest { OrderData = painBytes, OrderType = "CCT" }
 await client.Send(new UploadRequest { OrderData = painBytes, FileFormat = "pain.001.001.09" });
 ```
 
-`MaxSegmentSizeBytes` steuert die (rohe, vor-Base64-) Segmentgröße; ohne Angabe gilt der
-Connector-Default. Das Ergebnis ist stets ein `EbicsResult<UploadResult>` mit der hex-kodierten
-`TransactionId` und der Segmentanzahl.
+`MaxSegmentSizeBytes` steuert die (rohe, vor-Base64-) Segmentgröße; ohne Angabe gilt der geteilte
+Default `EbicsSegmentation.DefaultSegmentSizeBytes` (**512 KiB**), auf den sich auch
+`EbicoServerOptions.SegmentSizeBytes` bezieht. Das Ergebnis ist stets ein `EbicsResult<UploadResult>` mit
+der hex-kodierten `TransactionId` und der Segmentanzahl.
+
+> **Beim Anheben mitdenken (#124):** Ein Segment reist base64-kodiert (Faktor 4/3) *zusammen mit seinem
+> Envelope* in einem HTTP-Body. Wer die Segmentgröße erhöht, muss das Body-Limit der Gegenstelle im Blick
+> behalten — sonst antwortet sie mit **HTTP 413**, also einer Transport-Exception mitten in der
+> Transaktion statt eines EBICS-Returncodes. `EbicsSegmentation.MaxSegmentSizeForRequestBody(limit)`
+> leitet den größten sicheren Wert ab. Genau diese Abstimmung fehlte bis #124: der Default lag auf
+> 768 KiB, deren Base64-Form das 1-MiB-Limit des Emulators exakt ausfüllt
+> ([Segmentierung](../server/segmentation.md#der-default-ist-geteilt-124)).
+
+`DistributedSignature = true` bittet die Bank, den Auftrag für die **verteilte elektronische
+Unterschrift** zu parken statt ihn auszuführen (H005 `SignatureFlag`, H003/H004 `OrderAttribute=OZHNN`).
+Der weitere Ablauf — zeichnen, stornieren, Übersicht — steht in [Connector: VEU](veu.md).
 
 ## Ablauf (clientseitig)
 

@@ -36,6 +36,70 @@ namespace EBICO.Core.Serialization;
 public static class EbicsSegmentation
 {
     /// <summary>
+    /// The recommended default maximum size of a single <i>raw</i> (pre-base64) order-data segment:
+    /// <b>512&#160;KiB</b>. Both sides of EBICO default to this value — the emulator via
+    /// <c>EbicoServerOptions.SegmentSizeBytes</c> and the connector's upload pipeline — so a client
+    /// built with the defaults can always talk to a server running the defaults.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The value is chosen so that a full segment still fits into a 1&#160;MiB request body <em>together
+    /// with its envelope</em>. Base64 inflates the payload to 4/3 of its raw size, so 512&#160;KiB raw
+    /// becomes ~683&#160;KiB on the wire and leaves ~341&#160;KiB of headroom for the surrounding
+    /// <c>ebicsRequest</c> (header, <c>AuthSignature</c>, order params).
+    /// </para>
+    /// <para>
+    /// <b>Nicht</b> auf die theoretische Obergrenze setzen (#124): 768&#160;KiB raw base64-encodes to
+    /// <em>exactly</em> 1&#160;MiB, which consumes the whole default body limit and leaves nothing for
+    /// the envelope — every full segment is then rejected with HTTP 413 before the server can answer
+    /// with an EBICS return code. <see cref="MaxSegmentSizeForRequestBody"/> derives a safe size for a
+    /// non-default body limit.
+    /// </para>
+    /// </remarks>
+    public const int DefaultSegmentSizeBytes = 512 * 1024;
+
+    /// <summary>
+    /// The base64 wire size of a raw payload of <paramref name="rawByteCount"/> bytes: the length of
+    /// its base64 encoding, without line breaks (4 characters per 3 input bytes, padded).
+    /// </summary>
+    /// <param name="rawByteCount">The raw (pre-base64) byte count; must not be negative.</param>
+    /// <returns>The encoded length in bytes.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="rawByteCount"/> is negative.</exception>
+    public static long Base64Length(int rawByteCount)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(rawByteCount);
+        return ((long)rawByteCount + 2) / 3 * 4;
+    }
+
+    /// <summary>
+    /// The largest raw segment size whose base64 form still leaves <paramref name="envelopeReserveBytes"/>
+    /// of room inside a request body of <paramref name="maxRequestBodyBytes"/> bytes. Use this when
+    /// deviating from <see cref="DefaultSegmentSizeBytes"/> to keep client and server compatible.
+    /// </summary>
+    /// <param name="maxRequestBodyBytes">The peer's maximum accepted request body size in bytes; must be positive.</param>
+    /// <param name="envelopeReserveBytes">Bytes to reserve for the surrounding envelope. Defaults to 64&#160;KiB, comfortably above a real <c>ebicsRequest</c> header plus <c>AuthSignature</c>.</param>
+    /// <returns>The maximum raw segment size in bytes; at least 1.</returns>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxRequestBodyBytes"/> is not positive, <paramref name="envelopeReserveBytes"/> is negative, or the reserve leaves no room for a segment.</exception>
+    public static int MaxSegmentSizeForRequestBody(long maxRequestBodyBytes, int envelopeReserveBytes = 64 * 1024)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxRequestBodyBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(envelopeReserveBytes);
+
+        var budget = maxRequestBodyBytes - envelopeReserveBytes;
+        if (budget <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(envelopeReserveBytes),
+                envelopeReserveBytes,
+                $"The envelope reserve leaves no room for a segment inside {maxRequestBodyBytes} bytes.");
+        }
+
+        // Invert Base64Length: 4 wire bytes carry 3 raw bytes.
+        var raw = budget / 4 * 3;
+        return raw <= 0 ? 1 : (int)Math.Min(raw, int.MaxValue);
+    }
+
+    /// <summary>
     /// Splits <paramref name="payload"/> into ordered raw-byte segments of at most
     /// <paramref name="maxSegmentSizeBytes"/> bytes each.
     /// </summary>
