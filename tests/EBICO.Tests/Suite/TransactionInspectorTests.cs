@@ -87,6 +87,25 @@ public class TransactionInspectorTests
         cut.Find("#event-log").TextContent.Should().Contain("PARTNER02");
     }
 
+    [Fact]
+    public void FilterOptions_OnlyOfferValuesThatOccur()
+    {
+        // Issue #126: the Typ/Severity dropdowns used to list every enum value, so picking one that no
+        // event carries led straight into „Keine Ereignisse für den aktuellen Filter."
+        using var ctx = new BunitContext();
+        ctx.Services.AddScoped<ITransactionInspectorProvider>(_ => new FakeInspector());
+
+        var cut = ctx.Render<TransactionInspector>();
+
+        var types = cut.FindAll("#filter-type option").Select(o => o.GetAttribute("value")).ToArray();
+        types.Should().BeEquivalentTo(["", "RequestReceived", "UploadStarted"]);
+        types.Should().NotContain("VeuSigned", "no event in the log has that type");
+
+        var severities = cut.FindAll("#filter-severity option").Select(o => o.GetAttribute("value")).ToArray();
+        severities.Should().BeEquivalentTo(["", "Info", "Warning"]);
+        severities.Should().NotContain("Error", "no event in the log has that severity");
+    }
+
     private sealed class FakeInspector : ITransactionInspectorProvider
     {
         public EventLogFilter? LastFilter { get; private set; }
@@ -173,5 +192,12 @@ public class TransactionInspectorTests
 
         public Task<IReadOnlyList<string>> GetCustomerOptionsAsync(CancellationToken cancellationToken = default)
             => Task.FromResult<IReadOnlyList<string>>(["PARTNER01", "PARTNER02"]);
+
+        // Derived from the fake's own events, mirroring the real provider: only what occurs is offered (#126).
+        public Task<IReadOnlyList<EbicsEventType>> GetTypeOptionsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<EbicsEventType>>([.. _events.Select(e => e.Type).Distinct().Order()]);
+
+        public Task<IReadOnlyList<EbicsEventSeverity>> GetSeverityOptionsAsync(CancellationToken cancellationToken = default)
+            => Task.FromResult<IReadOnlyList<EbicsEventSeverity>>([.. _events.Select(e => e.Severity).Distinct().Order()]);
     }
 }

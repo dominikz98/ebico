@@ -203,6 +203,41 @@ public class TransactionInspectorProviderTests
         customers.Should().Equal(["PARTNER01", "PARTNER02"]);
     }
 
+    [Fact]
+    public async Task GetTypeOptionsAsync_ReturnsOnlyTypesPresentInTheLog()
+    {
+        // Issue #126: derived from the data, not from Enum.GetValues — an option nothing carries only
+        // ever leads into an empty table.
+        await AppendAsync(EbicsEventType.UploadStarted, "AA", "BTU");
+        await AppendAsync(EbicsEventType.UploadCompleted, "AA", "BTU");
+        await AppendAsync(EbicsEventType.UploadStarted, "BB", "BTU");
+
+        var types = await _provider.GetTypeOptionsAsync(_ct);
+
+        types.Should().Equal([EbicsEventType.UploadStarted, EbicsEventType.UploadCompleted]);
+        types.Should().NotContain(EbicsEventType.VeuSigned);
+    }
+
+    [Fact]
+    public async Task GetSeverityOptionsAsync_ReturnsOnlySeveritiesPresentInTheLog()
+    {
+        await AppendAsync(EbicsEventType.UploadStarted, "AA", "BTU");
+        await AppendAsync(EbicsEventType.TransactionEvicted, "AA", "BTU", EbicsEventSeverity.Warning);
+
+        var severities = await _provider.GetSeverityOptionsAsync(_ct);
+
+        severities.Should().Equal([EbicsEventSeverity.Info, EbicsEventSeverity.Warning]);
+        severities.Should().NotContain(EbicsEventSeverity.Error);
+    }
+
+    [Fact]
+    public async Task FilterOptions_OnAnEmptyLog_AreEmpty()
+    {
+        (await _provider.GetTypeOptionsAsync(_ct)).Should().BeEmpty();
+        (await _provider.GetSeverityOptionsAsync(_ct)).Should().BeEmpty();
+        (await _provider.GetCustomerOptionsAsync(_ct)).Should().BeEmpty();
+    }
+
     // --- Helpers ---------------------------------------------------------------------------
 
     private Task AppendAsync(

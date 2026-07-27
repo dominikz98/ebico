@@ -64,6 +64,11 @@
             Der Fingerprint konnte nicht als Hexadezimalwert gelesen werden.
         </div>
         break;
+    case Outcome.MissingFingerprint:
+        <div class="alert alert-warning mt-3" role="alert">
+            Bitte den Fingerprint aus dem INI-Brief eintragen.
+        </div>
+        break;
 }
 
 @code {
@@ -81,6 +86,14 @@
     private void Compare()
     {
         _actualFingerprint = null;
+
+        // An empty field is „nothing typed yet", not „unreadable hex" — the tool exists for transcribing
+        // a fingerprint off a letter, so the two cases need different guidance (issue #126).
+        if (string.IsNullOrWhiteSpace(_expected))
+        {
+            _result = Outcome.MissingFingerprint;
+            return;
+        }
 
         if (!TryResolveKey(out var key))
         {
@@ -126,5 +139,6 @@
         Mismatch,
         InvalidKey,
         InvalidFingerprint,
+        MissingFingerprint,
     }
 }

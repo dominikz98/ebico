@@ -81,7 +81,7 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
   synchron gehalten; enthält einen eigenen Lücken-Abschnitt. Seit #124 trennt sie
   **Server**- und **Connector**-Verfügbarkeit: serverseitig implementiert heißt nicht,
   dass der mitgelieferte Client die Auftragsart senden kann.
-- `docs/adr/README.md` — 30 ADRs (0001–0030, MADR-lite, alle `accepted`) + Backlog
+- `docs/adr/README.md` — 31 ADRs (0001–0031, MADR-lite, alle `accepted`) + Backlog
   offener/abgelöster Entscheidungen. Jede größere Designfrage ist hier begründet.
 - `docs/ticket-overview.md` — Milestones (M0–M9), Issues, Epics.
 - Feature-Doku liegt thematisch unter `docs/<bereich>/<name>.md`

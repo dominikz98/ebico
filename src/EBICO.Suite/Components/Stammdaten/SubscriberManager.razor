@@ -1,8 +1,12 @@
+@implements IDisposable
 @inject IEmulatorStateProvider State
 @inject IMasterDataManager Manager
+@inject IMasterDataChangeNotifier Changes
 
 @* Interactive island (issue #53): manage subscribers (Teilnehmer) — create, delete, lifecycle
-   transitions and per-OrderType permissions. Identity is the (HostID, PartnerID, UserID) triple. *@
+   transitions and per-OrderType permissions. Identity is the (HostID, PartnerID, UserID) triple.
+   Listens for master-data changes from the sibling islands, whose bank/partner deletions cascade into
+   this table and whose new banks/partners must show up in the create form (issue #126). *@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -177,14 +181,73 @@
 
     private static readonly SignatureClass[] SignatureClasses = Enum.GetValues<SignatureClass>();
 
-    /// <inheritdoc />
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    private IDisposable? _subscription;
 
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _subscription = Changes.Subscribe(OnMasterDataChangedAsync);
+        await ReloadAsync();
+    }
+
+    /// <inheritdoc />
+    public void Dispose() => _subscription?.Dispose();
+
+    // Sorted so the table and the bank dropdown have a stable order (issue #126).
     private async Task ReloadAsync()
     {
-        _banks = await State.GetBanksAsync();
-        _subscribers = await State.GetSubscribersAsync();
+        _banks = [.. (await State.GetBanksAsync()).OrderBy(b => b.HostId.Value, StringComparer.Ordinal)];
+        _subscribers =
+        [
+            .. (await State.GetSubscribersAsync())
+                .OrderBy(s => s.HostId.Value, StringComparer.Ordinal)
+                .ThenBy(s => s.PartnerId.Value, StringComparer.Ordinal)
+                .ThenBy(s => s.UserId.Value, StringComparer.Ordinal),
+        ];
         _partnersExist = (await State.GetPartnersAsync()).Count > 0;
+    }
+
+    // A sibling island mutated the master data. Marshal onto this component's renderer before touching
+    // state, then re-resolve everything that referenced a bank/partner which may now be gone.
+    private Task OnMasterDataChangedAsync() => InvokeAsync(async () =>
+    {
+        await ReloadAsync();
+        await DropDanglingSelectionsAsync();
+        StateHasChanged();
+    });
+
+    private async Task DropDanglingSelectionsAsync()
+    {
+        if (_deleteTarget is { } t
+            && !_subscribers.Any(s => s.HostId == t.Host && s.PartnerId == t.Partner && s.UserId == t.User))
+        {
+            _deleteTarget = null;
+        }
+
+        // An open detail panel for a cascaded subscriber has nothing left to show.
+        if (_selected is { } sel
+            && !_subscribers.Any(s => s.HostId == sel.Host && s.PartnerId == sel.Partner && s.UserId == sel.User))
+        {
+            _selected = null;
+            _permRows.Clear();
+            _detailError = null;
+        }
+
+        if (_mode != FormMode.Create)
+        {
+            return;
+        }
+
+        // Re-resolve the create form's bank/partner selection against the fresh data.
+        if (!HostId.TryCreate(_cHost, out var host) || !_banks.Any(b => b.HostId == host))
+        {
+            _cHost = _banks.Count > 0 ? _banks[0].HostId.Value : string.Empty;
+            _formError = _banks.Count > 0
+                ? "Die gewählte Bank wurde zwischenzeitlich gelöscht — bitte die Auswahl prüfen."
+                : "Es existiert keine Bank mehr.";
+        }
+
+        await LoadCreatePartnersAsync();
     }
 
     // --- Selection / detail ----------------------------------------------------------------
@@ -217,6 +280,7 @@
             await Manager.TransitionSubscriberAsync(sub.HostId, sub.PartnerId, sub.UserId, target);
             _alert = ($"Teilnehmer {sub.UserId.Value} ist jetzt {target}.", "alert-success");
             await ReloadAsync();
+            await Changes.NotifyChangedAsync();
         }
         catch (InvalidSubscriberStateTransitionException ex)
         {
@@ -245,6 +309,7 @@
         await Manager.SetPermissionsAsync(sub.HostId, sub.PartnerId, sub.UserId, permissions);
         _alert = ($"Berechtigungen von {sub.UserId.Value} gespeichert.", "alert-success");
         await ReloadAsync();
+        await Changes.NotifyChangedAsync();
     }
 
     // --- Create ----------------------------------------------------------------------------
@@ -270,8 +335,16 @@
     private async Task LoadCreatePartnersAsync()
     {
         _createPartnerOptions = HostId.TryCreate(_cHost, out var host)
-            ? await Manager.GetPartnersAsync(host)
+            ? [.. (await Manager.GetPartnersAsync(host)).OrderBy(p => p.PartnerId.Value, StringComparer.Ordinal)]
             : [];
+
+        // Keep the current selection when it survives the reload — an external change (#126) must not
+        // silently move the form to a different partner.
+        if (_createPartnerOptions.Any(p => p.PartnerId.Value == _cPartner))
+        {
+            return;
+        }
+
         _cPartner = _createPartnerOptions.Count > 0 ? _createPartnerOptions[0].PartnerId.Value : string.Empty;
     }
 
@@ -308,6 +381,17 @@
             systemId = sys;
         }
 
+        // SaveSubscriberAsync is an idempotent upsert (docs/server/master-data.md). Passing a fresh
+        // aggregate through the *create* form would silently reset an existing subscriber's lifecycle
+        // state and drop all its permissions — with a success message (#126). Guard the identity.
+        if (await Manager.GetSubscriberAsync(host, partner, user) is not null)
+        {
+            _formError =
+                $"Teilnehmer {user.Value} existiert bei {host.Value}/{partner.Value} bereits — "
+                + "zum Ändern »Details« verwenden.";
+            return;
+        }
+
         try
         {
             await Manager.SaveSubscriberAsync(new Subscriber(host, partner, user, systemId));
@@ -321,6 +405,7 @@
         _alert = ($"Teilnehmer {user.Value} gespeichert.", "alert-success");
         _mode = FormMode.None;
         await ReloadAsync();
+        await Changes.NotifyChangedAsync();
     }
 
     // --- Delete ----------------------------------------------------------------------------
@@ -342,6 +427,7 @@
             _alert = ($"Teilnehmer {t.User.Value} gelöscht.", "alert-success");
             _deleteTarget = null;
             await ReloadAsync();
+            await Changes.NotifyChangedAsync();
         }
     }
 

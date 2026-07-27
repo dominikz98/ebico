@@ -1,5 +1,18 @@
-﻿@page "/not-found"
+@page "/not-found"
 @layout MainLayout
 
-<h3>Not Found</h3>
-<p>Sorry, the content you are looking for does not exist.</p>
+@* Reached via UseStatusCodePagesWithReExecute („/not-found") and the Router's NotFoundPage. German like
+   the rest of the shell, with an h1 so <FocusOnNavigate Selector="h1" /> in Routes.razor finds a target
+   and screen readers get a page heading (issue #126). *@
+
+<PageTitle>Seite nicht gefunden</PageTitle>
+
+<h1>Seite nicht gefunden</h1>
+
+<p class="text-muted">
+    Die aufgerufene Adresse gehört zu keiner Seite dieser Oberfläche.
+</p>
+
+<p>
+    <a href="">Zurück zur Übersicht</a>
+</p>

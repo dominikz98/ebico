@@ -57,6 +57,7 @@ gelöscht, sondern als abgelöst markiert und auf die Nachfolge-ADR verwiesen.
 | [0028](0028-branch-protection-main.md) | Branch-Protection für `main`: CI als durchgesetztes Merge-Gate (Required Checks, `enforce_admins`, keine Review-Pflicht) | accepted |
 | [0029](0029-interop-fixes-reale-clients.md) | Interop-Fixes für reale Clients (`OrderDetails` ohne `xsi:type`, `A006` auf H004, Modulus-Normalisierung) | accepted |
 | [0030](0030-defaults-und-clientseitige-veu-anbindung.md) | Abgestimmte Transport-Defaults (Segmentgröße ↔ Body-Limit), konsistente Returncode-Texte und clientseitige VEU-Anbindung | accepted |
+| [0031](0031-stammdaten-inseln-aenderungsbenachrichtigung.md) | Änderungsbenachrichtigung zwischen den Stammdaten-Inseln der Suite (`IMasterDataChangeNotifier`, Singleton) | accepted |
 
 ## Offene/geplante Entscheidungen (Backlog)
 

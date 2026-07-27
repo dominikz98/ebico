@@ -18,6 +18,11 @@ builder.Services.AddSingleton<IMasterDataManager, MasterDataManager>();
 builder.Services.AddSingleton<SampleEmulatorStateProvider>();
 builder.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>();
 
+// Change notification between the three independently rendered management islands (#126). Singleton,
+// like the stores it guards: a mutation in one island — or in another browser session — has to reach
+// every component showing the same master data, otherwise cascades leave stale rows behind.
+builder.Services.AddSingleton<IMasterDataChangeNotifier, MasterDataChangeNotifier>();
+
 // The subscriber public keys (INI/HIA) and the bank key pair (HPB) from EBICO.Server, read in-process
 // (ADR-0009) for the key/certificate view (#55). Registered manually — like the stores above — rather
 // than via AddEbicoServer(), which would also pull the whole request pipeline, order handlers and a
