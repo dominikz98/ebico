@@ -149,21 +149,29 @@ internal static class RequestValidator
     {
         if (version == EbicsVersion.H005)
         {
-            var resolvedBtf = btf;
-            if (resolvedBtf is null)
+            if (btf is { } explicitBtf)
             {
-                if (string.IsNullOrEmpty(orderType) || !BtfOrderTypeCatalog.TryGetBtf(orderType, out var mapped))
-                {
-                    throw new EbicsConfigurationException(
-                        $"H005 uploads require a business transaction format (BTF); none was supplied and " +
-                        $"order type '{orderType}' has no BTF mapping.");
-                }
-
-                resolvedBtf = mapped;
+                var explicitEffective = BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, explicitBtf, null);
+                return new ValidatedUploadIdentity(BtuOrderType, explicitBtf, null, explicitEffective);
             }
 
-            var effective = BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, resolvedBtf, null);
-            return new ValidatedUploadIdentity(BtuOrderType, resolvedBtf, null, effective);
+            if (string.IsNullOrEmpty(orderType))
+            {
+                throw new EbicsConfigurationException(
+                    "H005 uploads require an order type (e.g. \"CCT\") or a business transaction format (BTF).");
+            }
+
+            // Business order types map to a BTF and travel as BTU; administrative upload order types
+            // (the VEU orders HVE/HVS) are not BTF services and stay AdminOrderTypes — mirroring the
+            // download side, which has always done this. Without the fallback the VEU uploads were
+            // rejected client-side and never reached the wire (#124).
+            if (BtfOrderTypeCatalog.TryGetBtf(orderType, out var mapped))
+            {
+                var effective = BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, mapped, null);
+                return new ValidatedUploadIdentity(BtuOrderType, mapped, null, effective);
+            }
+
+            return new ValidatedUploadIdentity(orderType, null, null, orderType);
         }
 
         if (!string.IsNullOrEmpty(fileFormat))

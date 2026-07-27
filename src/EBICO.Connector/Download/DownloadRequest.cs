@@ -49,4 +49,11 @@ public sealed class DownloadRequest : IEbicsRequest<DownloadResult>
     /// connector sends a <em>negative</em> receipt (so the server re-provides the data) and rethrows.
     /// </summary>
     public Func<ReadOnlyMemory<byte>, object?>? Parse { get; init; }
+
+    /// <summary>
+    /// The parked order this download asks about — required for the VEU orders <c>HVD</c> (status) and
+    /// <c>HVT</c> (transaction details), ignored for every other order type. The overview orders
+    /// <c>HVU</c>/<c>HVZ</c> list all open orders and need no reference.
+    /// </summary>
+    public VeuOrderReference? Veu { get; init; }
 }

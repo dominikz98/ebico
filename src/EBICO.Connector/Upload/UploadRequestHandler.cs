@@ -20,6 +20,7 @@ internal sealed class UploadRequestHandler : IEbicsRequestHandler<UploadRequest,
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(ctx);
         return _executor.ExecuteAsync(
-            request.OrderData, request.OrderType, request.Btf, request.FileFormat, request.MaxSegmentSizeBytes, ctx, ct);
+            request.OrderData, request.OrderType, request.Btf, request.FileFormat, request.MaxSegmentSizeBytes, ctx, ct,
+            request.DistributedSignature, request.Veu);
     }
 }

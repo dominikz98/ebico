@@ -87,6 +87,44 @@ public class UploadValidationTests
         }
     }
 
+    // An administrative upload order type has no BTF. H005 must therefore keep it as the AdminOrderType
+    // instead of demanding a BTF — exactly what the download path has always done. Before #124 this threw
+    // "H005 uploads require a business transaction format (BTF)" and the VEU uploads never reached the wire.
+    [Fact]
+    public async Task H005_administrative_upload_order_type_travels_as_the_admin_order_type()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var harness = await UploadTestHarness.CreateAsync(EbicsVersion.H005, ct: ct);
+
+        var result = await harness.Client.Send(
+            new UploadRequest
+            {
+                OrderType = "HVE",
+                OrderData = SamplePain001,
+                Veu = new VeuOrderReference { OrderId = "A1B2", OrderType = "CCT" },
+            },
+            ct);
+
+        result.IsSuccess.Should().BeTrue();
+        harness.Server.InitRequestCount.Should().Be(1);
+        harness.Server.HeaderOrderType.Should().Be("HVE", "administrative orders are not BTU business transactions");
+    }
+
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public async Task Veu_upload_without_an_order_reference_throws_before_any_transport(EbicsVersion version)
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var harness = await UploadTestHarness.CreateAsync(version, ct: ct);
+
+        var act = async () => await harness.Client.Send(
+            new UploadRequest { OrderData = SamplePain001, OrderType = "HVS" }, ct);
+
+        (await act.Should().ThrowAsync<EbicsConfigurationException>())
+            .WithMessage("*must reference the parked order*");
+        harness.Server.InitRequestCount.Should().Be(0);
+    }
+
     [Theory]
     [MemberData(nameof(Versions))]
     public async Task Empty_payload_throws_before_any_transport(EbicsVersion version)
@@ -129,14 +167,33 @@ public class UploadValidationTests
         harness.Server.InitRequestCount.Should().Be(0);
     }
 
+    // Behaviour change in #124: an H005 order type without a BTF mapping is no longer a client-side error.
+    // It is submitted as the AdminOrderType and the bank decides — mirroring the download path, which has
+    // always worked that way. Rejecting locally made the administrative uploads (VEU) unreachable, and the
+    // BTF catalogue is an explicitly best-effort seed, so it is not a reliable "does this exist" oracle.
+    // An order type the bank does not know still fails, just with the bank's 091006 instead of an exception.
     [Fact]
-    public async Task H005_upload_with_an_unmapped_order_type_and_no_btf_throws()
+    public async Task H005_upload_with_an_unmapped_order_type_travels_as_the_admin_order_type()
     {
         var ct = TestContext.Current.CancellationToken;
         using var harness = await UploadTestHarness.CreateAsync(EbicsVersion.H005, ct: ct);
 
-        var act = async () => await harness.Client.Send(
+        var result = await harness.Client.Send(
             new UploadRequest { OrderData = SamplePain001, OrderType = "ZZZ" }, ct);
+
+        result.IsSuccess.Should().BeTrue("the fake server accepts whatever it is sent");
+        harness.Server.InitRequestCount.Should().Be(1);
+        harness.Server.HeaderOrderType.Should().Be("ZZZ");
+    }
+
+    [Fact]
+    public async Task H005_upload_without_an_order_type_or_btf_still_throws()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        using var harness = await UploadTestHarness.CreateAsync(EbicsVersion.H005, ct: ct);
+
+        // Nothing at all to identify the order with remains a configuration error.
+        var act = async () => await harness.Client.Send(new UploadRequest { OrderData = SamplePain001 }, ct);
 
         await act.Should().ThrowAsync<EbicsConfigurationException>();
         harness.Server.InitRequestCount.Should().Be(0);

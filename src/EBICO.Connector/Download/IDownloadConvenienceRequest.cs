@@ -18,4 +18,10 @@ internal interface IDownloadConvenienceRequest
 
     /// <summary>An optional parsing hook applied to the decrypted order data before the receipt.</summary>
     Func<ReadOnlyMemory<byte>, object?>? Parse { get; }
+
+    /// <summary>
+    /// The referenced parked order for the VEU downloads <c>HVD</c>/<c>HVT</c>; <see langword="null"/>
+    /// for every other convenience request.
+    /// </summary>
+    VeuOrderReference? Veu => null;
 }

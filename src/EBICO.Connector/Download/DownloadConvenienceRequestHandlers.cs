@@ -32,3 +32,15 @@ internal sealed class HacDownloadRequestHandler(DownloadExecutor executor) : Dow
 
 /// <summary>Handles <see cref="PtkDownloadRequest"/> (textual customer protocol, <c>PTK</c>).</summary>
 internal sealed class PtkDownloadRequestHandler(DownloadExecutor executor) : DownloadConvenienceHandlerBase<PtkDownloadRequest>(executor);
+
+/// <summary>Handles <see cref="HvuDownloadRequest"/> (overview of orders awaiting signatures, <c>HVU</c>).</summary>
+internal sealed class HvuDownloadRequestHandler(DownloadExecutor executor) : DownloadConvenienceHandlerBase<HvuDownloadRequest>(executor);
+
+/// <summary>Handles <see cref="HvzDownloadRequest"/> (overview with payment details, <c>HVZ</c>).</summary>
+internal sealed class HvzDownloadRequestHandler(DownloadExecutor executor) : DownloadConvenienceHandlerBase<HvzDownloadRequest>(executor);
+
+/// <summary>Handles <see cref="HvdDownloadRequest"/> (status of one awaiting order, <c>HVD</c>).</summary>
+internal sealed class HvdDownloadRequestHandler(DownloadExecutor executor) : DownloadConvenienceHandlerBase<HvdDownloadRequest>(executor);
+
+/// <summary>Handles <see cref="HvtDownloadRequest"/> (transaction details of one awaiting order, <c>HVT</c>).</summary>
+internal sealed class HvtDownloadRequestHandler(DownloadExecutor executor) : DownloadConvenienceHandlerBase<HvtDownloadRequest>(executor);

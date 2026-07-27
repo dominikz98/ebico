@@ -122,17 +122,22 @@ camt.086/pain.002 realisiert (siehe [Offene Lücken](#offene-lücken)).
 Auftragstypen der verteilten elektronischen Unterschrift (#42). Bleiben in H005 `AdminOrderType`s
 (kein BTF). Siehe [VEU-Orders](veu-orders.md).
 
-| OrderType | Beschreibung | BTF (H005) | H003 | H004 | H005 | Status |
-| --- | --- | --- | --- | --- | --- | --- |
-| `HVU` | Übersicht offener Aufträge (Download) | – | ✅ | ✅ | ✅ | ✅ |
-| `HVZ` | Übersicht mit Zusatzdetails (Download) | – | ✅ | ✅ | ✅ | ✅ |
-| `HVD` | Status/Detail eines Auftrags (Download) | – | ✅ | ✅ | ✅ | ✅ |
-| `HVT` | Transaktionsdetails eines Auftrags (Download) | – | ✅ | ✅ | ✅ | 🟡 |
-| `HVE` | Unterschrift hinzufügen (Upload) | – | ✅ | ✅ | ✅ | ✅ |
-| `HVS` | Auftrag stornieren/ablehnen (Upload) | – | ✅ | ✅ | ✅ | ✅ |
+| OrderType | Beschreibung | BTF (H005) | H003 | H004 | H005 | Status | Connector |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `HVU` | Übersicht offener Aufträge (Download) | – | ✅ | ✅ | ✅ | ✅ | ✅ `HvuDownloadRequest` |
+| `HVZ` | Übersicht mit Zusatzdetails (Download) | – | ✅ | ✅ | ✅ | ✅ | ✅ `HvzDownloadRequest` |
+| `HVD` | Status/Detail eines Auftrags (Download) | – | ✅ | ✅ | ✅ | ✅ | ✅ `HvdDownloadRequest` |
+| `HVT` | Transaktionsdetails eines Auftrags (Download) | – | ✅ | ✅ | ✅ | 🟡 | ✅ `HvtDownloadRequest` |
+| `HVE` | Unterschrift hinzufügen (Upload) | – | ✅ | ✅ | ✅ | ✅ | ✅ `HveUploadRequest` |
+| `HVS` | Auftrag stornieren/ablehnen (Upload) | – | ✅ | ✅ | ✅ | ✅ | ✅ `HvsUploadRequest` |
 
 `HVT` liefert die Detailübersicht auftrags-summarisch (keine ISO-20022-Einzeltransaktions-Zerlegung,
 siehe [Offene Lücken](#offene-lücken)).
+
+Die Spalte **Connector** ist mit **#124** dazugekommen. Bis dahin war die VEU serverseitig vollständig
+(seit #42) und vom mitgelieferten Client aus **in keiner Version fahrbar** — die Matrix beschrieb nur den
+Server und stellte damit eine Abdeckung dar, die es aus Anwendersicht nicht gab. Details und Park-Trigger:
+[Connector: VEU](../connector/veu.md), [ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md).
 
 ## Nur Schema-Binding (nicht verdrahtet)
 

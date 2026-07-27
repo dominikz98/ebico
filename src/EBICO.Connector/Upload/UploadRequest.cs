@@ -44,4 +44,23 @@ public sealed class UploadRequest : IEbicsRequest<UploadResult>
     /// transfer messages. <see langword="null"/> uses the connector default.
     /// </summary>
     public int? MaxSegmentSizeBytes { get; init; }
+
+    /// <summary>
+    /// Requests that the bank park this order for the <b>distributed electronic signature</b> (VEU/EDS)
+    /// instead of executing it immediately: it is held until the required number of signatures has been
+    /// collected via <c>HVE</c>. Defaults to <see langword="false"/> (immediate execution).
+    /// </summary>
+    /// <remarks>
+    /// Emitted version-appropriately — on H005 as the <c>BTUOrderParams/SignatureFlag</c> element, on
+    /// H003/H004 as the order attribute <c>OZHNN</c> instead of the default <c>DZHNN</c>. Without this
+    /// flag there is no way to create a parked order, which made the whole VEU workflow unreachable from
+    /// the connector (#124).
+    /// </remarks>
+    public bool DistributedSignature { get; init; }
+
+    /// <summary>
+    /// The parked order this upload acts on — required for the VEU orders <c>HVE</c> and <c>HVS</c>,
+    /// ignored for every other order type.
+    /// </summary>
+    public VeuOrderReference? Veu { get; init; }
 }
