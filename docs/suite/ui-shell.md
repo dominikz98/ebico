@@ -33,7 +33,7 @@ die Blazor-Template-Demoseiten (Counter/Weather) wurden entfernt.
 | --- | --- | --- |
 | Dashboard | `/` | Kennzahlen des Emulator-Zustands (Anzahl Banken/Partner/Teilnehmer) |
 | Stammdaten | `/stammdaten` | Verwaltung der Banken/Partner/Teilnehmer ([#53](stammdaten.md)) |
-| Transaktionen | `/transaktionen` | Platzhalter — Transaktions-Inspektor (#54) |
+| Transaktionen | `/transaktionen` | Transaktions-Inspektor ([#54](transaktions-inspektor.md)) |
 | Schlüssel | `/schluessel` | Fingerprints, INI-Brief-Vergleich, Test-CA/Schlüssel-Werkzeuge ([#55](schluessel-ansicht.md)) |
 
 Das `MainLayout` behält die Sidebar-Struktur des Templates (Sidebar + Content),
@@ -51,6 +51,19 @@ Diese Trennung ist seit [ADR-0009](../adr/0009-blazor-render-mode.md) gewollt un
 war nur **in der Oberfläche selbst** unsichtbar. Wer `docker compose up` fährt, sieht zwei Dienste
 nebeneinander und eine UI, die plausible Transaktionen eines Servers zeigt, der sie nie gesehen hat.
 Der Banner schließt genau diese Lücke zwischen Doku und Bildschirm.
+
+### Unbekannte Route (#126)
+
+Eine nicht existierende Adresse liefert **HTTP 404** und rendert `Components/Pages/NotFound.razor` im
+`MainLayout` — verdrahtet doppelt: über `NotFoundPage` am `Router` (`Components/Routes.razor`) für die
+clientseitige Navigation und über `UseStatusCodePagesWithReExecute("/not-found")` in `Program.cs` für
+direkte Aufrufe.
+
+Die Seite war bis #126 der unveränderte Blazor-Template-Rest: englischer Text in einer durchgängig
+deutschen Oberfläche, **ohne `<PageTitle>`** (leerer Browser-Tab, während jede andere Seite einen Titel
+setzt) und mit `<h3>` statt `<h1>`, wodurch das `<FocusOnNavigate Selector="h1" />` desselben Routers
+ins Leere griff — die Seite hatte überhaupt keine `h1`. Jetzt deutsch, mit Titel, `h1` und einem Link
+zurück zum Dashboard.
 
 ## Theming
 
@@ -99,6 +112,8 @@ oder HTTP-API) ohne Änderung an den Aufrufstellen eingehängt werden kann.
   **keine** Counter/Weather-Demolinks mehr.
 - `DashboardTests` — bUnit mit einem Fake-`IEmulatorStateProvider`: das Dashboard
   zeigt die Kennzahlen aus dem State-Provider.
+- `NotFoundPageTests` — bUnit: deutsche `h1`-Überschrift, keine englischen Template-Reste,
+  kein `h3`, Rückweg zum Dashboard (#126).
 
 Für Blazor-Komponententests wurde **bUnit** (`Directory.Packages.props`)
 aufgenommen; es wird framework-agnostisch mit xUnit v3 genutzt (`BunitContext`).

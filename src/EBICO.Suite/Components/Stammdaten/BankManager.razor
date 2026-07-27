@@ -1,7 +1,11 @@
+@implements IDisposable
 @inject IEmulatorStateProvider State
 @inject IMasterDataManager Manager
+@inject IMasterDataChangeNotifier Changes
 
-@* Interactive island (issue #53): manage the emulator's banks (Kreditinstitute / EBICS hosts). *@
+@* Interactive island (issue #53): manage the emulator's banks (Kreditinstitute / EBICS hosts).
+   Mutations are broadcast via IMasterDataChangeNotifier so the sibling islands — which see the
+   cascade into partners and subscribers — refresh too (issue #126). *@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -98,11 +102,47 @@
     private HostId? _deleteTarget;
     private string? _formError;
     private (string Text, string Css)? _alert;
+    private IDisposable? _subscription;
 
     /// <inheritdoc />
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        _subscription = Changes.Subscribe(OnMasterDataChangedAsync);
+        await ReloadAsync();
+    }
 
-    private async Task ReloadAsync() => _banks = await State.GetBanksAsync();
+    /// <inheritdoc />
+    public void Dispose() => _subscription?.Dispose();
+
+    // Sorted so the table has a stable order: the store hands out dictionary order (issue #126).
+    private async Task ReloadAsync()
+        => _banks = [.. (await State.GetBanksAsync()).OrderBy(b => b.HostId.Value, StringComparer.Ordinal)];
+
+    // A sibling island mutated the master data. Marshal onto this component's renderer before touching
+    // state, because the notification arrives on the notifying circuit's thread.
+    private Task OnMasterDataChangedAsync() => InvokeAsync(async () =>
+    {
+        await ReloadAsync();
+        DropDanglingSelections();
+        StateHasChanged();
+    });
+
+    // Drops transient UI state that points at a bank which no longer exists.
+    private void DropDanglingSelections()
+    {
+        if (_deleteTarget is { } target && !_banks.Any(b => b.HostId == target))
+        {
+            _deleteTarget = null;
+        }
+
+        if (_mode == FormMode.Edit
+            && HostId.TryCreate(_hostId, out var edited)
+            && !_banks.Any(b => b.HostId == edited))
+        {
+            _mode = FormMode.None;
+            _alert = ($"Bank {edited.Value} wurde zwischenzeitlich gelöscht.", "alert-warning");
+        }
+    }
 
     private void BeginCreate()
     {
@@ -146,6 +186,9 @@
             _deleteTarget = null;
             _alert = ($"Bank {hostId.Value} gelöscht.", "alert-success");
             await ReloadAsync();
+
+            // Cascaded into partners and subscribers — the sibling islands must drop those rows.
+            await Changes.NotifyChangedAsync();
         }
     }
 
@@ -166,10 +209,21 @@
             return;
         }
 
+        // SaveBankAsync is an idempotent upsert (docs/server/master-data.md). The create form must not
+        // silently overwrite an existing bank's name and versions, so guard the identity here (#126).
+        if (_mode == FormMode.Create && await Manager.GetBankAsync(hostId) is not null)
+        {
+            _formError = $"Bank {hostId.Value} existiert bereits — zum Ändern »Bearbeiten« verwenden.";
+            return;
+        }
+
         var name = string.IsNullOrWhiteSpace(_name) ? null : _name.Trim();
         await Manager.SaveBankAsync(new Bank(hostId, name, selected));
         _alert = ($"Bank {hostId.Value} gespeichert.", "alert-success");
         _mode = FormMode.None;
         await ReloadAsync();
+
+        // A new bank must appear in the partner/subscriber dropdowns without a page reload.
+        await Changes.NotifyChangedAsync();
     }
 }

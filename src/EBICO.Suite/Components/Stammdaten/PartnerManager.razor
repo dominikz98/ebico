@@ -1,8 +1,11 @@
+@implements IDisposable
 @inject IEmulatorStateProvider State
 @inject IMasterDataManager Manager
+@inject IMasterDataChangeNotifier Changes
 
 @* Interactive island (issue #53): manage partners (Kunden). A partner is scoped to a bank, so its
-   identity is the (HostID, PartnerID) pair (multi-tenant). *@
+   identity is the (HostID, PartnerID) pair (multi-tenant). Listens for master-data changes from the
+   sibling islands so the bank dropdown and the table never go stale (issue #126). *@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
@@ -102,13 +105,71 @@
     private string? _formError;
     private (string Text, string Css)? _alert;
 
-    /// <inheritdoc />
-    protected override async Task OnInitializedAsync() => await ReloadAsync();
+    private IDisposable? _subscription;
 
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _subscription = Changes.Subscribe(OnMasterDataChangedAsync);
+        await ReloadAsync();
+    }
+
+    /// <inheritdoc />
+    public void Dispose() => _subscription?.Dispose();
+
+    // Sorted so the table and the bank dropdown have a stable order (issue #126).
     private async Task ReloadAsync()
     {
-        _banks = await State.GetBanksAsync();
-        _partners = await State.GetPartnersAsync();
+        _banks = [.. (await State.GetBanksAsync()).OrderBy(b => b.HostId.Value, StringComparer.Ordinal)];
+        _partners =
+        [
+            .. (await State.GetPartnersAsync())
+                .OrderBy(p => p.HostId.Value, StringComparer.Ordinal)
+                .ThenBy(p => p.PartnerId.Value, StringComparer.Ordinal),
+        ];
+    }
+
+    // A sibling island mutated the master data (e.g. a new bank, or a bank deletion that cascaded into
+    // this table). Marshal onto this component's renderer before touching state.
+    private Task OnMasterDataChangedAsync() => InvokeAsync(async () =>
+    {
+        await ReloadAsync();
+        DropDanglingSelections();
+        StateHasChanged();
+    });
+
+    // Keeps transient UI state pointing at data that still exists: an open create form must not offer a
+    // bank that has just been deleted, and a delete confirmation for a cascaded partner is moot.
+    private void DropDanglingSelections()
+    {
+        if (_deleteTarget is { } t && !_partners.Any(p => p.HostId == t.Host && p.PartnerId == t.Partner))
+        {
+            _deleteTarget = null;
+        }
+
+        if (_mode == FormMode.None)
+        {
+            return;
+        }
+
+        var selectedHostGone = !HostId.TryCreate(_hostId, out var host) || !_banks.Any(b => b.HostId == host);
+        if (!selectedHostGone)
+        {
+            return;
+        }
+
+        if (_mode == FormMode.Edit)
+        {
+            _mode = FormMode.None;
+            _alert = ($"Partner {_partnerId} wurde zwischenzeitlich gelöscht.", "alert-warning");
+            return;
+        }
+
+        // Create: fall back to a bank that exists rather than posting against a deleted one.
+        _hostId = _banks.Count > 0 ? _banks[0].HostId.Value : string.Empty;
+        _formError = _banks.Count > 0
+            ? "Die gewählte Bank wurde zwischenzeitlich gelöscht — bitte die Auswahl prüfen."
+            : "Es existiert keine Bank mehr.";
     }
 
     private bool IsDeleteTarget(Partner partner)
@@ -150,6 +211,9 @@
             _alert = ($"Partner {t.Partner.Value} gelöscht.", "alert-success");
             _deleteTarget = null;
             await ReloadAsync();
+
+            // Cascaded into the partner's subscribers — the subscriber island must drop those rows.
+            await Changes.NotifyChangedAsync();
         }
     }
 
@@ -169,6 +233,15 @@
             return;
         }
 
+        // SavePartnerAsync is an idempotent upsert (docs/server/master-data.md); the create form must not
+        // silently overwrite an existing partner's name (#126).
+        if (_mode == FormMode.Create && await Manager.GetPartnerAsync(hostId, partnerId) is not null)
+        {
+            _formError =
+                $"Partner {partnerId.Value} existiert bei {hostId.Value} bereits — zum Ändern »Bearbeiten« verwenden.";
+            return;
+        }
+
         var name = string.IsNullOrWhiteSpace(_name) ? null : _name.Trim();
         try
         {
@@ -183,5 +256,8 @@
         _alert = ($"Partner {partnerId.Value} gespeichert.", "alert-success");
         _mode = FormMode.None;
         await ReloadAsync();
+
+        // A new partner must appear in the subscriber form's partner dropdown without a page reload.
+        await Changes.NotifyChangedAsync();
     }
 }

@@ -93,6 +93,13 @@ Live-Filter: **Kunde** (Partner-Dropdown), **Typ** (`EbicsEventType`), **Severit
 clientseitig** nachgefiltert, da `EbicsEventQuery` keine Severity-Dimension trägt. Jede Ereigniszeile
 mit Transaktions-ID hat einen „→ Transaktion"-Sprung, der die Detailansicht öffnet.
 
+**Die Auswahllisten sind datengetrieben** (`GetCustomerOptionsAsync` / `GetTypeOptionsAsync` /
+`GetSeverityOptionsAsync`): angeboten wird nur, was im Protokoll tatsächlich vorkommt. Vorher stammten
+Typ und Severity aus `Enum.GetValues`, sodass die meisten Optionen (`VeuSigned`, `ReceiptNegative`,
+`Error`, …) zuverlässig in „Keine Ereignisse für den aktuellen Filter." führten (#126). „Aktualisieren"
+liest die Listen neu und **verwirft eine Auswahl, die nicht mehr vorkommt** — die Tabelle kann so nicht
+in einem leeren Ergebnis hängen bleiben.
+
 ## Grenzen
 
 - **Key-Management-Orders** (INI/HIA/HPB/…) tragen keine Transaktions-ID und werden daher **nicht**
@@ -106,9 +113,10 @@ mit Transaktions-ID hat einen „→ Transaktion"-Sprung, der die Detailansicht 
 - `Server/InMemoryMessageCaptureStoreTests` — Sequence/Timestamp, Ring-Puffer, keyed Lookup, Kürzung.
 - `Server/MessageCaptureWritePointTests` — die Pipeline erfasst Init+Transfer roh; INI (ohne TxId) nicht.
 - `Suite/TransactionInspectorProviderTests` — Rekonstruktion/Status/Kind, Filter (inkl. Severity
-  clientseitig), OrderData resident vs. `null`, Kundenoptionen.
+  clientseitig), OrderData resident vs. `null`, Kunden-/Typ-/Severity-Optionen (nur Vorkommendes,
+  leeres Protokoll → leere Listen).
 - `Suite/TransactionInspectorTests` — bUnit: Liste + Status-Badges, Detail-Tabs (Roh-XML/OrderData),
-  Live-Severity-Filter, Sprung Ereignis→Transaktion.
+  Live-Severity-Filter, Sprung Ereignis→Transaktion, datengetriebene Filteroptionen.
 - `Suite/TransactionInspectorSeederTests` — der Seeder füllt Log/Stores/Captures und ist idempotent.
 
 ## Verwandtes

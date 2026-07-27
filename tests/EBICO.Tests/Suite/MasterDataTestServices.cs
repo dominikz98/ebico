@@ -20,6 +20,7 @@ internal static class MasterDataTestServices
         ctx.Services.AddSingleton<IServerKeyStore, InMemoryServerKeyStore>();
         ctx.Services.AddSingleton<IServerBankKeyStore, InMemoryServerBankKeyStore>();
         ctx.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>();
+        ctx.Services.AddSingleton<IMasterDataChangeNotifier, MasterDataChangeNotifier>();
         return ctx.Services.GetRequiredService<IMasterDataManager>();
     }
 }

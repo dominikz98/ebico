@@ -138,6 +138,22 @@ public sealed class TransactionInspectorProvider : ITransactionInspectorProvider
             .ToList();
     }
 
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<EbicsEventType>> GetTypeOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await _eventLog.QueryAsync(new EbicsEventQuery(), cancellationToken).ConfigureAwait(false);
+
+        return events.Select(e => e.Type).Distinct().OrderBy(t => t).ToList();
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<EbicsEventSeverity>> GetSeverityOptionsAsync(CancellationToken cancellationToken = default)
+    {
+        var events = await _eventLog.QueryAsync(new EbicsEventQuery(), cancellationToken).ConfigureAwait(false);
+
+        return events.Select(e => e.Severity).Distinct().OrderBy(s => s).ToList();
+    }
+
     // Groups the transaction-bearing events by their (hex) transaction id, preserving first-seen order and
     // ascending sequence within each group.
     private static Dictionary<string, List<EbicsEvent>> GroupByTransaction(IReadOnlyList<EbicsEvent> events)

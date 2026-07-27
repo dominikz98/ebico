@@ -54,4 +54,24 @@ public class IniLetterComparisonToolTests
 
         cut.Find(".alert-warning").TextContent.Should().Contain("Hexadezimal");
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Compare_EmptyFingerprint_AsksForInputInsteadOfBlamingTheHex(string expected)
+    {
+        // Issue #126: an empty field is „nothing typed yet", not „unreadable hex" — the tool is for
+        // transcribing a fingerprint off a letter, so the guidance has to differ.
+        using var ctx = new BunitContext();
+        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TEST", KeyPurpose.Signature, "A006");
+        ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
+
+        var cut = ctx.Render<IniLetterComparisonTool>();
+        cut.Find("#expected-fingerprint").Change(expected);
+        cut.Find("button").Click();
+
+        var warning = cut.Find(".alert-warning").TextContent;
+        warning.Should().Contain("Bitte den Fingerprint aus dem INI-Brief eintragen");
+        warning.Should().NotContain("Hexadezimal");
+    }
 }

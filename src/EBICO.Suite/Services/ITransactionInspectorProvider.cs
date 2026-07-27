@@ -1,3 +1,5 @@
+using EBICO.Server.State;
+
 namespace EBICO.Suite.Services;
 
 /// <summary>
@@ -36,4 +38,23 @@ public interface ITransactionInspectorProvider
     /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>The distinct customer ids, ascending.</returns>
     Task<IReadOnlyList<string>> GetCustomerOptionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the distinct event types actually present in the log, for the filter dropdown.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The distinct types, in enum order.</returns>
+    /// <remarks>
+    /// Derived from the data rather than from <c>Enum.GetValues</c>: offering every type led into an
+    /// empty table for the ones no event ever carried (issue #126), the same reason
+    /// <see cref="GetCustomerOptionsAsync"/> has always been data-driven.
+    /// </remarks>
+    Task<IReadOnlyList<EbicsEventType>> GetTypeOptionsAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Returns the distinct severities actually present in the log, for the filter dropdown.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>The distinct severities, in enum order (ascending by severity).</returns>
+    Task<IReadOnlyList<EbicsEventSeverity>> GetSeverityOptionsAsync(CancellationToken cancellationToken = default);
 }

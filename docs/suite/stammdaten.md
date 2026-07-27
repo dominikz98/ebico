@@ -49,6 +49,57 @@ Die Seite selbst ist **Static SSR**; die drei Verwaltungsbereiche sind **interak
 gesetzt (ADR-0009, „Interaktivität pro Komponente"). Formulare nutzen einfaches Bootstrap mit
 `@bind`/`@onclick` und melden Ergebnisse über Bootstrap-Alerts zurück — keine Exceptions in der UI.
 
+## Konsistenz zwischen den Inseln (#126)
+
+Die drei Inseln sind **eigenständige Komponenten mit je eigener Zustandskopie**, schreiben aber durch
+denselben `IMasterDataManager` — und die Beziehungen kaskadieren. Ohne Benachrichtigung entwertet
+deshalb jede Mutation in einer Insel die anderen beiden still (neue Bank fehlt in den Auswahlfeldern,
+kaskadierend gelöschte Zeilen bleiben als Karteileichen stehen). Dafür gibt es
+**`IMasterDataChangeNotifier`** ([ADR-0031](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)):
+
+```csharp
+// Program.cs — Singleton, wie die Stores dahinter
+builder.Services.AddSingleton<IMasterDataChangeNotifier, MasterDataChangeNotifier>();
+```
+
+Regeln für jede Komponente, die Stammdaten anzeigt:
+
+1. In `OnInitializedAsync` **abonnieren**, in `Dispose` das Abo **zurückgeben**
+   (`@implements IDisposable`).
+2. Nach **jeder** erfolgreichen Mutation `await Changes.NotifyChangedAsync()`.
+3. Im Handler über **`InvokeAsync`** auf den eigenen Renderer zurückwechseln — die Benachrichtigung
+   kommt auf dem Thread des auslösenden Circuits an, nicht auf dem eigenen.
+4. Nach dem Neuladen **transiente UI-Zustände prüfen**: ein offenes Formular darf keine gelöschte
+   Bank mehr anbieten, eine Löschbestätigung für einen kaskadierten Datensatz ist gegenstandslos, ein
+   Detailbereich ohne Datensatz schließt sich. Neuladen allein repariert nur die Tabellen.
+
+> **Wer das Abo vergisst, veraltet wieder still** — es gibt dafür keinen Wächter außer den Tests in
+> `StammdatenIslandSyncTests`.
+
+Weil der Notifier ein Singleton ist, konvergieren auch **mehrere Browser-Sitzungen**: der Zustand
+dahinter ist prozessweit geteilt, die Benachrichtigung ist es damit ebenso.
+
+## Anlegen ist nicht Überschreiben (#126)
+
+Die `Save*`-Operationen des Managers sind **idempotente Upserts**
+([master-data.md](../server/master-data.md)) — richtig für die API, aber gefährlich hinter einem
+Formular, das „Anlegen" heißt. Ein `SaveSubscriberAsync(new Subscriber(...))` auf eine bereits
+belegte Identität setzte den Teilnehmer auf `New` zurück und verwarf alle Berechtigungen, gemeldet mit
+einer grünen Erfolgsmeldung. Die Create-Pfade prüfen die Identität deshalb **vorher**
+(`GetBankAsync`/`GetPartnerAsync`/`GetSubscriberAsync`) und weisen die Kollision mit einem Hinweis auf
+„Bearbeiten" bzw. „Details" ab. Die Edit-Pfade sind unberührt — dort *ist* Überschreiben gewollt.
+
+Die Mehrmandanten-Semantik bleibt erhalten: derselbe `PartnerID` an einer anderen Bank bzw. dieselbe
+`UserID` bei einem anderen Partner ist eine **andere** Identität und wird nicht als Kollision gewertet.
+
+## Sortierung
+
+Der Store liefert Dictionary-Reihenfolge (`_banks.Values.ToArray()`), also keine zugesagte Ordnung —
+in der UI sprangen Zeilen dadurch beim Anlegen/Löschen an unvorhersehbare Stellen. Die Komponenten
+sortieren daher selbst (Banken nach `HostID`, Partner nach `(HostID, PartnerID)`, Teilnehmer nach
+`(HostID, PartnerID, UserID)`, ordinal). Der Store bleibt bewusst „dumm" — die Sortierung ist eine
+Darstellungsfrage.
+
 ## Aufbau
 
 | Komponente | Inhalt | Operationen |
@@ -105,6 +156,16 @@ den **echten** `MasterDataManager` über einen `InMemoryEbicsStateStore`):
 - `PartnerManagerTests` — Anlegen über Bank-Dropdown, „ohne Bank"-Sperre, Löschen.
 - `SubscriberManagerTests` — Anlegen über abhängige Dropdowns, Status-Übergang, Berechtigung
   hinzufügen/speichern, Löschen.
+- `MasterDataChangeNotifierTests` — der Broadcast-Kontrakt: jeder Abonnent wird erreicht, `Dispose`
+  meldet wirklich ab (und ist idempotent), ein fehlschlagender Abonnent stoppt die übrigen nicht.
+- `StammdatenIslandSyncTests` — die #126-Regression. Mehrere Komponenten in **einem**
+  `BunitContext` teilen den DI-Container und damit Store und Notifier, was den Insel-Aufbau der Seite
+  nachbildet: neue Bank erscheint in beiden Auswahlfeldern (auch in einem *bereits geöffneten*
+  Formular), gelöschte Bank verschwindet daraus, Kaskaden räumen die Geschwister-Tabellen, ein
+  Detailbereich über einem kaskadierten Teilnehmer schließt sich, und die Tabellen sind sortiert.
+- `StammdatenCreateCollisionTests` — Anlegen auf eine belegte Identität wird abgewiesen und lässt
+  Status/Berechtigungen unangetastet; Bearbeiten speichert weiterhin; gleiche `PartnerID`/`UserID` bei
+  anderer Bank/anderem Partner bleibt erlaubt.
 
 ## Verwandtes
 
@@ -112,3 +173,4 @@ den **echten** `MasterDataManager` über einen `InMemoryEbicsStateStore`):
 - [Server: Stammdatenverwaltung (#30)](../server/master-data.md) — die genutzte Manager-/Store-Schicht
 - [Domänenmodell](../protocol/domain-model.md) — Aggregate, IDs, Berechtigungen, Zustände
 - [ADR-0009 — Blazor Render-Modus (In-Process-Zustand)](../adr/0009-blazor-render-mode.md)
+- [ADR-0031 — Änderungsbenachrichtigung zwischen den Stammdaten-Inseln](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)

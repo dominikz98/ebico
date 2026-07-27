@@ -185,7 +185,7 @@
             <label class="form-label small mb-0" for="filter-type">Typ</label>
             <select class="form-select form-select-sm" id="filter-type" @bind="_filterType" @bind:after="ApplyFilterAsync">
                 <option value="">Alle Typen</option>
-                @foreach (var type in EventTypes)
+                @foreach (var type in _typeOptions)
                 {
                     <option value="@type">@type</option>
                 }
@@ -195,7 +195,7 @@
             <label class="form-label small mb-0" for="filter-severity">Severity</label>
             <select class="form-select form-select-sm" id="filter-severity" @bind="_filterSeverity" @bind:after="ApplyFilterAsync">
                 <option value="">Alle</option>
-                @foreach (var severity in Severities)
+                @foreach (var severity in _severityOptions)
                 {
                     <option value="@severity">@severity</option>
                 }
@@ -268,13 +268,15 @@
         Events,
     }
 
-    private static readonly EbicsEventType[] EventTypes = Enum.GetValues<EbicsEventType>();
-    private static readonly EbicsEventSeverity[] Severities = Enum.GetValues<EbicsEventSeverity>();
-
     private bool _loading = true;
     private IReadOnlyList<TransactionSummary> _transactions = [];
     private IReadOnlyList<EventView> _events = [];
     private IReadOnlyList<string> _customerOptions = [];
+
+    // Filter options come from the log, not from Enum.GetValues: an option no event carries only ever
+    // leads into „Keine Ereignisse für den aktuellen Filter." (issue #126).
+    private IReadOnlyList<EbicsEventType> _typeOptions = [];
+    private IReadOnlyList<EbicsEventSeverity> _severityOptions = [];
 
     private string? _selectedTxId;
     private TransactionDetail? _detail;
@@ -290,7 +292,7 @@
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
-        _customerOptions = await Inspector.GetCustomerOptionsAsync();
+        await LoadFilterOptionsAsync();
         _transactions = await Inspector.GetTransactionsAsync();
         _events = await Inspector.GetEventsAsync(new EventLogFilter());
         _loading = false;
@@ -299,10 +301,34 @@
     private async Task ReloadAsync()
     {
         _transactions = await Inspector.GetTransactionsAsync();
-        _customerOptions = await Inspector.GetCustomerOptionsAsync();
+        await LoadFilterOptionsAsync();
         if (_selectedTxId is { } id)
         {
             _detail = await Inspector.GetTransactionAsync(id);
+        }
+    }
+
+    // Re-reads the three data-driven filter option lists and drops a selection that no longer occurs,
+    // so the table cannot get stuck on an empty result after a refresh.
+    private async Task LoadFilterOptionsAsync()
+    {
+        _customerOptions = await Inspector.GetCustomerOptionsAsync();
+        _typeOptions = await Inspector.GetTypeOptionsAsync();
+        _severityOptions = await Inspector.GetSeverityOptionsAsync();
+
+        if (_filterPartner.Length > 0 && !_customerOptions.Contains(_filterPartner, StringComparer.Ordinal))
+        {
+            _filterPartner = string.Empty;
+        }
+
+        if (_filterType.Length > 0 && !_typeOptions.Any(t => t.ToString() == _filterType))
+        {
+            _filterType = string.Empty;
+        }
+
+        if (_filterSeverity.Length > 0 && !_severityOptions.Any(s => s.ToString() == _filterSeverity))
+        {
+            _filterSeverity = string.Empty;
         }
     }
 

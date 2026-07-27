@@ -33,7 +33,7 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 ## 4. ADR (bei Designentscheidungen)
 
 - Neue Datei `docs/adr/NNNN-<kebab-titel-deutsch>.md` mit der **nächsten freien Nummer** (aktuell endet
-  der Bestand bei 0028). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
+  der Bestand bei 0031). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
 - Im ADR-Index `docs/adr/README.md` eintragen.
 
 ## 5. Tests
