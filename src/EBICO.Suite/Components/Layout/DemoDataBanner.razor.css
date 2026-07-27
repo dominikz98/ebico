@@ -1,0 +1,30 @@
+.demo-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.6rem;
+    margin: 0 0 1.25rem;
+    padding: 0.7rem 0.95rem;
+    border: 1px solid #ffe08a;
+    border-left: 4px solid #f0ad4e;
+    border-radius: 4px;
+    background-color: #fff9e6;
+    color: #4a3b12;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.demo-banner-icon {
+    flex: 0 0 auto;
+    line-height: 1.45;
+}
+
+.demo-banner code {
+    padding: 0.05rem 0.3rem;
+    border-radius: 3px;
+    background-color: rgba(0, 0, 0, 0.06);
+    font-size: 0.85em;
+}
+
+.demo-banner a {
+    color: #6b4e00;
+}

@@ -39,6 +39,19 @@ die Blazor-Template-Demoseiten (Counter/Weather) wurden entfernt.
 Das `MainLayout` behält die Sidebar-Struktur des Templates (Sidebar + Content),
 zeigt in der Top-Row aber den EBICO-Titel statt des Template-„About"-Links.
 
+### Beispieldaten-Banner (#124)
+
+Über dem Seiteninhalt steht in **jeder** Ansicht ein `DemoDataBanner`
+(`Components/Layout/DemoDataBanner.razor`, `role="note"`): die Suite arbeitet auf einem **eigenen**
+In-Memory-Zustand mit geseedeten Stammdaten und Transaktionen und ist **nicht** mit einem separat
+gestarteten `EBICO.Server`-Prozess verbunden.
+
+Diese Trennung ist seit [ADR-0009](../adr/0009-blazor-render-mode.md) gewollt und in
+[ADR-0015](../adr/0015-ereignis-protokollspeicher.md) sowie im `docker-compose.yml` dokumentiert — sie
+war nur **in der Oberfläche selbst** unsichtbar. Wer `docker compose up` fährt, sieht zwei Dienste
+nebeneinander und eine UI, die plausible Transaktionen eines Servers zeigt, der sie nie gesehen hat.
+Der Banner schließt genau diese Lücke zwischen Doku und Bildschirm.
+
 ## Theming
 
 Ein zurückhaltendes, EBICO-eigenes Theme statt der Template-Defaults; kein
