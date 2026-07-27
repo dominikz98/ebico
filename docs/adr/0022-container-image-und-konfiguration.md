@@ -20,8 +20,9 @@ gar nicht griffen.
 ## Entscheidung
 
 1. **Multi-Stage-Build, offizielle .NET-Images.** Build-Stage `mcr.microsoft.com/dotnet/sdk:10.0`,
-   Runtime-Stage `mcr.microsoft.com/dotnet/aspnet:10.0`. Das Floating-Tag `10.0` erfüllt den engen
-   `global.json`-Pin (`10.0.300`, `latestFeature`). Kein `--locked-mode` (keine Lockfiles, zentrale
+   Runtime-Stage `mcr.microsoft.com/dotnet/aspnet:10.0`. Das Floating-Tag `10.0` erfüllt den
+   `global.json`-Pin (damals `10.0.300`, seit #124 `10.0.100` — je `latestFeature`; das Floating-Tag
+   liefert ohnehin das neueste 10.0.x). Kein `--locked-mode` (keine Lockfiles, zentrale
    Paketverwaltung). Runtime läuft als **nicht-root** (`USER $APP_UID`), Port **8080**.
 2. **Ein einziges, parametrisiertes Dockerfile im Repo-Root** mit Build-Arg **`PROJECT`** (Default
    `EBICO.Server`). `docker build .` baut den Server (das Headline-Artefakt); `--build-arg

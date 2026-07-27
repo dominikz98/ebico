@@ -35,10 +35,10 @@ docker build --build-arg PROJECT=EBICO.Suite -t ebico-suite:local .
 `ENTRYPOINT` ist `["dotnet"]`, `CMD` ist `["EBICO.Server.dll"]`. Für die Suite wird das Kommando auf
 `EBICO.Suite.dll` überschrieben (siehe `docker-compose.yml`).
 
-> **SDK-Pin:** `global.json` pinnt das SDK auf `10.0.300` (`rollForward: latestFeature`). Das
-> Floating-Tag `sdk:10.0` liefert stets das neueste 10.0.x-SDK (≥ 10.0.300) und erfüllt den Pin. Es
-> gibt bewusst **keine** `packages.lock.json` (zentrale Paketverwaltung), daher wird `dotnet restore`
-> **nicht** im `--locked-mode` ausgeführt.
+> **SDK-Pin:** `global.json` pinnt das SDK auf `10.0.100` (`rollForward: latestFeature`, seit #124 die
+> niedrigste taugliche Version statt eines hohen Feature-Bands). Das Floating-Tag `sdk:10.0` liefert
+> stets das neueste 10.0.x-SDK und erfüllt den Pin. Es gibt bewusst **keine** `packages.lock.json`
+> (zentrale Paketverwaltung), daher wird `dotnet restore` **nicht** im `--locked-mode` ausgeführt.
 
 Der Container starten & prüfen:
 

@@ -70,8 +70,18 @@ transitive Pakete — das liefert reproduzierbare Restores **ohne**
 
 ### `global.json`
 
-Pinnt die .NET-SDK-Version (`rollForward: latestFeature`), damit lokale Builds
-und CI dieselbe Toolchain verwenden.
+Pinnt die .NET-SDK-Version auf **`10.0.100`** mit `rollForward: latestFeature`:
+verlangt wird .NET 10 (das Ziel-Framework aller Projekte), akzeptiert wird jedes
+installierte 10.0.x-SDK ab dem ersten Feature-Band — genommen wird das höchste
+davon. Damit bauen lokale Maschinen und CI mit derselben Major-Toolchain, ohne
+dass ein Beitragender ein bestimmtes Feature-Band nachinstallieren muss.
+
+> **Warum nicht auf ein höheres Band pinnen (#124):** `latestFeature` rollt nur
+> **aufwärts**. Ein Pin auf z. B. `10.0.300` lässt sich mit einem installierten
+> SDK 10.0.2xx **nicht** auflösen — dann scheitert jeder `dotnet`-Befehl im Repo
+> mit „A compatible .NET SDK was not found", während die CI unauffällig grün
+> bleibt (`actions/setup-dotnet` lädt die gepinnte Version einfach herunter).
+> Der Pin nennt daher die **niedrigste** taugliche Version, nicht die neueste.
 
 ### `.editorconfig`
 
