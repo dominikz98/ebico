@@ -15,6 +15,13 @@ public sealed class CdbUploadRequest : IEbicsRequest<UploadResult>, IPaymentUplo
     /// <summary>The maximum raw segment size in bytes, or <see langword="null"/> for the connector default.</summary>
     public int? MaxSegmentSizeBytes { get; init; }
 
+    /// <summary>
+    /// Asks the bank to park this payment for the <b>distributed electronic signature</b> (VEU/EDS)
+    /// instead of executing it immediately (#124). See <see cref="UploadRequest.DistributedSignature"/>
+    /// and <c>docs/connector/veu.md</c>.
+    /// </summary>
+    public bool DistributedSignature { get; init; }
+
     /// <inheritdoc />
     ReadOnlyMemory<byte> IPaymentUploadRequest.Payload => Pain008;
 
@@ -23,4 +30,7 @@ public sealed class CdbUploadRequest : IEbicsRequest<UploadResult>, IPaymentUplo
 
     /// <inheritdoc />
     int? IPaymentUploadRequest.MaxSegmentSizeBytes => MaxSegmentSizeBytes;
+
+    /// <inheritdoc />
+    bool IPaymentUploadRequest.DistributedSignature => DistributedSignature;
 }

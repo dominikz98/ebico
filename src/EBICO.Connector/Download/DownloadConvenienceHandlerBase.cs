@@ -25,6 +25,6 @@ internal abstract class DownloadConvenienceHandlerBase<TRequest> : IEbicsRequest
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(ctx);
         return _executor.ExecuteAsync(
-            request.OrderType, btf: null, fileFormat: null, request.Period, request.Parse, ctx, ct);
+            request.OrderType, btf: null, fileFormat: null, request.Period, request.Parse, ctx, ct, request.Veu);
     }
 }

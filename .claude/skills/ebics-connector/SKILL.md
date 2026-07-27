@@ -39,7 +39,16 @@ Mediator-Muster: die Anwendung kennt nur `IEbicsClient.Send(request)` und bekomm
   zweiphasig (Initialisation → Transfer).
 - **Download** (`docs/connector/download.md`): generische `DownloadRequest` + Convenience (STA/VMK/C5x/…,
   HAC/HTD/HKD/…), optionale Parsing-Hooks (`DownloadResult.ParsedAs<T>()`); dreiphasig (… → Receipt).
+- **VEU** (`docs/connector/veu.md`, #124): `UploadRequest.DistributedSignature` parkt einen Auftrag;
+  `Hvu`/`Hvz`/`Hvd`/`Hvt`/`Hve`/`HvsRequest` + `VeuOrderReference` fahren den Mehr-Augen-Workflow.
 - **Versions-Dispatch:** H005 `BTU`/`BTD`+BTF · H003/H004 `OrderType`/`FUL`/`FDL`.
+  **Administrative Order-Typen** (HTD/HKD/… und VEU) tragen **keinen** BTF und bleiben auf H005
+  `AdminOrderType` — in **beide** Richtungen, Upload wie Download (seit #124/ADR-0030).
+- **Segmentgröße:** Default ist der geteilte `EbicsSegmentation.DefaultSegmentSizeBytes` (512 KiB). Beim
+  Anheben immer gegen das Body-Limit der Gegenstelle rechnen (`MaxSegmentSizeForRequestBody`), sonst
+  antwortet sie mit HTTP 413 statt mit einem Returncode.
+- **Antworten auswerten:** Code und Report-Text gemeinsam über `EbicsReturnCodes.CombineOutcome(…)` —
+  nie den Header-Text zu einem Body-Code mischen.
 
 ## Clientseitige Sende-Validierung (ADR-0025)
 

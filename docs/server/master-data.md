@@ -108,6 +108,7 @@ Pfad ist über `EbicoServerOptions.AdminApiPath` konfigurierbar.
 | `GET/PUT/DELETE …/subscribers/{userId}` | Teilnehmer lesen / upsert / löschen | 200 / 200 / 204 |
 | `PUT …/subscribers/{userId}/permissions` | Berechtigungsmenge ersetzen | 200 |
 | `POST …/subscribers/{userId}/state` | Lebenszyklus-Übergang (`{"target":"Ready"}`) | 200 |
+| `GET /admin/banks/{hostId}/keys` | öffentliche **Bankschlüssel** (Fingerprints, PEM) | 200 |
 
 Beispiel — Teilnehmer anlegen (nachdem Bank + Partner existieren):
 
@@ -124,6 +125,33 @@ Content-Type: application/json
 > `Partner.accounts` (`[{iban,bic,holder,currency,description,id}]`, von HTD/HKD ausgeliefert) sowie
 > `Subscriber.name` (Teilnehmer-Name). Alle sind rückwärtskompatibel (Default `null`/leer) und werden vom
 > jeweiligen `GET` wieder zurückgeliefert.
+
+### Bankschlüssel abrufen — der „Bankbrief" des Emulators (#124)
+
+`GET /admin/banks/{hostId}/keys` liefert die **öffentlichen** Schlüssel der Bank (`X00x`/`E00x`) aus dem
+`IServerBankKeyStore` — je Fingerprint (Hex und Briefformat), Version, Schlüssellänge und
+`SubjectPublicKeyInfo`-PEM. Das Paar wird beim ersten Zugriff erzeugt, genau wie HPB es täte, und bleibt
+danach stabil. Eine unbekannte Bank ergibt **404**.
+
+```jsonc
+{
+  "hostId": "EBICOHOST",
+  "authentication": {
+    "purpose": "Authentication", "version": "X002", "keySizeBits": 2048,
+    "fingerprint": "A1B2…",              // gegen HpbResult vergleichen
+    "fingerprintLetterFormat": "A1 B2 …", // Darstellung wie auf einem Bankbrief
+    "publicKeyPem": "-----BEGIN PUBLIC KEY-----\n…"
+  },
+  "encryption": { "purpose": "Encryption", "version": "E002", /* … */ }
+}
+```
+
+> **Wozu:** Ein Client soll die Fingerprints aus der HPB-Antwort gegen einen **unabhängigen** Kanal
+> prüfen — bei einer echten Bank ist das der Bankbrief. Gegen einen separat gehosteten Emulator gab es
+> diesen Kanal nicht: HPB lieferte die Schlüssel aus, aber niemand konnte sie vorher kennen, also blieb
+> `HpbResult.FingerprintsVerified` dort zwangsläufig `false`. In-process bleibt
+> `IServerBankKeyStore.SetAsync` der Weg, ein *bekanntes* Paar zu setzen (so macht es der Quickstart).
+> Private Bestandteile werden **nicht** exponiert.
 
 Fehlerabbildung:
 

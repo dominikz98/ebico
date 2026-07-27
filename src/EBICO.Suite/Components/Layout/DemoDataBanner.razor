@@ -1,0 +1,15 @@
+@* Kennzeichnet den Datenbestand der Suite als eigenständige Beispieldaten (#124).
+
+   Die Suite hält ihren eigenen In-Memory-Zustand und teilt ihn nicht mit einem separat laufenden
+   EBICO.Server-Prozess (ADR-0009/ADR-0015). Ohne diesen Hinweis lesen sich die geseedeten Banken,
+   Teilnehmer und Transaktionen wie der Live-Zustand eines danebenlaufenden Emulators. *@
+
+<div class="demo-banner" role="note">
+    <span class="demo-banner-icon" aria-hidden="true">ℹ️</span>
+    <span>
+        <strong>Beispieldaten.</strong> Diese Oberfläche arbeitet auf einem eigenen In-Memory-Zustand
+        mit vorbelegten Stammdaten und Transaktionen. Sie ist <strong>nicht</strong> mit einem separat
+        laufenden <code>EBICO.Server</code>-Prozess verbunden — dessen echte Transaktionen erscheinen
+        hier nicht (<a href="https://github.com/dominikz98/ebico/blob/main/docs/adr/0015-ereignis-protokollspeicher.md" target="_blank" rel="noopener">ADR-0015</a>).
+    </span>
+</div>

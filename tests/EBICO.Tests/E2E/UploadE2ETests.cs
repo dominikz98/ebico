@@ -5,6 +5,7 @@ using EBICO.Connector.Upload;
 using EBICO.Core;
 using EBICO.Core.Domain;
 using EBICO.Core.ReturnCodes;
+using EBICO.Core.Serialization;
 using EBICO.Server.State;
 using EBICO.Tests.Infrastructure;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -58,6 +59,33 @@ public class UploadE2ETests : IClassFixture<WebApplicationFactory<ServerProgram>
         // BTF of SCT/pain.001), the server resolves it back to the one classical code it authorises and
         // processes against.
         transaction.EffectiveOrderType.Should().Be("CCT");
+    }
+
+    [Theory]
+    [MemberData(nameof(Versions))]
+    public async Task CctUpload_LargerThanOneSegment_RoundTripsWithTheShippedDefaults(EbicsVersion version)
+    {
+        // The gap that let #124 through: every other upload test fits into a single segment, so the
+        // connector's segment size and the server's request-body limit were never exercised together.
+        // With the historical 768 KiB default this call died with HTTP 413 before reaching the pipeline.
+        await using var harness = await EbicsE2EHarness.CreateAsync(_factory, version, "CCTMULTISEG", ct: _ct);
+        (await harness.OnboardAsync(_ct)).ThrowIfFailed();
+
+        // Incompressible content, so the ciphertext really spans several segments (a repetitive sample
+        // deflates into one no matter how large it is).
+        var pain = Encoding.UTF8.GetBytes(PainSamples.IncompressibleCreditTransfer(transactionCount: 6000));
+        pain.Length.Should().BeGreaterThan(EbicsSegmentation.DefaultSegmentSizeBytes);
+
+        var result = await harness.Client.Send(new CctUploadRequest { Pain001 = pain }, _ct);
+
+        result.IsSuccess.Should().BeTrue($"multi-segment CCT upload failed: {result.ReturnCode} {result.ReturnText}");
+        result.Value!.NumSegments.Should().BeGreaterThan(1, "the payload must not fit into a single segment");
+
+        // The server reassembled every segment back into the exact bytes the client sent.
+        var store = harness.ServerServices.GetRequiredService<IUploadTransactionStore>();
+        store.TryGet(result.Value.TransactionId, out var transaction).Should().BeTrue();
+        transaction!.IsComplete.Should().BeTrue();
+        transaction.OrderData.Should().Equal(pain);
     }
 
     [Theory]

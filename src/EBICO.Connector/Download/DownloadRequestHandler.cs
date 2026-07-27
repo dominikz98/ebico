@@ -20,6 +20,6 @@ internal sealed class DownloadRequestHandler : IEbicsRequestHandler<DownloadRequ
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(ctx);
         return _executor.ExecuteAsync(
-            request.OrderType, request.Btf, request.FileFormat, request.Period, request.Parse, ctx, ct);
+            request.OrderType, request.Btf, request.FileFormat, request.Period, request.Parse, ctx, ct, request.Veu);
     }
 }

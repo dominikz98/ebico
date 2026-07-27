@@ -69,6 +69,12 @@ public class DownloadE2ETests : IClassFixture<WebApplicationFactory<ServerProgra
         // H005 BTF (BTD) identifier the connector actually sent.
         result.IsSuccess.Should().BeFalse();
         result.ReturnCode.Should().Be(EbicsReturnCode.AuthorisationOrderTypeFailed.Code);
+
+        // A business fault reports its code with a text that agrees with it. Before #124 the code came
+        // from the body while the text was read from the header — which says EBICS_OK in exactly this
+        // situation — so callers saw "090003: EBICS_OK".
+        result.ReturnText.Should().NotBe("EBICS_OK");
+        result.ReturnText.Should().Be(EbicsReturnCode.AuthorisationOrderTypeFailed.SymbolicName);
     }
 
     private static byte[] Unzip(byte[] zip)

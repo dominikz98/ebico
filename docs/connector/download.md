@@ -215,6 +215,7 @@ Server-Antworten baut ein Tier-A-Fake mit dem echten `EbicsResponseFactory`.
 - [Server: Download-Transaktion](../server/download-transaction.md) — die Gegenseite (#33)
 - [Server: Kontoauszug-Orders](../server/statement-orders.md) — STA/VMK/C53/C52/C54-Erzeugung (#40)
 - [Server: Status-/Protokoll-Orders](../server/status-protocol-orders.md) — HAC/HTD/HKD/HAA/HPD/PTK (#41)
+- [Connector: VEU](veu.md) — #124: die VEU-Downloads HVU/HVZ/HVD/HVT (letztere beide über `DownloadRequest.Veu` bzw. eine `VeuOrderReference`)
 - [Verschlüsselung E002](../protocol/encryption-e002.md) · [Authentifikationssignatur X002](../protocol/auth-signature-x002.md) · [Segmentierung](../server/segmentation.md)
 
 ---

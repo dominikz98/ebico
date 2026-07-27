@@ -78,6 +78,29 @@ Der Default 512 KiB lässt bewusst Reserve für Header, `AuthSignature` und die 
 alle in denselben HTTP-Body zählen. Determinismus: gleiche Eingabe + gleiche Größe → **byte-identische**
 Segmente (`NumSegments = ⌈payload.Length / SegmentSizeBytes⌉`, feste sequentielle Slices).
 
+### Der Default ist geteilt (#124)
+
+Die Zahl steht seit **#124** genau einmal, in `EBICO.Core`:
+**`EbicsSegmentation.DefaultSegmentSizeBytes`**. Sowohl `EbicoServerOptions.SegmentSizeBytes` als auch die
+Upload-Pipeline des Connectors (`UploadExecutor`) beziehen sich darauf — beide Seiten sind damit **per
+Konstruktion** kompatibel.
+
+> **Warum das nötig war:** vorher wählten beide Seiten unabhängig. Der Connector nahm 768 KiB — das
+> theoretische Maximum aus der Tabelle oben, dessen Base64-Form *exakt* das 1-MiB-Body-Limit ausfüllt und
+> **null** Reserve fürs Envelope lässt. Jeder Upload, dessen komprimierte und verschlüsselte
+> Auftragsdaten ein volles Segment füllten, wurde mit **HTTP 413** abgewiesen, bevor der Server
+> überhaupt antworten konnte (also ohne EBICS-Returncode, als Transport-Exception mitten in der
+> Transaktion). Beide Defaults waren einzeln getestet, aber nie gemeinsam über den echten Draht:
+> `UploadE2ETests` prüfte explizit `NumSegments == 1`.
+
+Wer von einem 1-MiB-Body-Limit abweicht, leitet die passende Segmentgröße mit
+**`EbicsSegmentation.MaxSegmentSizeForRequestBody(maxRequestBodyBytes, envelopeReserveBytes)`** ab, statt
+sie zu raten. `EbicsSegmentation.Base64Length(n)` liefert die Drahtgröße ohne Probe-Encoding. Die
+Beziehung selbst — *Base64-Segment + Envelope-Reserve ≤ Body-Limit* — ist als Guard-Test festgeschrieben
+(`SegmentSizeCompatibilityTests`), inklusive des historischen 768-KiB-Werts als Negativbeispiel. Die
+Primitive `Split` bleibt davon unberührt **policy-frei**: der Default ist eine Konstante daneben, keine
+Vorgabe im Splitter.
+
 ## Returncodes & Grenzfälle
 
 Die Primitive wirft nur **Argument-Form-Fehler** (BCL, keine eigene Exception-Klasse):
@@ -139,6 +162,13 @@ Elemente). Der Cast `int → ulong` erfolgt erst beim Header-Mapping in #32/#33.
 - **End-to-end mit `EbicsCompression`:** `Decompress(Reassemble(Split(Compress(data), 64).Segments)) == data`
   (kleine Segmentgröße erzwingt mehrere Segmente) — belegt deterministische Reassemblierung real, nicht
   nur Selbstkonsistenz einer Ebene.
+- **Default-Kompatibilität** (`SegmentSizeCompatibilityTests`, #124): `Base64Length(SegmentSizeBytes)` +
+  Envelope-Reserve ≤ `MaxRequestBodyBytes`; Server- und Core-Default sind dieselbe Konstante; der
+  historische 768-KiB-Wert füllt das Limit exakt aus (als Negativbeispiel festgehalten);
+  `MaxSegmentSizeForRequestBody` liefert den größten Wert, der noch passt.
+- **Mehrsegmentiger E2E-Upload** (`UploadE2ETests`, #124): ein Upload mit den **ausgelieferten** Defaults
+  über mehrere Segmente, je H003/H004/H005. Die Nutzlast ist bewusst inkompressibel (base64-Rauschen) —
+  ein normales pain.001 deflatiert auch bei zehn Megabyte auf ein einziges Segment.
 
 ## Verwandte Doku
 

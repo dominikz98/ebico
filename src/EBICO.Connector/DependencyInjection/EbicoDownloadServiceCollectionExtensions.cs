@@ -55,6 +55,13 @@ public static class EbicoDownloadServiceCollectionExtensions
         services.TryAddSingleton<IEbicsRequestHandler<HacDownloadRequest, DownloadResult>, HacDownloadRequestHandler>();
         services.TryAddSingleton<IEbicsRequestHandler<PtkDownloadRequest, DownloadResult>, PtkDownloadRequestHandler>();
 
+        // Distributed-electronic-signature (VEU/EDS) convenience handlers: overview (HVU/HVZ) and the
+        // per-order detail views (HVD/HVT) of the orders parked for additional signatures (#124).
+        services.TryAddSingleton<IEbicsRequestHandler<HvuDownloadRequest, DownloadResult>, HvuDownloadRequestHandler>();
+        services.TryAddSingleton<IEbicsRequestHandler<HvzDownloadRequest, DownloadResult>, HvzDownloadRequestHandler>();
+        services.TryAddSingleton<IEbicsRequestHandler<HvdDownloadRequest, DownloadResult>, HvdDownloadRequestHandler>();
+        services.TryAddSingleton<IEbicsRequestHandler<HvtDownloadRequest, DownloadResult>, HvtDownloadRequestHandler>();
+
         return services;
     }
 }

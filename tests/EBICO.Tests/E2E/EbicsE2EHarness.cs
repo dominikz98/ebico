@@ -252,6 +252,69 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
         => ServerServices.GetRequiredService<IMasterDataManager>().GetSubscriberAsync(HostId, PartnerId, UserId, ct);
 
     /// <summary>
+    /// Registers a <b>second</b> subscriber under the same bank and partner and returns an onboarded
+    /// client for it. Needed by the distributed-signature flows (issue #124), which are multi-person by
+    /// definition: the emulator counts the submitter's own bank-technical signature, so releasing an order
+    /// requires a different subscriber to send the HVE.
+    /// </summary>
+    /// <param name="factory">The class fixture's application factory (the same host this harness uses).</param>
+    /// <param name="userSuffix">Distinguishes the co-signer's UserID; must be EBICS-identifier-safe.</param>
+    /// <param name="permissions">The co-signer's order authorisations.</param>
+    /// <param name="ct">A cancellation token.</param>
+    /// <returns>A co-signer whose client has completed INI/HIA/HPB.</returns>
+    public async Task<E2ECoSigner> AddCoSignerAsync(
+        WebApplicationFactory<ServerProgram> factory,
+        string userSuffix,
+        IEnumerable<SubscriberPermission> permissions,
+        CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+
+        var coSignerId = UserId.Create($"{UserId.Value}{userSuffix}");
+        await ServerServices.GetRequiredService<IMasterDataManager>()
+            .SaveSubscriberAsync(new Subscriber(HostId, PartnerId, coSignerId, permissions: permissions), ct);
+
+        var services = new ServiceCollection();
+        services.AddEbicoConnector(o =>
+            {
+                o.Url = "http://localhost/ebics";
+                o.HostId = HostId.Value;
+                o.PartnerId = PartnerId.Value;
+                o.UserId = coSignerId.Value;
+                o.Version = Version;
+            })
+            .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
+        services.AddEbicoOnboarding();
+        services.AddEbicoUpload();
+        services.AddEbicoDownload();
+        var provider = services.BuildServiceProvider();
+
+        // A distinct key per co-signer would cost another three RSA generations; the pool's material is
+        // fine here because the server stores subscriber keys per (host, partner, user).
+        var keys = provider.GetRequiredService<IKeyStore>();
+        foreach (var purpose in (KeyPurpose[])[KeyPurpose.Signature, KeyPurpose.Authentication, KeyPurpose.Encryption])
+        {
+            await keys.StoreAsync(KeyOwner.Subscriber, purpose, E2EKeyPool.Subscriber(purpose), ct);
+        }
+
+        var client = provider.GetRequiredService<IEbicsClient>();
+        var bankKeys = E2EKeyPool.BankKeys();
+        (await client.Send(new IniRequest { IncludeLetter = false }, ct)).IsSuccess
+            .Should().BeTrue("the co-signer's INI must succeed");
+        (await client.Send(new HiaRequest { IncludeLetter = false }, ct)).IsSuccess
+            .Should().BeTrue("the co-signer's HIA must succeed");
+        (await client.Send(
+            new HpbRequest
+            {
+                ExpectedAuthenticationKeyDigest = PublicKeyFingerprint.Compute(bankKeys.Authentication),
+                ExpectedEncryptionKeyDigest = PublicKeyFingerprint.Compute(bankKeys.Encryption),
+            },
+            ct)).IsSuccess.Should().BeTrue("the co-signer's HPB must succeed");
+
+        return new E2ECoSigner(provider, coSignerId);
+    }
+
+    /// <summary>
     /// Runs INI, HIA and HPB in order and returns their raw results without asserting, so the onboarding
     /// tests can assert each step themselves. Callers that need onboarding only as a precondition should
     /// chain <see cref="E2EOnboardingResults.ThrowIfFailed"/>.
@@ -278,6 +341,34 @@ internal sealed class EbicsE2EHarness : IAsyncDisposable
             ct);
         return new E2EOnboardingResults(ini, hia, hpb);
     }
+
+    /// <inheritdoc />
+    public ValueTask DisposeAsync() => _provider.DisposeAsync();
+}
+
+/// <summary>
+/// A second, fully onboarded subscriber under the same bank and partner as an
+/// <see cref="EbicsE2EHarness"/>, created by <see cref="EbicsE2EHarness.AddCoSignerAsync"/>. Exists for
+/// the distributed-signature flows, which need a signer that is not the submitter (issue #124).
+/// </summary>
+internal sealed class E2ECoSigner : IAsyncDisposable
+{
+    private readonly ServiceProvider _provider;
+
+    /// <summary>Initializes the co-signer.</summary>
+    /// <param name="provider">The co-signer's own connector service provider.</param>
+    /// <param name="userId">The co-signer's UserID.</param>
+    public E2ECoSigner(ServiceProvider provider, UserId userId)
+    {
+        _provider = provider;
+        UserId = userId;
+    }
+
+    /// <summary>The co-signer's UserID.</summary>
+    public UserId UserId { get; }
+
+    /// <summary>The co-signer's connector client.</summary>
+    public IEbicsClient Client => _provider.GetRequiredService<IEbicsClient>();
 
     /// <inheritdoc />
     public ValueTask DisposeAsync() => _provider.DisposeAsync();

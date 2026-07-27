@@ -25,6 +25,7 @@ internal abstract class PaymentUploadHandlerBase<TRequest> : IEbicsRequestHandle
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(ctx);
         return _executor.ExecuteAsync(
-            request.Payload, request.OrderType, btf: null, fileFormat: null, request.MaxSegmentSizeBytes, ctx, ct);
+            request.Payload, request.OrderType, btf: null, fileFormat: null, request.MaxSegmentSizeBytes, ctx, ct,
+            request.DistributedSignature);
     }
 }

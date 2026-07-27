@@ -50,6 +50,62 @@ public class AdminApiIntegrationTests
     }
 
     [Fact]
+    public async Task GetBankKeys_ReturnsTheFingerprintsAClientCanVerifyHpbAgainst()
+    {
+        // The emulator's stand-in for the bank letter (issue #124): without it a client talking to a
+        // separately hosted server has no out-of-band channel for the fingerprints HPB returns.
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST", new BankUpsertDto(null, null), _ct);
+
+        var keys = await client.GetFromJsonAsync<BankKeysDto>("/admin/banks/EBICOHOST/keys", _ct);
+
+        keys!.HostId.Should().Be("EBICOHOST");
+        keys.Authentication.Purpose.Should().Be("Authentication");
+        keys.Authentication.Version.Should().Be("X002");
+        keys.Encryption.Purpose.Should().Be("Encryption");
+        keys.Encryption.Version.Should().Be("E002");
+
+        foreach (var key in (BankKeyDto[])[keys.Authentication, keys.Encryption])
+        {
+            key.KeySizeBits.Should().BeGreaterThanOrEqualTo(2048);
+            key.Fingerprint.Should().MatchRegex("^[0-9A-F]{64}$", "a SHA-256 digest as uppercase hex");
+            key.FingerprintLetterFormat.Should().NotBeNullOrWhiteSpace();
+            key.PublicKeyPem.Should().StartWith("-----BEGIN PUBLIC KEY-----");
+            key.PublicKeyPem.Should().NotContain("PRIVATE", "only public components may be exposed");
+        }
+
+        keys.Authentication.Fingerprint.Should().NotBe(
+            keys.Encryption.Fingerprint, "the two purposes use distinct key material");
+    }
+
+    [Fact]
+    public async Task GetBankKeys_IsStableAcrossCalls()
+    {
+        // HPB must keep returning the same public keys, so the fingerprints a client pinned stay valid.
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+        await client.PutAsJsonAsync("/admin/banks/EBICOHOST", new BankUpsertDto(null, null), _ct);
+
+        var first = await client.GetFromJsonAsync<BankKeysDto>("/admin/banks/EBICOHOST/keys", _ct);
+        var second = await client.GetFromJsonAsync<BankKeysDto>("/admin/banks/EBICOHOST/keys", _ct);
+
+        second!.Authentication.Fingerprint.Should().Be(first!.Authentication.Fingerprint);
+        second.Encryption.Fingerprint.Should().Be(first.Encryption.Fingerprint);
+    }
+
+    [Fact]
+    public async Task GetBankKeys_ForAnUnknownBank_Returns404()
+    {
+        using var factory = NewFactory();
+        var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/admin/banks/NOSUCHHOST/keys", _ct);
+
+        response.StatusCode.Should().Be(HttpStatusCode.NotFound);
+    }
+
+    [Fact]
     public async Task PutPartner_WithAddressAndAccounts_RoundTrips()
     {
         using var factory = NewFactory();

@@ -1,6 +1,7 @@
 using EBICO.Connector.Upload.Envelopes;
 using EBICO.Connector.Validation;
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
@@ -17,10 +18,19 @@ namespace EBICO.Connector.Upload;
 internal sealed class UploadExecutor
 {
     /// <summary>
-    /// The default maximum raw (pre-base64) segment size. Kept below 1 MB so the base64-encoded segment
-    /// stays within the EBICS 1 MB per-segment ceiling.
+    /// The default maximum raw (pre-base64) segment size — the shared EBICO default
+    /// (<see cref="EbicsSegmentation.DefaultSegmentSizeBytes"/>, 512 KiB), which is also what
+    /// <c>EbicoServerOptions.SegmentSizeBytes</c> uses.
     /// </summary>
-    private const int DefaultMaxSegmentSizeBytes = 768 * 1024;
+    /// <remarks>
+    /// Must stay in sync with the server default: a full segment's base64 form plus the surrounding
+    /// envelope has to fit into the peer's request-body limit. The previous 768 KiB base64-encoded to
+    /// exactly 1 MiB — the emulator's default body limit — so every full segment was rejected with
+    /// HTTP 413 before the server could answer at all (#124). Callers that talk to a peer with a
+    /// different limit should pass an explicit size derived from
+    /// <see cref="EbicsSegmentation.MaxSegmentSizeForRequestBody"/>.
+    /// </remarks>
+    private const int DefaultMaxSegmentSizeBytes = EbicsSegmentation.DefaultSegmentSizeBytes;
 
     private readonly IUploadEnvelopeBuilderRegistry _registry;
 
@@ -41,8 +51,10 @@ internal sealed class UploadExecutor
     /// <param name="maxSegmentSizeBytes">The maximum raw segment size, or <see langword="null"/> for the default.</param>
     /// <param name="ctx">The per-send execution context.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="distributedSignature">Whether to ask the bank to park the order for the distributed electronic signature (see <see cref="UploadRequest.DistributedSignature"/>).</param>
+    /// <param name="veu">The referenced parked order for the VEU uploads HVE/HVS, or <see langword="null"/>.</param>
     /// <returns>The upload result, or a failure carrying the server return code.</returns>
-    /// <exception cref="EbicsConfigurationException">The order identity is incomplete, the segment size is not positive, or a required key is missing.</exception>
+    /// <exception cref="EbicsConfigurationException">The order identity is incomplete, the segment size is not positive, a VEU reference is missing or a required key is missing.</exception>
     public async Task<EbicsResult<UploadResult>> ExecuteAsync(
         ReadOnlyMemory<byte> orderData,
         string? orderType,
@@ -50,7 +62,9 @@ internal sealed class UploadExecutor
         string? fileFormat,
         int? maxSegmentSizeBytes,
         EbicsContext ctx,
-        CancellationToken ct)
+        CancellationToken ct,
+        bool distributedSignature = false,
+        VeuOrderReference? veu = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -65,7 +79,16 @@ internal sealed class UploadExecutor
             return EbicsResult<UploadResult>.Failure(validation.ReturnCode, validation.ReturnText);
         }
 
-        var (headerOrderType, effectiveBtf, effectiveFileFormat, _) = validation.Identity;
+        var (headerOrderType, effectiveBtf, effectiveFileFormat, effectiveOrderType) = validation.Identity;
+
+        // HVE/HVS act on one specific parked order; without its id the bank can only answer
+        // 091121 EBICS_INVALID_ORDER_IDENTIFIER, so fail fast with a message that says what is missing (#124).
+        if (VeuOrderTypes.IsVeuUploadOrderType(effectiveOrderType) && veu is null)
+        {
+            throw new EbicsConfigurationException(
+                $"The VEU upload '{effectiveOrderType}' must reference the parked order it acts on; "
+                    + $"set {nameof(UploadRequest)}.{nameof(UploadRequest.Veu)}.");
+        }
 
         var segmentSize = maxSegmentSizeBytes ?? DefaultMaxSegmentSizeBytes;
         var version = connection.Version;
@@ -96,7 +119,9 @@ internal sealed class UploadExecutor
             prepared.EncryptedTransactionKey,
             prepared.EncryptionPubKeyDigest,
             encVersion.Value,
-            prepared.SignatureData);
+            prepared.SignatureData,
+            distributedSignature,
+            veu);
 
         var initEnvelope = builder.BuildInitRequest(initContext);
         Sign(initEnvelope, authKey, authVersion);

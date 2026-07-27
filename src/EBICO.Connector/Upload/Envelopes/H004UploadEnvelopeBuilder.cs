@@ -1,11 +1,11 @@
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using H = EBICO.Core.Schema.H004;
 
 namespace EBICO.Connector.Upload.Envelopes;
-
 /// <summary>
 /// The H004 upload envelope builder. H004 submits either a classical upload order type directly (e.g.
 /// <c>"CCT"</c>) or the generic <c>"FUL"</c> file upload with a <c>FULOrderParams/FileFormat</c>. The
@@ -16,7 +16,6 @@ internal sealed class H004UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
 {
     /// <inheritdoc />
     public override EbicsVersion Version => EbicsVersion.H004;
-
     /// <inheritdoc />
     public override IAuthSignedRequestEnvelope BuildInitRequest(in UploadInitContext ctx)
         => new H.EbicsRequest
@@ -32,10 +31,8 @@ internal sealed class H004UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
                     OrderDetails = new H.StaticHeaderOrderDetailsType
                     {
                         OrderType = new H.StaticHeaderOrderDetailsTypeOrderType { Value = ctx.HeaderOrderType },
-                        OrderAttribute = H.OrderAttributeType.Dzhnn,
-                        OrderParams = ctx.FileFormat is { } fileFormat
-                            ? new H.FulOrderParamsType { FileFormat = new H.FileFormatType { Value = fileFormat } }
-                            : null,
+                        OrderAttribute = ctx.DistributedSignature ? H.OrderAttributeType.Ozhnn : H.OrderAttributeType.Dzhnn,
+                        OrderParams = BuildOrderParams(ctx),
                     },
                     SecurityMedium = SecurityMedium,
                     NumSegments = ctx.NumSegments,
@@ -60,7 +57,6 @@ internal sealed class H004UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
                 },
             },
         };
-
     /// <inheritdoc />
     public override IAuthSignedRequestEnvelope BuildTransferRequest(in UploadTransferContext ctx)
         => new H.EbicsRequest
@@ -80,24 +76,52 @@ internal sealed class H004UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
                 DataTransfer = new H.DataTransferRequestType { OrderData = new H.DataTransferRequestTypeOrderData { Value = ctx.Segment } },
             },
         };
+    // Selects the order params for the initialisation header: the VEU uploads HVE/HVS reference a parked
+    // order by id, a generic FUL upload carries its FileFormat, everything else has none (#124).
+    private static object? BuildOrderParams(in UploadInitContext ctx)
+    {
+        if (ctx.Veu is { } veu)
+        {
+            switch (ctx.HeaderOrderType)
+            {
+                case VeuOrderTypes.AddSignature:
+                    return new H.HveOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        OrderType = veu.OrderType,
+                        FileFormat = veu.FileFormat is { } ff ? new H.FileFormatType { Value = ff } : null,
+                        OrderId = veu.OrderId,
+                    };
+                case VeuOrderTypes.CancelOrder:
+                    return new H.HvsOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        OrderType = veu.OrderType,
+                        FileFormat = veu.FileFormat is { } cancelFormat ? new H.FileFormatType { Value = cancelFormat } : null,
+                        OrderId = veu.OrderId,
+                    };
+            }
+        }
+
+        return ctx.FileFormat is { } fileFormat
+            ? new H.FulOrderParamsType { FileFormat = new H.FileFormatType { Value = fileFormat } }
+            : null;
+    }
 
     /// <inheritdoc />
     public override UploadResponseView ParseInitResponse(string responseXml)
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new UploadResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Header?.Static?.TransactionId);
     }
-
     /// <inheritdoc />
     public override UploadResponseView ParseTransferResponse(string responseXml)
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new UploadResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
-            TransactionId: null);
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
+            transactionId: null);
     }
 }

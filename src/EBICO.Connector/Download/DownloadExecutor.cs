@@ -1,6 +1,7 @@
 using EBICO.Connector.Download.Envelopes;
 using EBICO.Connector.Validation;
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Btf;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
@@ -36,8 +37,9 @@ internal sealed class DownloadExecutor
     /// <param name="parse">An optional parsing hook applied to the decrypted order data before the receipt.</param>
     /// <param name="ctx">The per-send execution context.</param>
     /// <param name="ct">A cancellation token.</param>
+    /// <param name="veu">The referenced parked order for the VEU downloads HVD/HVT, or <see langword="null"/>.</param>
     /// <returns>The download result, or a failure carrying the server return code.</returns>
-    /// <exception cref="EbicsConfigurationException">The order identity is incomplete or a required key is missing.</exception>
+    /// <exception cref="EbicsConfigurationException">The order identity is incomplete, a VEU reference is missing or a required key is missing.</exception>
     /// <exception cref="EbicsConnectorException">The server reported success but returned a malformed response, or the data could not be decrypted/decompressed.</exception>
     public async Task<EbicsResult<DownloadResult>> ExecuteAsync(
         string? orderType,
@@ -46,7 +48,8 @@ internal sealed class DownloadExecutor
         DateRange? period,
         Func<ReadOnlyMemory<byte>, object?>? parse,
         EbicsContext ctx,
-        CancellationToken ct)
+        CancellationToken ct,
+        VeuOrderReference? veu = null)
     {
         ArgumentNullException.ThrowIfNull(ctx);
 
@@ -60,7 +63,15 @@ internal sealed class DownloadExecutor
             return EbicsResult<DownloadResult>.Failure(validation.ReturnCode, validation.ReturnText);
         }
 
-        var (headerOrderType, effectiveBtf, effectiveFileFormat, _) = validation.Identity;
+        var (headerOrderType, effectiveBtf, effectiveFileFormat, effectiveOrderType) = validation.Identity;
+
+        // HVD/HVT ask about one specific parked order; without its id the bank has nothing to look up (#124).
+        if (effectiveOrderType is VeuOrderTypes.Detail or VeuOrderTypes.TransactionDetail && veu is null)
+        {
+            throw new EbicsConfigurationException(
+                $"The VEU download '{effectiveOrderType}' must reference the parked order it asks about; "
+                    + $"set {nameof(DownloadRequest)}.{nameof(DownloadRequest.Veu)}.");
+        }
 
         var version = connection.Version;
         var builder = _registry.Get(version);
@@ -82,7 +93,8 @@ internal sealed class DownloadExecutor
             headerOrderType,
             effectiveBtf,
             effectiveFileFormat,
-            period));
+            period,
+            veu));
         var initView = builder.ParseInitResponse(await SignAndExchangeAsync(initEnvelope).ConfigureAwait(false));
         if (initView.ReturnCode != EbicsResult<DownloadResult>.OkReturnCode)
         {

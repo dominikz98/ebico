@@ -16,4 +16,14 @@ internal interface IPaymentUploadRequest
 
     /// <summary>The maximum raw segment size in bytes, or <see langword="null"/> for the connector default.</summary>
     int? MaxSegmentSizeBytes { get; }
+
+    /// <summary>
+    /// Whether the bank should park the payment for the distributed electronic signature (VEU/EDS)
+    /// instead of executing it immediately. See <see cref="UploadRequest.DistributedSignature"/>.
+    /// </summary>
+    /// <remarks>
+    /// Belongs on the payment requests, not just on the generic <see cref="UploadRequest"/>: a SEPA
+    /// payment is precisely the kind of order a customer submits for multi-person approval (#124).
+    /// </remarks>
+    bool DistributedSignature { get; }
 }

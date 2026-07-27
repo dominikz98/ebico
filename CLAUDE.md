@@ -78,8 +78,10 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
 - `docs/index.md` — annotierter Gesamtindex; **immer zuerst** nachschlagen.
 - `docs/server/order-coverage-matrix.md` — **Source of Truth** für OrderType/BTF ×
   Version × Status. Per Guard-Test (`OrderCoverageMatrixTests`) mit den Code-Katalogen
-  synchron gehalten; enthält einen eigenen Lücken-Abschnitt.
-- `docs/adr/README.md` — 28 ADRs (0001–0028, MADR-lite, alle `accepted`) + Backlog
+  synchron gehalten; enthält einen eigenen Lücken-Abschnitt. Seit #124 trennt sie
+  **Server**- und **Connector**-Verfügbarkeit: serverseitig implementiert heißt nicht,
+  dass der mitgelieferte Client die Auftragsart senden kann.
+- `docs/adr/README.md` — 30 ADRs (0001–0030, MADR-lite, alle `accepted`) + Backlog
   offener/abgelöster Entscheidungen. Jede größere Designfrage ist hier begründet.
 - `docs/ticket-overview.md` — Milestones (M0–M9), Issues, Epics.
 - Feature-Doku liegt thematisch unter `docs/<bereich>/<name>.md`
@@ -100,8 +102,21 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
 - **BTF/OrderType-Auflösung:** `BtfOrderTypeCatalog.Resolve{Upload,Download}OrderType`
   bildet alle drei Konventionen ab (H005 BTU/BTD+BTF · H003/H004 direkter Code ·
   H003/H004 FUL/FDL+FileFormat). Berechtigung: `Subscriber.HasPermissionFor` → `090003`.
+  **Administrative Order-Typen haben keinen BTF** und bleiben auf H005 `AdminOrderType` — das gilt
+  clientseitig für Upload **und** Download symmetrisch (seit #124; vorher verlangte nur der
+  Upload-Pfad einen BTF und sperrte damit die VEU-Uploads aus). Der Katalog ist ein
+  Best-Effort-Seed, also **kein** Orakel dafür, ob es eine Auftragsart gibt.
 - **Guard-Tests halten Doku↔Code synchron:** ein neuer OrderType muss in Katalog **und**
   Coverage-Matrix nachgezogen werden, sonst schlägt `OrderCoverageMatrixTests` fehl.
+- **Geteilte Transport-Defaults (#124/ADR-0030):** Segmentgröße und Body-Limit sind gekoppelt — ein
+  base64-kodiertes Segment reist *mitsamt Envelope* in einem HTTP-Body. Der Default steht deshalb genau
+  einmal (`EbicsSegmentation.DefaultSegmentSizeBytes`, 512 KiB) und wird von `EbicoServerOptions` **und**
+  dem Connector-`UploadExecutor` konsumiert; `MaxSegmentSizeForRequestBody(…)` leitet abweichende Werte
+  ab, `SegmentSizeCompatibilityTests` bewacht die Beziehung. Vorsicht bei Änderungen: die vorherige
+  Konstellation (768 KiB Client / 1 MiB Server) machte jeden mehrsegmentigen Upload unmöglich (HTTP 413).
+- **Antwort-Auswertung im Connector:** Returncode **und** Report-Text immer gemeinsam über
+  `EbicsReturnCodes.CombineOutcome(headerCode, headerText, bodyCode)` auflösen. Der `ReportText` steht nur
+  im Header — ihn zu einem Body-Code zu mischen ergab „`090005: EBICS_OK`" (#124).
 - **Generierte Bindings + dokumentierte Fixups:** `scripts/generate-bindings.sh` ist kein reiner
   Generator — `apply_binding_fixups()` korrigiert nach jedem Lauf, was xscgen nicht abbilden kann
   (aktuell: `abstract` aus `OrderDetailsType` streichen, sonst verlangt der `XmlSerializer` einen
@@ -116,7 +131,9 @@ Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
 - **Spec-Vorbehalte (aktueller Stand):** serverseitige **X002-Verifikation ist aktiv**
   (`X002EbicsRequestVerifier`, ADR-0023/#58, greift erst nach HIA). **ES/A00x-Signaturprüfung
   der OrderData bleibt zurückgestellt**; kein Key-Gültigkeitsfenster; Server-Antworten
-  unsigniert. Teile der Architektur sind Design-Intent, noch nicht gegen die offiziellen
+  unsigniert. Bei der **VEU** (ADR-0020/#124) wertet der Emulator nur die `OrderID` aus — die
+  übrigen Felder der Order-Params werden schema-konform gesendet, aber nicht geprüft; Park-Trigger
+  (`OZHNN`/`SignatureFlag`) und HVE-Signatur sind ungeprüft. Teile der Architektur sind Design-Intent, noch nicht gegen die offiziellen
   XSDs verifiziert (Schemas proprietär). Zwei Entscheidungen sind gegen einen **realen Client**
   belegt, nicht gegen die Annexe (#117/ADR-0029): `OrderDetails` ohne `xsi:type` und `A006`/PSS
   ab H004 (H003 ausgeschlossen).

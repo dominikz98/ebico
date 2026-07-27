@@ -44,6 +44,11 @@ public static class EbicoUploadServiceCollectionExtensions
         services.TryAddSingleton<IEbicsRequestHandler<CdbUploadRequest, UploadResult>, CdbUploadRequestHandler>();
         services.TryAddSingleton<IEbicsRequestHandler<CipUploadRequest, UploadResult>, CipUploadRequestHandler>();
 
+        // Distributed-electronic-signature (VEU/EDS) convenience handlers: sign (HVE) and cancel (HVS)
+        // an order the bank parked for additional signatures (#124).
+        services.TryAddSingleton<IEbicsRequestHandler<HveUploadRequest, UploadResult>, HveUploadRequestHandler>();
+        services.TryAddSingleton<IEbicsRequestHandler<HvsUploadRequest, UploadResult>, HvsUploadRequestHandler>();
+
         return services;
     }
 }

@@ -1,5 +1,6 @@
 using EBICO.Core;
 using EBICO.Core.Btf;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Versioning;
 
 namespace EBICO.Connector.Download.Envelopes;
@@ -16,6 +17,7 @@ namespace EBICO.Connector.Download.Envelopes;
 /// <param name="Btf">The H005 business transaction format placed in <c>BTDOrderParams/Service</c> (statement/report downloads); <see langword="null"/> for H003/H004 and for H005 administrative downloads.</param>
 /// <param name="FileFormat">The H003/H004 <c>FDLOrderParams/FileFormat</c> value (only when <paramref name="HeaderOrderType"/> is <c>"FDL"</c>); ignored otherwise.</param>
 /// <param name="Period">An optional closed reporting period placed in the version-specific order params; emitted only when both bounds are set.</param>
+/// <param name="Veu">The referenced parked order for the VEU downloads <c>HVD</c>/<c>HVT</c>; <see langword="null"/> otherwise.</param>
 internal readonly record struct DownloadInitContext(
     string HostId,
     string PartnerId,
@@ -23,7 +25,8 @@ internal readonly record struct DownloadInitContext(
     string HeaderOrderType,
     BusinessTransactionFormat? Btf,
     string? FileFormat,
-    DateRange? Period);
+    DateRange? Period,
+    VeuOrderReference? Veu = null);
 
 /// <summary>The inputs for a single download <b>transfer</b> request: the transaction id and the 1-based segment number to fetch.</summary>
 /// <param name="HostId">The <c>HostID</c>.</param>
@@ -63,18 +66,52 @@ internal readonly record struct DownloadInitResponseView(
     byte[]? TransactionId,
     ulong? NumSegments,
     byte[]? Segment,
-    byte[]? EncryptedTransactionKey);
+    byte[]? EncryptedTransactionKey)
+{
+    /// <summary>Projects a combined <see cref="EbicsResponseOutcome"/> into the view (code and text stay consistent, #124).</summary>
+    /// <param name="outcome">The combined return code and report text.</param>
+    /// <param name="transactionId">The assigned transaction id, or <see langword="null"/>.</param>
+    /// <param name="numSegments">The announced number of order-data segments, or <see langword="null"/>.</param>
+    /// <param name="segment">The first order-data segment (ciphertext), or <see langword="null"/>.</param>
+    /// <param name="encryptedTransactionKey">The RSA-OAEP-encrypted transaction key, or <see langword="null"/>.</param>
+    public DownloadInitResponseView(
+        EbicsResponseOutcome outcome,
+        byte[]? transactionId,
+        ulong? numSegments,
+        byte[]? segment,
+        byte[]? encryptedTransactionKey)
+        : this(outcome.Code, outcome.Text, transactionId, numSegments, segment, encryptedTransactionKey)
+    {
+    }
+}
 
 /// <summary>The version-neutral projection of a download <b>transfer</b> response: the effective return code, the report text and the delivered order-data segment.</summary>
 /// <param name="ReturnCode">The effective EBICS return code.</param>
-/// <param name="ReportText">The human-readable report text from the mutable header, if any.</param>
+/// <param name="ReportText">The report text belonging to <paramref name="ReturnCode"/>, if any.</param>
 /// <param name="Segment">The delivered order-data segment (ciphertext), or <see langword="null"/>.</param>
-internal readonly record struct DownloadTransferResponseView(string ReturnCode, string? ReportText, byte[]? Segment);
+internal readonly record struct DownloadTransferResponseView(string ReturnCode, string? ReportText, byte[]? Segment)
+{
+    /// <summary>Projects a combined <see cref="EbicsResponseOutcome"/> into the view (code and text stay consistent, #124).</summary>
+    /// <param name="outcome">The combined return code and report text.</param>
+    /// <param name="segment">The delivered order-data segment (ciphertext), or <see langword="null"/>.</param>
+    public DownloadTransferResponseView(EbicsResponseOutcome outcome, byte[]? segment)
+        : this(outcome.Code, outcome.Text, segment)
+    {
+    }
+}
 
 /// <summary>The version-neutral projection of a download <b>receipt</b> response: the effective return code and the report text.</summary>
 /// <param name="ReturnCode">The effective EBICS return code (e.g. <c>011000</c> on a positive receipt).</param>
-/// <param name="ReportText">The human-readable report text from the mutable header, if any.</param>
-internal readonly record struct DownloadReceiptResponseView(string ReturnCode, string? ReportText);
+/// <param name="ReportText">The report text belonging to <paramref name="ReturnCode"/>, if any.</param>
+internal readonly record struct DownloadReceiptResponseView(string ReturnCode, string? ReportText)
+{
+    /// <summary>Projects a combined <see cref="EbicsResponseOutcome"/> into the view (code and text stay consistent, #124).</summary>
+    /// <param name="outcome">The combined return code and report text.</param>
+    public DownloadReceiptResponseView(EbicsResponseOutcome outcome)
+        : this(outcome.Code, outcome.Text)
+    {
+    }
+}
 
 /// <summary>
 /// Builds the version-specific download <c>ebicsRequest</c> envelopes (initialisation, transfer and

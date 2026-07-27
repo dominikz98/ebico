@@ -2,8 +2,9 @@
 
 Der schnellste Weg zu einem laufenden EBICS-Emulator und einem ersten End-to-End-Rundlauf mit dem
 Client. Umsetzung von **Issue #63** (Milestone M9 — Packaging & Docs). Voraussetzung: entweder
-**Docker** oder das **.NET SDK** gemäß [`global.json`](../global.json) — mehr braucht es nicht (die
-generierten Schema-Bindings sind committet, siehe [Schemas & Lizenz](#schemas--lizenz)).
+**Docker** oder ein **.NET-10-SDK** (jedes `10.0.x` ab `10.0.100`, siehe
+[`global.json`](../global.json)) — mehr braucht es nicht (die generierten Schema-Bindings sind
+committet, siehe [Schemas & Lizenz](#schemas--lizenz)).
 
 ## 1. Emulator starten
 
@@ -40,6 +41,16 @@ curl -i http://localhost:5014/health       # -> 200 "Healthy"
 Der EBICS-Endpoint liegt unter **`/ebics`**, die (unauthentifizierte) Admin-API unter **`/admin`** — der
 Server ist ein lokaler Emulator (wie *Azurite*), **nicht** für ungeschützte Netze gedacht (siehe
 [Sicherheit](deployment/container.md#sicherheit)).
+
+Ein frisch gestarteter Server hat **keine Stammdaten**. Bevor ein Client onboarden kann, brauchen Bank,
+Partner und Teilnehmer je einen `PUT` auf die Admin-API; die Fingerprints der Bankschlüssel — das
+Emulator-Äquivalent des Bankbriefs — liefert `GET /admin/banks/{hostId}/keys`. Beides beschreibt
+[Stammdatenverwaltung](server/master-data.md). Der Quickstart in Schritt 2 nimmt einem das ab, weil er
+seinen Server selbst hochfährt und in-process seedet.
+
+> **Die Suite zeigt eigene Beispieldaten.** Sie teilt ihren Zustand **nicht** mit dem hier gestarteten
+> Server (ADR-0009/ADR-0015) — die Transaktionen dieses Servers erscheinen dort also nicht. Die
+> Oberfläche weist mit einem Banner darauf hin.
 
 ## 2. Client ausprobieren (Quickstart-Sample)
 

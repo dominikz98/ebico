@@ -105,9 +105,22 @@ RSA-Generierungen je Test und macht die HPB-Fingerprints vorab bekannt.
 | --- | :---: | :---: | :---: | --- |
 | INI/HIA/HPB | ✅ | ✅ | ✅ | `New → Initialized → Ready`, Fingerprint-Abgleich, `FingerprintsVerified` |
 | Upload CCT | ✅ | ✅ | ✅ | Server rekonstruiert die pain.001-Bytes, `EffectiveOrderType == "CCT"` |
+| Upload CCT **über mehrere Segmente** | ✅ | ✅ | ✅ | mit den **ausgelieferten** Defaults, `NumSegments > 1`, Bytes identisch (#124) |
 | Download C53 | ✅ | ✅ | ✅ | camt.053 im ZIP, Receipt → `011000` |
+| VEU: parken → HVU → HVE/HVS → Freigabe | ✅ | ✅ | ✅ | eigene Suite, siehe [Connector: VEU](../connector/veu.md) (#124) |
 
-7 Theories × 3 Versionen = **21 Round-Trips**.
+### Die Ein-Segment-Lücke (#124)
+
+Bis #124 fuhr **jeder** Upload-Test in genau einem Segment — `UploadE2ETests` prüfte das sogar explizit
+(`NumSegments == 1`). Damit blieb die Kopplung zwischen der Segmentgröße des Connectors und dem
+Body-Limit des Servers ungetestet, obwohl beide Werte einzeln abgedeckt waren: der Connector-Default
+(768 KiB) erzeugte base64 exakt 1 MiB und damit Requests, die der Server-Default (1 MiB Body) **immer**
+mit HTTP 413 abweisen musste. Der neue Test schließt genau diese Naht.
+
+Damit er trägt, ist seine Nutzlast bewusst **inkompressibel** (base64-Rauschen in den Creditor-Namen,
+`PainSamples.IncompressibleCreditTransfer`): ein gewöhnliches pain.001 ist so repetitiv, dass selbst
+zehn Megabyte auf ein einziges Segment deflatieren — ein „großer" Testfall hätte die Lücke also gar
+nicht getroffen.
 
 Zwei Assertions tragen die Suite:
 

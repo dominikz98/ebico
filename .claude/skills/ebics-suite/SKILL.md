@@ -35,6 +35,12 @@ Seite unter `docs/suite/` lesen.
   INI-Brief-Vergleich (`PublicKeyFingerprint.Verify`), Test-CA/Schlüssel-Werkzeuge; PDF via
   QuestPDF (ADR-0010).
 
+> **Die Suite zeigt ihren eigenen Zustand, nicht den eines laufenden Servers.** Sie hostet die
+> Server-Stores in-process und seedet sie; ein separat gestarteter `EBICO.Server`-Prozess bleibt
+> unsichtbar (ADR-0009/ADR-0015). Der `DemoDataBanner` im `MainLayout` sagt das seit #124 in der
+> Oberfläche — bei neuen Ansichten also **keine** Formulierung wählen, die Live-Daten eines fremden
+> Servers suggeriert („Transaktionen des Emulators" o. Ä.).
+
 ## Neue Seite/Komponente anlegen
 
 1. Razor-Komponente unter `Components/` (bei Seite mit `@page`, an der Navigation registrieren).
