@@ -1,5 +1,6 @@
 using EBICO.Core;
 using EBICO.Core.Btf;
+using EBICO.Core.ReturnCodes;
 using EBICO.Core.Versioning;
 
 namespace EBICO.Connector.Upload.Envelopes;
@@ -21,6 +22,8 @@ namespace EBICO.Connector.Upload.Envelopes;
 /// <param name="EncryptionPubKeyDigest">The SHA-256 fingerprint of the bank encryption key (<c>EncryptionPubKeyDigest</c>).</param>
 /// <param name="EncryptionVersion">The bank encryption key version code (e.g. <c>"E002"</c>).</param>
 /// <param name="SignatureData">The compressed-and-encrypted electronic signature (<c>DataTransfer/SignatureData</c>).</param>
+/// <param name="DistributedSignature">Whether the bank should park the order for the distributed electronic signature (H005 <c>SignatureFlag</c>, H003/H004 order attribute <c>OZHNN</c>).</param>
+/// <param name="Veu">The referenced parked order for the VEU uploads <c>HVE</c>/<c>HVS</c>; <see langword="null"/> otherwise.</param>
 internal readonly record struct UploadInitContext(
     string HostId,
     string PartnerId,
@@ -32,7 +35,9 @@ internal readonly record struct UploadInitContext(
     byte[] EncryptedTransactionKey,
     byte[] EncryptionPubKeyDigest,
     string EncryptionVersion,
-    byte[] SignatureData);
+    byte[] SignatureData,
+    bool DistributedSignature = false,
+    VeuOrderReference? Veu = null);
 
 /// <summary>The inputs for a single upload <b>transfer</b> request: the transaction id, the 1-based segment number and the segment bytes.</summary>
 /// <param name="HostId">The <c>HostID</c>.</param>
@@ -53,9 +58,18 @@ internal readonly record struct UploadTransferContext(
 /// report text and — for an initialisation response — the assigned transaction id.
 /// </summary>
 /// <param name="ReturnCode">The effective EBICS return code.</param>
-/// <param name="ReportText">The human-readable report text from the mutable header, if any.</param>
+/// <param name="ReportText">The report text belonging to <paramref name="ReturnCode"/>, if any.</param>
 /// <param name="TransactionId">The assigned transaction id (initialisation response only), or <see langword="null"/>.</param>
-internal readonly record struct UploadResponseView(string ReturnCode, string? ReportText, byte[]? TransactionId);
+internal readonly record struct UploadResponseView(string ReturnCode, string? ReportText, byte[]? TransactionId)
+{
+    /// <summary>Projects a combined <see cref="EbicsResponseOutcome"/> into the view (code and text stay consistent, #124).</summary>
+    /// <param name="outcome">The combined return code and report text.</param>
+    /// <param name="transactionId">The assigned transaction id (initialisation response only), or <see langword="null"/>.</param>
+    public UploadResponseView(EbicsResponseOutcome outcome, byte[]? transactionId)
+        : this(outcome.Code, outcome.Text, transactionId)
+    {
+    }
+}
 
 /// <summary>
 /// Builds the version-specific upload <c>ebicsRequest</c> envelopes (initialisation and transfer) and

@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using H = EBICO.Core.Schema.H004;
@@ -80,8 +81,7 @@ internal sealed class H004DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         var dataTransfer = response.Body?.DataTransfer;
         return new DownloadInitResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Header?.Static?.TransactionId,
             response.Header?.Static?.NumSegments,
             dataTransfer?.OrderData?.Value,
@@ -93,8 +93,7 @@ internal sealed class H004DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new DownloadTransferResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Body?.DataTransfer?.OrderData?.Value);
     }
 
@@ -103,14 +102,35 @@ internal sealed class H004DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new DownloadReceiptResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText);
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value));
     }
 
     // FDL → FDLOrderParams (FileFormat + optional DateRange); a classical order type → StandardOrderParams
     // (only when a period is present, otherwise no params element).
     private static object? BuildOrderParams(in DownloadInitContext ctx)
     {
+        // The VEU downloads HVD/HVT reference one parked order by id instead of carrying a period (#124).
+        if (ctx.Veu is { } veu)
+        {
+            switch (ctx.HeaderOrderType)
+            {
+                case VeuOrderTypes.Detail:
+                    return new H.HvdOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        OrderType = veu.OrderType,
+                        OrderId = veu.OrderId,
+                    };
+                case VeuOrderTypes.TransactionDetail:
+                    return new H.HvtOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        OrderType = veu.OrderType,
+                        OrderId = veu.OrderId,
+                    };
+            }
+        }
+
         if (ctx.FileFormat is { } fileFormat)
         {
             return new H.FdlOrderParamsType

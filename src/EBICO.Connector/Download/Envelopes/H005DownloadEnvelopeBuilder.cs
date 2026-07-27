@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
 using H = EBICO.Core.Schema.H005;
@@ -31,9 +32,7 @@ internal sealed class H005DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
                     OrderDetails = new H.StaticHeaderOrderDetailsType
                     {
                         AdminOrderType = new H.StaticHeaderOrderDetailsTypeAdminOrderType { Value = ctx.HeaderOrderType },
-                        OrderParams = ctx.Btf is { } btf
-                            ? new H.BtdParamsType { Service = btf.ToRestrictedServiceType(), DateRange = ToDateRange(ctx.Period) }
-                            : null,
+                        OrderParams = BuildOrderParams(ctx),
                     },
                     SecurityMedium = SecurityMedium,
                 },
@@ -81,8 +80,7 @@ internal sealed class H005DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         var dataTransfer = response.Body?.DataTransfer;
         return new DownloadInitResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Header?.Static?.TransactionId,
             response.Header?.Static?.NumSegments,
             dataTransfer?.OrderData?.Value,
@@ -94,8 +92,7 @@ internal sealed class H005DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new DownloadTransferResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Body?.DataTransfer?.OrderData?.Value);
     }
 
@@ -104,8 +101,38 @@ internal sealed class H005DownloadEnvelopeBuilder : DownloadEnvelopeBuilderBase
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new DownloadReceiptResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText);
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value));
+    }
+
+    // Selects the H005 order params for the initialisation header: the VEU downloads HVD/HVT reference a
+    // parked order by id, everything else carries the BTF (plus an optional period) in BTDOrderParams (#124).
+    private static object? BuildOrderParams(in DownloadInitContext ctx)
+    {
+        if (ctx.Veu is { } veu)
+        {
+            var service = (veu.Btf ?? ctx.Btf)?.ToRestrictedServiceType();
+            switch (ctx.HeaderOrderType)
+            {
+                case VeuOrderTypes.Detail:
+                    return new H.HvdOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        Service = service,
+                        OrderId = veu.OrderId,
+                    };
+                case VeuOrderTypes.TransactionDetail:
+                    return new H.HvtOrderParamsType
+                    {
+                        PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                        Service = service,
+                        OrderId = veu.OrderId,
+                    };
+            }
+        }
+
+        return ctx.Btf is { } btf
+            ? new H.BtdParamsType { Service = btf.ToRestrictedServiceType(), DateRange = ToDateRange(ctx.Period) }
+            : null;
     }
 
     // Maps the version-neutral reporting period onto the H005 BTDOrderParams DateRange element, emitted

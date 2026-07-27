@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Administrative;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
 using EBICO.Core.Versioning;
@@ -30,9 +31,7 @@ internal sealed class H005UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
                     OrderDetails = new H.StaticHeaderOrderDetailsType
                     {
                         AdminOrderType = new H.StaticHeaderOrderDetailsTypeAdminOrderType { Value = ctx.HeaderOrderType },
-                        OrderParams = ctx.Btf is { } btf
-                            ? new H.BtuParamsType { Service = btf.ToRestrictedServiceType() }
-                            : null,
+                        OrderParams = BuildOrderParams(ctx),
                     },
                     SecurityMedium = SecurityMedium,
                     NumSegments = ctx.NumSegments,
@@ -78,13 +77,55 @@ internal sealed class H005UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
             },
         };
 
+    // Selects the H005 order params for the initialisation header: the VEU uploads HVE/HVS reference a
+    // parked order by id, everything else carries the BTF in BTUOrderParams. The SignatureFlag element
+    // is what asks the bank to park the order for the distributed signature (#124).
+    private static object? BuildOrderParams(in UploadInitContext ctx)
+    {
+        if (ctx.Veu is { } veu)
+        {
+            var service = (veu.Btf ?? ctx.Btf)?.ToRestrictedServiceType();
+            return ctx.HeaderOrderType switch
+            {
+                VeuOrderTypes.AddSignature => new H.HveOrderParamsType
+                {
+                    PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                    Service = service,
+                    OrderId = veu.OrderId,
+                },
+                VeuOrderTypes.CancelOrder => new H.HvsOrderParamsType
+                {
+                    PartnerId = veu.PartnerId ?? ctx.PartnerId,
+                    Service = service,
+                    OrderId = veu.OrderId,
+                },
+                _ => BuildBtuParams(ctx),
+            };
+        }
+
+        return BuildBtuParams(ctx);
+    }
+
+    private static H.BtuParamsType? BuildBtuParams(in UploadInitContext ctx)
+    {
+        if (ctx.Btf is not { } btf)
+        {
+            return null;
+        }
+
+        return new H.BtuParamsType
+        {
+            Service = btf.ToRestrictedServiceType(),
+            SignatureFlag = ctx.DistributedSignature ? new H.SignatureFlagType() : null,
+        };
+    }
+
     /// <inheritdoc />
     public override UploadResponseView ParseInitResponse(string responseXml)
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new UploadResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
             response.Header?.Static?.TransactionId);
     }
 
@@ -93,8 +134,7 @@ internal sealed class H005UploadEnvelopeBuilder : UploadEnvelopeBuilderBase
     {
         var response = EbicsXmlSerializer.Deserialize<H.EbicsResponse>(responseXml);
         return new UploadResponseView(
-            CombineReturnCode(response.Header?.Mutable?.ReturnCode, response.Body?.ReturnCode?.Value),
-            response.Header?.Mutable?.ReportText,
-            TransactionId: null);
+            CombineOutcome(response.Header?.Mutable?.ReturnCode, response.Header?.Mutable?.ReportText, response.Body?.ReturnCode?.Value),
+            transactionId: null);
     }
 }

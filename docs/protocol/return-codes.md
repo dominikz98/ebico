@@ -44,6 +44,33 @@ if (EbicsReturnCodes.TryFromCode("091010", out var rc))
 bool ok = EbicsReturnCodes.IsSuccess("000000"); // true
 ```
 
+### Antwort lesen: Code und Text gehören zusammen (#124)
+
+Beim **Auswerten** einer Antwort greift die Ablage-Regel rückwärts, und dabei lauert eine Falle: Der
+`ReportText` existiert nur **einmal**, im Header. Wer den Code aus dem gewinnenden Slot liest, den Text
+aber unbesehen aus dem Header, erzeugt Widersprüche — bei jedem fachlichen Fehler nämlich genau die
+Kombination „Fehlercode + `EBICS_OK`".
+
+`EbicsReturnCodes.CombineOutcome(headerCode, headerText, bodyCode)` löst beides **gemeinsam** auf und
+liefert ein `EbicsResponseOutcome` (`Code` + `Text`):
+
+| Fall | Ergebnis-Code | Ergebnis-Text |
+| --- | --- | --- |
+| Header ≠ `000000` (technisch) | Header-Code | Header-`ReportText` (ersatzweise `SymbolicName`) |
+| Body ≠ `000000` (fachlich) | Body-Code | `SymbolicName` aus der Registry — **nie** der Header-Text |
+| beide `000000` | `000000` | Header-`ReportText` |
+| Body-Code unbekannt | Body-Code | `null` (kein erfundener Text) |
+
+```csharp
+var outcome = EbicsReturnCodes.CombineOutcome("000000", "EBICS_OK", "090005");
+// outcome.Code == "090005", outcome.Text == "EBICS_NO_DOWNLOAD_DATA_AVAILABLE", outcome.IsSuccess == false
+```
+
+Der Connector nutzt das in beiden Envelope-Basisklassen (`DownloadEnvelopeBuilderBase` /
+`UploadEnvelopeBuilderBase`), sodass `EbicsResult.ReturnCode` und `EbicsResult.ReturnText` nie
+auseinanderlaufen. Vorher meldete jeder fachliche Fehler `EBICS_OK` als Text
+([ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md)).
+
 ## Katalog
 
 Werte und symbolische Namen folgen EBICS Annex 1. Die neun vom laufenden Code genutzten Codes
