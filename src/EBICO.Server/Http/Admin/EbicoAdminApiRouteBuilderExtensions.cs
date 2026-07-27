@@ -1,4 +1,5 @@
 using EBICO.Core;
+using EBICO.Core.Crypto;
 using EBICO.Core.Domain;
 using EBICO.Server.State;
 using Microsoft.AspNetCore.Builder;
@@ -70,6 +71,26 @@ public static class EbicoAdminApiRouteBuilderExtensions
         {
             var removed = await manager.DeleteBankAsync(HostId.Create(hostId), http.RequestAborted).ConfigureAwait(false);
             return removed ? Results.NoContent() : Results.NotFound();
+        }));
+
+        // The bank's own public keys — the emulator's stand-in for the bank letter (issue #124). Without
+        // this a client talking to a separately hosted emulator has no out-of-band channel to verify the
+        // fingerprints HPB returns, so HpbResult.FingerprintsVerified could never be true. Only public
+        // components are returned; the pair is generated on first access, exactly as HPB would.
+        group.MapGet("/banks/{hostId}/keys", (string hostId, IMasterDataManager manager, IServerBankKeyStore keyStore, HttpContext http) => Guard(async () =>
+        {
+            var host = HostId.Create(hostId);
+            var bank = await manager.GetBankAsync(host, http.RequestAborted).ConfigureAwait(false);
+            if (bank is null)
+            {
+                return Results.NotFound();
+            }
+
+            var keys = await keyStore.GetOrCreateAsync(host, http.RequestAborted).ConfigureAwait(false);
+            return Results.Ok(new BankKeysDto(
+                host.Value,
+                ToDto("Authentication", keys.Authentication, keys.AuthenticationVersion),
+                ToDto("Encryption", keys.Encryption, keys.EncryptionVersion)));
         }));
     }
 
@@ -233,6 +254,21 @@ public static class EbicoAdminApiRouteBuilderExtensions
 
     private static BankDto ToDto(Bank bank)
         => new(bank.HostId.Value, bank.Name, bank.SupportedVersions.Select(v => v.ToString()).ToArray(), bank.Url);
+
+    // Projects one of the bank's own keys onto its public representation: fingerprint (both the raw hex a
+    // client compares against HpbResult and the grouped letter format) plus the SubjectPublicKeyInfo PEM.
+    private static BankKeyDto ToDto(string purpose, RsaKeyMaterial key, KeyVersion version)
+    {
+        var digest = PublicKeyFingerprint.Compute(key);
+        using var rsa = key.CreateRsa();
+        return new BankKeyDto(
+            purpose,
+            version.Value,
+            key.KeySizeBits,
+            Convert.ToHexString(digest),
+            PublicKeyFingerprint.ToLetterFormat(digest),
+            rsa.ExportSubjectPublicKeyInfoPem());
+    }
 
     private static PartnerDto ToDto(Partner partner)
         => new(

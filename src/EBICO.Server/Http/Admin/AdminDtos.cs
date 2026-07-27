@@ -120,3 +120,31 @@ public sealed record DownloadDataDto(string Base64Data);
 /// <summary>Status of the download queue for a (subscriber, order type): how many payloads are pending.</summary>
 /// <param name="Pending">The number of payloads currently available for download.</param>
 public sealed record DownloadDataStatusDto(int Pending);
+
+/// <summary>
+/// One of the bank's own public keys as exposed by the admin API (issue #124): what a client would
+/// otherwise learn from the bank letter, so it can verify the fingerprints an <c>HPB</c> response
+/// returns.
+/// </summary>
+/// <param name="Purpose">The key's role: <c>"Authentication"</c> (X00x) or <c>"Encryption"</c> (E00x).</param>
+/// <param name="Version">The EBICS key version code (e.g. <c>"X002"</c>, <c>"E002"</c>).</param>
+/// <param name="KeySizeBits">The RSA key size in bits.</param>
+/// <param name="Fingerprint">The SHA-256 public-key fingerprint as uppercase hex (compare against <c>HpbResult</c>).</param>
+/// <param name="FingerprintLetterFormat">The same fingerprint grouped for printing on a bank letter.</param>
+/// <param name="PublicKeyPem">The public key in PEM (<c>SubjectPublicKeyInfo</c>) form.</param>
+public sealed record BankKeyDto(
+    string Purpose,
+    string Version,
+    int KeySizeBits,
+    string Fingerprint,
+    string FingerprintLetterFormat,
+    string PublicKeyPem);
+
+/// <summary>
+/// The bank's own public key pair for a host: the emulator's equivalent of the bank letter a real bank
+/// sends out (issue #124). Only <b>public</b> components are exposed.
+/// </summary>
+/// <param name="HostId">The host the keys belong to.</param>
+/// <param name="Authentication">The bank's authentication key (<c>X00x</c>).</param>
+/// <param name="Encryption">The bank's encryption key (<c>E00x</c>).</param>
+public sealed record BankKeysDto(string HostId, BankKeyDto Authentication, BankKeyDto Encryption);
