@@ -1,31 +1,31 @@
-# Connector: Verteilte elektronische Unterschrift (HVU/HVZ/HVD/HVT/HVE/HVS)
+# Connector: Distributed electronic signature (HVU/HVZ/HVD/HVT/HVE/HVS)
 
-> Umsetzung von **Issue #124** ([ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md)).
-> Serverseitig existiert die VEU seit **#42** ([VEU-Orders](../server/veu-orders.md), ADR-0020) — diese
-> Seite beschreibt die **Client**-Seite, die bis #124 fehlte.
+> Implementation of **issue #124** ([ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md)).
+> On the server side the VEU has existed since **#42** ([VEU orders](../server/veu-orders.md), ADR-0020) — this
+> page describes the **client** side, which was missing up to #124.
 
-Die *verteilte elektronische Unterschrift* (VEU/EDS) ist der Mehr-Augen-Workflow von EBICS: ein Auftrag
-wird eingereicht, von der Bank **geparkt** statt ausgeführt, und erst freigegeben, wenn genügend
-Berechtigte ihn gezeichnet haben.
+The *distributed electronic signature* (VEU/EDS) is EBICS's multi-eyes workflow: an order is
+submitted, **parked** by the bank instead of executed, and released only once enough authorised
+subscribers have signed it.
 
-## Warum es diese Seite gibt
+## Why this page exists
 
-Die [Order-/BTF-Abdeckungsmatrix](../server/order-coverage-matrix.md) führte HVU–HVS für alle drei
-Versionen als ✅ — das galt für den **Server**. Mit dem mitgelieferten Connector war der Workflow in
-keiner Version fahrbar; drei Lücken griffen ineinander:
+The [order/BTF coverage matrix](../server/order-coverage-matrix.md) listed HVU–HVS as ✅ for all three
+versions — that held for the **server**. With the shipped connector the workflow was not runnable in
+any version; three gaps interlocked:
 
-1. **H005-Uploads verlangten einen BTF.** HVE/HVS sind administrative Order-Typen *ohne* BTF, wurden also
-   clientseitig mit `EbicsConfigurationException` abgelehnt und erreichten den Draht nie. Der
-   Download-Pfad kannte diesen Fall längst — HVU/HVZ funktionierten deshalb.
-2. **Es gab kein Feld für die `OrderID`.** HVE/HVS/HVD/HVT beziehen sich auf *einen* geparkten Auftrag.
-   Auf H003/H004 gingen sie zwar raus, quittierten aber folgerichtig mit `091121`.
-3. **Es ließ sich gar kein Auftrag parken.** Das `OrderAttribute` war in allen Upload-Envelopes hart auf
-   `DZHNN` verdrahtet, ein `SignatureFlag` kannte der Connector nicht.
+1. **H005 uploads required a BTF.** HVE/HVS are administrative order types *without* a BTF, so they
+   were rejected client-side with `EbicsConfigurationException` and never reached the wire. The
+   download path had long known this case — which is why HVU/HVZ worked.
+2. **There was no field for the `OrderID`.** HVE/HVS/HVD/HVT refer to *one* parked order.
+   On H003/H004 they did go out, but consequently acknowledged with `091121`.
+3. **No order could be parked at all.** The `OrderAttribute` was hard-wired to `DZHNN` in all upload
+   envelopes, and the connector knew no `SignatureFlag`.
 
-Merksatz: Eine Auftragsart ist aus Anwendersicht erst verfügbar, wenn der mitgelieferte Client sie senden
-kann. Die Coverage-Matrix trennt deshalb seit #124 **Server**- und **Client**-Verfügbarkeit.
+Maxim: an order type is available from a user's perspective only once the shipped client can send it.
+The coverage matrix therefore separates **server** and **client** availability since #124.
 
-## Der Ablauf
+## The flow
 
 ```csharp
 // 1) Auftrag einreichen und zum Parken markieren.
@@ -57,96 +57,96 @@ var cancelled = await client.Send(new HvsUploadRequest
 });
 ```
 
-Erreicht die Zahl der Unterschriften `EbicoServerOptions.VeuRequiredSignatures` (Default **2**), gibt der
-Server den Auftrag frei, legt den `pain.002`-Statusreport für den Einreicher ab und entfernt ihn aus dem
-VEU-Speicher.
+Once the number of signatures reaches `EbicoServerOptions.VeuRequiredSignatures` (default **2**), the
+server releases the order, files the `pain.002` status report for the submitter and removes it from
+the VEU store.
 
-> **Der Einreicher zählt mit.** Hält der einreichende Teilnehmer eine bank-technische Berechtigung
-> (E/A/B) für den Auftragstyp, wertet der Emulator seine Einreichung bereits als **erste** Unterschrift
-> (`SepaPaymentUploadProcessor`). Ein zweites HVE desselben Teilnehmers wird als Doppelunterschrift
-> abgelehnt — der freigebende HVE muss von einem **anderen** Teilnehmer kommen. Genau das ist der Zweck
-> der VEU.
+> **The submitter counts too.** If the submitting subscriber holds a bank-technical authorisation
+> (E/A/B) for the order type, the emulator already counts their submission as the **first** signature
+> (`SepaPaymentUploadProcessor`). A second HVE from the same subscriber is rejected as a double
+> signature — the releasing HVE must come from a **different** subscriber. That is precisely the
+> purpose of the VEU.
 
 ## API
 
-| Typ | Auftragsart | Zweck |
+| Type | Order type | Purpose |
 | --- | --- | --- |
-| `UploadRequest.DistributedSignature` / `CctUploadRequest…` | — | Park-Trigger auf dem einreichenden Upload |
-| `HvuDownloadRequest` | `HVU` | Übersicht der offenen Aufträge |
-| `HvzDownloadRequest` | `HVZ` | Übersicht mit Zahlungsdetails |
-| `HvdDownloadRequest` | `HVD` | Status/Detail eines Auftrags |
-| `HvtDownloadRequest` | `HVT` | Transaktionsdetails eines Auftrags 🟡 |
-| `HveUploadRequest` | `HVE` | Unterschrift hinzufügen |
-| `HvsUploadRequest` | `HVS` | Auftrag stornieren/ablehnen |
+| `UploadRequest.DistributedSignature` / `CctUploadRequest…` | — | park trigger on the submitting upload |
+| `HvuDownloadRequest` | `HVU` | overview of the open orders |
+| `HvzDownloadRequest` | `HVZ` | overview with payment details |
+| `HvdDownloadRequest` | `HVD` | status/detail of an order |
+| `HvtDownloadRequest` | `HVT` | transaction details of an order 🟡 |
+| `HveUploadRequest` | `HVE` | add signature |
+| `HvsUploadRequest` | `HVS` | cancel/reject order |
 
-Alle sechs sind über `AddEbicoUpload()` / `AddEbicoDownload()` registriert — kein eigenes
-`AddEbicoVeu()`, weil sie sich Executor und Envelope-Builder mit den übrigen Orders teilen.
+All six are registered via `AddEbicoUpload()` / `AddEbicoDownload()` — no separate
+`AddEbicoVeu()`, because they share the executor and envelope builder with the other orders.
 
 ### `VeuOrderReference`
 
-Benennt den geparkten Auftrag. Nur `OrderId` ist Pflicht:
+Names the parked order. Only `OrderId` is mandatory:
 
-| Eigenschaft | Bedeutung |
+| Property | Meaning |
 | --- | --- |
-| `OrderId` | Die von der Bank vergebene Auftrags-ID aus HVU/HVZ. **Pflicht.** |
-| `PartnerId` | Kunde des Einreichers; Default ist der eigene `PartnerID`. |
-| `OrderType` | Klassischer Auftragstyp des referenzierten Auftrags (H003/H004); dient auf H005 der BTF-Auflösung. |
-| `Btf` | H005-`Service` des referenzierten Auftrags; wird sonst aus `OrderType` abgeleitet. |
-| `FileFormat` | Nur H004, wenn der Auftrag als generischer `FUL` eingereicht wurde. |
+| `OrderId` | The order ID assigned by the bank from HVU/HVZ. **Mandatory.** |
+| `PartnerId` | Customer of the submitter; the default is your own `PartnerID`. |
+| `OrderType` | Classic order type of the referenced order (H003/H004); serves the BTF resolution on H005. |
+| `Btf` | H005 `Service` of the referenced order; otherwise derived from `OrderType`. |
+| `FileFormat` | Only H004, if the order was submitted as a generic `FUL`. |
 
-Fehlt die Referenz bei HVE/HVS (Upload) bzw. HVD/HVT (Download), schlägt der Aufruf **clientseitig** mit
-`EbicsConfigurationException` fehl — mit einer Meldung, die benennt was fehlt, statt mit dem generischen
-`091121` der Bank.
+If the reference is missing on HVE/HVS (upload) or HVD/HVT (download), the call fails **client-side**
+with `EbicsConfigurationException` — with a message that names what is missing, instead of the bank's
+generic `091121`.
 
-## Versions-Dispatch
+## Version dispatch
 
-| Aspekt | H003 | H004 | H005 |
+| Aspect | H003 | H004 | H005 |
 | --- | --- | --- | --- |
-| Park-Trigger | `OrderAttribute=OZHNN` | `OrderAttribute=OZHNN` | `BTUOrderParams/SignatureFlag` |
-| Auftragstyp im Header | `OrderType` | `OrderType` | `AdminOrderType` (**kein** BTU/BTD) |
-| Order-Params | `Hve`/`Hvs`/`Hvd`/`HvtOrderParamsType` mit `PartnerID`/`OrderType`/`OrderID` | dito, zusätzlich `FileFormat` | dito, aber `Service` (BTF) statt `OrderType` |
+| Park trigger | `OrderAttribute=OZHNN` | `OrderAttribute=OZHNN` | `BTUOrderParams/SignatureFlag` |
+| Order type in the header | `OrderType` | `OrderType` | `AdminOrderType` (**no** BTU/BTD) |
+| Order params | `Hve`/`Hvs`/`Hvd`/`HvtOrderParamsType` with `PartnerID`/`OrderType`/`OrderID` | ditto, plus `FileFormat` | ditto, but `Service` (BTF) instead of `OrderType` |
 
-## Returncodes
+## Return codes
 
-| Code | Bedeutung |
+| Code | Meaning |
 | --- | --- |
-| `000000` | HVE/HVS angenommen |
-| `011000` | HVU/HVZ/HVD/HVT ausgeliefert (Download-Postprocessing) |
-| `090003` | Teilnehmer darf den zugrundeliegenden Auftrag nicht zeichnen |
-| `090004` | Doppelunterschrift bzw. bereits vollständig gezeichnet |
-| `090005` | HVD/HVT: keine Daten zur angegebenen `OrderID` |
-| `091121` | `EBICS_INVALID_ORDER_IDENTIFIER` — unbekannte `OrderID` |
+| `000000` | HVE/HVS accepted |
+| `011000` | HVU/HVZ/HVD/HVT delivered (download post-processing) |
+| `090003` | subscriber may not sign the underlying order |
+| `090004` | double signature or already fully signed |
+| `090005` | HVD/HVT: no data for the given `OrderID` |
+| `091121` | `EBICS_INVALID_ORDER_IDENTIFIER` — unknown `OrderID` |
 
-## Spec-Vorbehalte
+## Spec caveats
 
-- **Nur die `OrderID` wird serverseitig ausgewertet.** Die übrigen Felder der `VeuOrderReference`
-  (PartnerID, OrderType/Service, FileFormat) werden schema-konform emittiert, aber der Emulator
-  schlüsselt seinen VEU-Speicher allein über die `OrderID`. Gegen eine reale Bank ungeprüft.
-- **Der Park-Trigger ist Design-Intent.** Dass `OZHNN` bzw. `SignatureFlag` die maßgeblichen Signale sind,
-  ist nicht gegen die offiziellen Annexe verifiziert (Schemas proprietär,
+- **Only the `OrderID` is evaluated on the server side.** The other fields of the `VeuOrderReference`
+  (PartnerID, OrderType/Service, FileFormat) are emitted schema-compliantly, but the emulator keys its
+  VEU store solely on the `OrderID`. Unverified against a real bank.
+- **The park trigger is design intent.** That `OZHNN` or `SignatureFlag` are the decisive signals is
+  not verified against the official annexes (schemas proprietary,
   [ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md)).
-- **Die HVE-Signatur wird nicht geprüft.** `HveUploadRequest.SignaturePayload` trägt per Default einen
-  minimalen Platzhalter; der Emulator protokolliert *dass* ein Berechtigter gezeichnet hat (ADR-0020).
-- **HVT ist auftrags-summarisch** — keine ISO-20022-Einzeltransaktions-Zerlegung.
-- **Freigabe nach Anzahl**, nicht nach kontobezogenen Unterschriftsregeln.
+- **The HVE signature is not checked.** `HveUploadRequest.SignaturePayload` carries a minimal
+  placeholder by default; the emulator logs *that* an authorised party signed (ADR-0020).
+- **HVT is order-summary** — no ISO-20022 single-transaction decomposition.
+- **Release by count**, not by account-related signature rules.
 
 ## Tests
 
-`tests/EBICO.Tests/E2E/VeuE2ETests.cs` — echter Round-Trip Connector ↔ Server je H003/H004/H005:
+`tests/EBICO.Tests/E2E/VeuE2ETests.cs` — real round-trip Connector ↔ Server for each H003/H004/H005:
 
-- Auftrag parken und in HVU wiederfinden (inkl. `1/2` Unterschriften des Einreichers),
-- Freigabe durch einen **zweiten** Teilnehmer (`EbicsE2EHarness.AddCoSignerAsync`),
-- Doppelunterschrift des Einreichers wird abgelehnt,
-- Storno via HVS,
-- HVD löst die referenzierte `OrderID` auf — und findet zu einer fremden ID nichts (`090005`),
-- unbekannte `OrderID` bei HVE → `091121`,
-- fehlende Referenz → clientseitige `EbicsConfigurationException` ohne Round-Trip.
+- park an order and find it again in HVU (incl. `1/2` signatures of the submitter),
+- release by a **second** subscriber (`EbicsE2EHarness.AddCoSignerAsync`),
+- a double signature by the submitter is rejected,
+- cancellation via HVS,
+- HVD resolves the referenced `OrderID` — and finds nothing for a foreign ID (`090005`),
+- unknown `OrderID` on HVE → `091121`,
+- missing reference → client-side `EbicsConfigurationException` without a round-trip.
 
-Dazu `UploadValidationTests` für den H005-`AdminOrderType`-Pfad.
+Additionally `UploadValidationTests` for the H005 `AdminOrderType` path.
 
-## Verwandte Doku
+## Related docs
 
-- [VEU-Orders (Server)](../server/veu-orders.md) — die serverseitige Umsetzung und der Zustandsautomat
-- [Upload-API](upload.md) · [Download-API](download.md) — die Familien, in die sich VEU einreiht
-- [Order-/BTF-Abdeckungsmatrix](../server/order-coverage-matrix.md) — Server- und Client-Verfügbarkeit
+- [VEU orders (server)](../server/veu-orders.md) — the server-side implementation and the state machine
+- [Upload API](upload.md) · [Download API](download.md) — the families the VEU fits into
+- [Order/BTF coverage matrix](../server/order-coverage-matrix.md) — server and client availability
 - [ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md) · [ADR-0020](../adr/0020-veu-orders.md)

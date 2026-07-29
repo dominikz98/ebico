@@ -1,50 +1,50 @@
-# Server: HIA — Senden der Auth- & Enc-Schlüssel (X002/E002)
+# Server: HIA — Sending the Auth & Enc keys (X002/E002)
 
-> Umsetzung von **Issue #27** (Milestone M3 — Server: Key Management). Diese Seite
-> beschreibt den zweiten fachlichen **Order-Handler** des Emulators: den Empfang des
-> öffentlichen **Authentifizierungsschlüssels** (X00x) und **Verschlüsselungsschlüssels**
-> (E00x) eines Teilnehmers per **HIA**, das serverseitige **Speichern** beider Schlüssel
-> und den Lebenszyklus-Übergang **`Initialized → Ready`**.
+> Implementation of **Issue #27** (Milestone M3 — Server: Key Management). This page
+> describes the emulator's second business **order handler**: receiving a subscriber's
+> public **authentication key** (X00x) and **encryption key**
+> (E00x) via **HIA**, the server-side **storage** of both keys
+> and the lifecycle transition **`Initialized → Ready`**.
 >
-> Bewusst **enthalten**: OrderType-`HIA`-Verarbeitung für H003/H004/H005, Extraktion und
-> Speicherung des X00x- und E00x-Schlüssels, Antwort als `ebicsKeyManagementResponse`,
-> Returncodes für die Fehlerfälle (INI noch nicht gelaufen, unbekannter Teilnehmer,
-> bereits abgeschlossen, defekte Order-Data).
-> Bewusst **noch nicht**: HPB (#28), Antwort-Signatur (X002, M4), Persistenz des
-> Schlüssel-Stores (In-Memory bleibt Default), Zertifikatsketten-Prüfung bei H005 (M8),
-> vollständiger Returncode-Katalog (#36/M4), freie INI/HIA-Reihenfolge (siehe Spec-Vorbehalte).
+> Deliberately **included**: OrderType-`HIA` processing for H003/H004/H005, extraction and
+> storage of the X00x and E00x key, response as `ebicsKeyManagementResponse`,
+> return codes for the error cases (INI not yet run, unknown subscriber,
+> already completed, malformed order data).
+> Deliberately **not yet**: HPB (#28), response signature (X002, M4), persistence of the
+> key store (in-memory remains the default), certificate-chain checking for H005 (M8),
+> the complete return code catalogue (#36/M4), free INI/HIA ordering (see spec caveats).
 
-## Zweck
+## Purpose
 
-HIA ist der zweite Schritt der Teilnehmer-Initialisierung (nach [INI](ini.md)): der
-Client sendet einen **ungesicherten** `ebicsUnsecuredRequest`, dessen Order-Data das
-selbstbeschreibende `HIARequestOrderData`-Dokument mit dem öffentlichen
-Authentifizierungsschlüssel (Version X001/X002 — „X00x") und dem
-Verschlüsselungsschlüssel (Version E001/E002 — „E00x") trägt. Der Server nimmt beide
-Schlüssel entgegen, legt sie ab und markiert den Teilnehmer als `Ready`.
+HIA is the second step of subscriber initialisation (after [INI](ini.md)): the
+client sends an **unsecured** `ebicsUnsecuredRequest` whose order data carries the
+self-describing `HIARequestOrderData` document with the public
+authentication key (version X001/X002 — "X00x") and the
+encryption key (version E001/E002 — "E00x"). The server accepts both
+keys, stores them and marks the subscriber as `Ready`.
 
-Der Client-Gegenpart (Schlüsselerzeugung, HIA senden) ist im Connector umgesetzt
-(siehe [Onboarding-Flows](../connector/onboarding.md)) und liefert genau die Order-Data,
-die dieser Handler konsumiert.
+The client counterpart (key generation, sending HIA) is implemented in the connector
+(see [Onboarding flows](../connector/onboarding.md)) and delivers exactly the order data
+that this handler consumes.
 
-## Ablauf
+## Flow
 
-Die Pipeline (`EbicsRequestPipeline`) erkennt den ungesicherten Request, zieht den
-OrderType `HIA` aus dem Header und leitet an den versionspassenden Handler weiter. Der
-versionsagnostische Ablauf liegt in `HiaOrderHandlerBase`, die versionsspezifische
-Schlüssel-Extraktion in `H003`/`H004`/`H005HiaOrderHandler`:
+The pipeline (`EbicsRequestPipeline`) recognises the unsecured request, pulls the
+OrderType `HIA` from the header and forwards it to the version-matching handler. The
+version-agnostic flow lives in `HiaOrderHandlerBase`, the version-specific
+key extraction in `H003`/`H004`/`H005HiaOrderHandler`:
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Extraktion | `Body/DataTransfer/OrderData` (base64 vom Binding dekodiert) → `EbicsCompression.Decompress` → `EbicsXmlSerializer.Deserialize<HiaRequestOrderData>` |
-| 2. Schlüssel | Je Schlüssel — H003/H004: `PubKeyValue/RSAKeyValue` (Modulus/Exponent) → `RsaKeyImportExport.ImportRsaKeyValue`. H005: `X509Data` → `RsaKeyImportExport.ImportPublicKeyFromCertificate` |
-| 3. Versionsprüfung | `AuthenticationVersion` muss eine X00x-, `EncryptionVersion` eine E00x-Version und beide für die Protokollversion zulässig sein (`KeyVersions.EnsurePermitted`) |
-| 4. Teilnehmer | `IMasterDataManager.GetSubscriberAsync` — muss existieren und im Zustand `Initialized` sein (INI zuvor gelaufen) |
-| 5. Speichern | beide öffentlichen Schlüssel → `IServerKeyStore.StoreAsync` (gekeyt auf Teilnehmer × `KeyPurpose.Authentication` bzw. `KeyPurpose.Encryption`) |
-| 6. Status | `IMasterDataManager.TransitionSubscriberAsync(…, Ready)` |
-| 7. Antwort | `ebicsKeyManagementResponse` mit `000000`/`000000` (`EbicsResponseFactory.BuildKeyManagementResponse`) |
+| 1. Extraction | `Body/DataTransfer/OrderData` (base64 decoded by the binding) → `EbicsCompression.Decompress` → `EbicsXmlSerializer.Deserialize<HiaRequestOrderData>` |
+| 2. Keys | Per key — H003/H004: `PubKeyValue/RSAKeyValue` (Modulus/Exponent) → `RsaKeyImportExport.ImportRsaKeyValue`. H005: `X509Data` → `RsaKeyImportExport.ImportPublicKeyFromCertificate` |
+| 3. Version check | `AuthenticationVersion` must be an X00x version, `EncryptionVersion` an E00x version, and both permitted for the protocol version (`KeyVersions.EnsurePermitted`) |
+| 4. Subscriber | `IMasterDataManager.GetSubscriberAsync` — must exist and be in state `Initialized` (INI run beforehand) |
+| 5. Storage | both public keys → `IServerKeyStore.StoreAsync` (keyed on subscriber × `KeyPurpose.Authentication` respectively `KeyPurpose.Encryption`) |
+| 6. State | `IMasterDataManager.TransitionSubscriberAsync(…, Ready)` |
+| 7. Response | `ebicsKeyManagementResponse` with `000000`/`000000` (`EbicsResponseFactory.BuildKeyManagementResponse`) |
 
-Beispiel — HIA-Order-Data (H004, gekürzt), vor Kompression/Base64:
+Example — HIA order data (H004, abridged), before compression/base64:
 
 ```xml
 <HIARequestOrderData xmlns="urn:org:ebics:H004" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
@@ -65,7 +65,7 @@ Beispiel — HIA-Order-Data (H004, gekürzt), vor Kompression/Base64:
 </HIARequestOrderData>
 ```
 
-Erfolgsantwort (H004, gekürzt):
+Success response (H004, abridged):
 
 ```xml
 <ebicsKeyManagementResponse xmlns="urn:org:ebics:H004" Version="H004">
@@ -77,84 +77,84 @@ Erfolgsantwort (H004, gekürzt):
 </ebicsKeyManagementResponse>
 ```
 
-## Schlüssel-Store
+## Key store
 
-Der Server hält empfangene öffentliche Schlüssel im `IServerKeyStore`
-(Default `InMemoryServerKeyStore`, via `TryAddSingleton` überschreibbar). Er ist auf
-(`HostId`, `PartnerId`, `UserId`) × `KeyPurpose` gekeyt und speichert ausschließlich den
-**öffentlichen** Schlüssel plus die EBICS-Schlüsselversion (`StoredPublicKey`). HIA legt
-zwei Einträge ab: den Authentifizierungsschlüssel (`X00x`, `KeyPurpose.Authentication`)
-und den Verschlüsselungsschlüssel (`E00x`, `KeyPurpose.Encryption`). Sie stehen
-purpose-isoliert neben dem bereits per [INI](ini.md) abgelegten Signaturschlüssel
-(`A00x`). Das Domänen-Aggregat `Subscriber` bleibt bewusst schlüsselfrei (siehe
-[Stammdaten](master-data.md)).
+The server holds received public keys in the `IServerKeyStore`
+(default `InMemoryServerKeyStore`, overridable via `TryAddSingleton`). It is keyed on
+(`HostId`, `PartnerId`, `UserId`) × `KeyPurpose` and stores exclusively the
+**public** key plus the EBICS key version (`StoredPublicKey`). HIA stores
+two entries: the authentication key (`X00x`, `KeyPurpose.Authentication`)
+and the encryption key (`E00x`, `KeyPurpose.Encryption`). They sit
+purpose-isolated alongside the signature key (`A00x`) already stored via [INI](ini.md).
+The domain aggregate `Subscriber` remains deliberately key-free (see
+[Master data](master-data.md)).
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-Wie beim gesamten `/ebics`-Endpoint werden Protokoll-/Businessfehler mit **HTTP 200** und
-einem Returncode im Envelope beantwortet (siehe [host.md](host.md)); der fachliche Code
-steht in `body/ReturnCode`.
+As across the entire `/ebics` endpoint, protocol/business errors are answered with **HTTP 200** and
+a return code in the envelope (see [host.md](host.md)); the business code
+sits in `body/ReturnCode`.
 
-| Situation | Returncode |
+| Situation | Return code |
 | --- | --- |
-| HIA angenommen | `000000` EBICS_OK |
-| Teilnehmer unbekannt, **noch nicht** `Initialized` (INI fehlt) **oder** nicht mehr `Initialized` (bereits `Ready`/`Suspended`) | `091002` EBICS_INVALID_USER_OR_USER_STATE |
-| Order-Data nicht entpack-/deserialisierbar, unbrauchbares Schlüsselmaterial oder falsche/unzulässige Auth-/Enc-Version | `090004` EBICS_INVALID_ORDER_DATA_FORMAT |
+| HIA accepted | `000000` EBICS_OK |
+| Subscriber unknown, **not yet** `Initialized` (INI missing) **or** no longer `Initialized` (already `Ready`/`Suspended`) | `091002` EBICS_INVALID_USER_OR_USER_STATE |
+| Order data cannot be decompressed/deserialised, unusable key material or wrong/impermissible auth/enc version | `090004` EBICS_INVALID_ORDER_DATA_FORMAT |
 
-HIA wird also nur im Zustand `Initialized` angenommen; ein erneutes HIA (Teilnehmer schon
-`Ready`) wird **strikt abgelehnt** — das deckt sich mit den erlaubten Übergängen der
-Domäne (`Initialized → Ready`).
+HIA is therefore only accepted in state `Initialized`; a repeated HIA (subscriber already
+`Ready`) is **strictly rejected** — this matches the domain's permitted
+transitions (`Initialized → Ready`).
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **Reihenfolge INI vor HIA wird erzwungen.** Da das Domänenmodell nur
-  `New → Initialized → Ready` kennt (kein Zwischenzustand für „HIA erledigt, INI fehlt"),
-  akzeptiert HIA nur einen `Initialized`-Teilnehmer und setzt damit INI voraus. Die
-  EBICS-Spezifikation erlaubt INI/HIA grundsätzlich in beliebiger Reihenfolge; diese
-  Vereinfachung ist gegen den offiziellen Ablauf zu verifizieren.
-- **`Ready` ohne separaten Aktivierungsschritt.** HIA schaltet direkt auf `Ready`. In der
-  Praxis wird ein Teilnehmer erst nach Abgleich der INI-/HIA-Briefe und expliziter
-  Freischaltung durch die Bank aktiv; der Emulator nimmt diesen Schritt (mangels
-  Operator/Brief-Workflow) implizit vorweg.
-- Die konkreten Codes (`091002` für Zustandsfehler, `090004` für Order-Data-Format) sind
-  gegen den offiziellen EBICS-Annex 1 zu verifizieren; der vollständige, zentrale
-  Returncode-Katalog kommt mit **#36 (M4)**.
-- Die Antwort ist **unsigniert** — die Antwort-Authentifikationssignatur (X002) ist **M4**;
-  strikte Clients könnten unsignierte Antworten ablehnen (konsistent mit `EbicsResponseFactory`).
-- **H005:** aus den übermittelten Zertifikaten wird nur der öffentliche Schlüssel entnommen
-  und gespeichert; eine Zertifikatsketten-/Selbstsignaturprüfung ist ein Conformance-Thema (**M8**).
-- `OrderAttribute`/`SecurityMedium` werden nicht erzwungen (unverifiziert, wie im Connector).
+- **INI-before-HIA ordering is enforced.** Since the domain model only knows
+  `New → Initialized → Ready` (no intermediate state for "HIA done, INI missing"),
+  HIA accepts only an `Initialized` subscriber and thereby presupposes INI. The
+  EBICS specification in principle allows INI/HIA in any order; this
+  simplification is to be verified against the official flow.
+- **`Ready` without a separate activation step.** HIA switches directly to `Ready`. In
+  practice a subscriber only becomes active after the INI/HIA letters are reconciled and
+  explicitly activated by the bank; the emulator anticipates this step (lacking an
+  operator/letter workflow) implicitly.
+- The concrete codes (`091002` for state errors, `090004` for order-data format) are
+  to be verified against the official EBICS Annex 1; the complete, central
+  return code catalogue arrives with **#36 (M4)**.
+- The response is **unsigned** — the response authentication signature (X002) is **M4**;
+  strict clients might reject unsigned responses (consistent with `EbicsResponseFactory`).
+- **H005:** only the public key is extracted from the transmitted certificates and
+  stored; a certificate-chain/self-signature check is a conformance topic (**M8**).
+- `OrderAttribute`/`SecurityMedium` are not enforced (unverified, as in the connector).
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-| Version | Order-Data | Schlüsseltransport | OrderType-Feld |
+| Version | Order data | Key transport | OrderType field |
 | --- | --- | --- | --- |
-| H003 / H004 | `H00x.HIARequestOrderData` | `RSAKeyValue` (Modulus/Exponent) je Schlüssel | `OrderType` |
-| H005 | `H005.HIARequestOrderData` | `X509Data` (Zertifikat) je Schlüssel | `AdminOrderType` |
+| H003 / H004 | `H00x.HIARequestOrderData` | `RSAKeyValue` (Modulus/Exponent) per key | `OrderType` |
+| H005 | `H005.HIARequestOrderData` | `X509Data` (certificate) per key | `AdminOrderType` |
 
-Erlaubte Versionen (via `KeyVersions`): Authentifizierung **X001** (nur H003/H004),
-**X002** (alle); Verschlüsselung **E001** (nur H003/H004), **E002** (alle). Eine für die
-Protokollversion unzulässige Version (z. B. E001 auf H005) oder eine zweckfremde Version
-(z. B. A005 als `AuthenticationVersion`) wird mit `090004` abgelehnt.
+Permitted versions (via `KeyVersions`): authentication **X001** (H003/H004 only),
+**X002** (all); encryption **E001** (H003/H004 only), **E002** (all). A version
+impermissible for the protocol version (e.g. E001 on H005) or a purpose-alien version
+(e.g. A005 as `AuthenticationVersion`) is rejected with `090004`.
 
 ## Tests
 
-`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; Request-XML aus committeten
-Core-Bindings, keine proprietären Fixtures):
+`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; request XML from committed
+Core bindings, no proprietary fixtures):
 
-- `HiaOrderHandlerTests` — End-to-End über `EbicsRequestPipeline`, `[Theory]` über H003/H004/H005:
-  Happy Path (Antwort `ebicsKeyManagementResponse` `000000`, Teilnehmer `Initialized→Ready`,
-  **beide** Schlüssel im `IServerKeyStore` mit passendem Modulus/Version) plus Negativfälle:
-  Teilnehmer noch `New` (INI fehlt), unbekannter Teilnehmer und bereits `Ready` (`091002`),
-  undekodierbare Order-Data (`090004`), für die Protokollversion unzulässige (E001/H005) bzw.
-  zweckfremde (A005 als AuthenticationVersion) Version (`090004`).
-- `InMemoryServerKeyStoreTests` — Store/Get/Contains, Purpose-Isolation, Overwrite, Teilnehmer-Isolation.
+- `HiaOrderHandlerTests` — end-to-end via `EbicsRequestPipeline`, `[Theory]` over H003/H004/H005:
+  happy path (response `ebicsKeyManagementResponse` `000000`, subscriber `Initialized→Ready`,
+  **both** keys in the `IServerKeyStore` with matching modulus/version) plus negative cases:
+  subscriber still `New` (INI missing), unknown subscriber and already `Ready` (`091002`),
+  undecodable order data (`090004`), a version impermissible for the protocol version (E001/H005) or
+  purpose-alien (A005 as AuthenticationVersion) (`090004`).
+- `InMemoryServerKeyStoreTests` — Store/Get/Contains, purpose isolation, overwrite, subscriber isolation.
 
-## Verwandte Doku
+## Related documentation
 
-- [INI — Senden der Signaturschlüssel (A00x)](ini.md) — der vorausgehende Onboarding-Schritt
-- [Hostable Server-Grundgerüst](host.md) — Host, Pipeline, Returncodes, Response-Factory
-- [Stammdatenverwaltung](master-data.md) — Teilnehmer-Lebenszyklus, `IMasterDataManager`, Store
-- [Onboarding-Flows INI / HIA / HPB](../connector/onboarding.md) — der Client-Gegenpart
-- [Schlüsselpaare & -repräsentation (A/E/X)](../protocol/key-representation.md) — Schlüsselversionen, RSAKeyValue/X.509-Import
-- [Public-Key-Fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md) — HIA-Brief-Abgleich
+- [INI — Sending the signature keys (A00x)](ini.md) — the preceding onboarding step
+- [Hostable server skeleton](host.md) — host, pipeline, return codes, response factory
+- [Master data management](master-data.md) — subscriber lifecycle, `IMasterDataManager`, store
+- [Onboarding flows INI / HIA / HPB](../connector/onboarding.md) — the client counterpart
+- [Key pairs & representation (A/E/X)](../protocol/key-representation.md) — key versions, RSAKeyValue/X.509 import
+- [Public key fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md) — HIA letter reconciliation

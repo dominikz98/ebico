@@ -1,56 +1,55 @@
-# Connector: Download-API (STA / C53 / VMK / C52 / C54 …)
+# Connector: Download API (STA / C53 / VMK / C52 / C54 …)
 
-> Umsetzung von **Issue #49** (Milestone M6 — Connector). Diese Seite beschreibt die clientseitige
-> Download-API des `EBICO.Connector`: die generische Download-Methode, die Convenience-Requests
-> (Kontoauszüge/Reports und Status-/Protokoll-Orders), die optionalen **Parsing-Hooks**, die
-> clientseitige Krypto-Pipeline (Segmente sammeln → Reassemblieren → E002-Entschlüsseln →
-> Dekomprimieren) und die dreiphasige Download-Transaktion inklusive **Receipt**. Grundlage ist der
-> [Client-Kern](client-core.md) (#46) und das abgeschlossene [Onboarding](onboarding.md) (#47); die
-> Gegenrichtung ist die [Upload-API](upload.md) (#48), der Gesamtentwurf steht in der
-> [Connector-Architektur](architecture.md).
+> Implementation of **issue #49** (milestone M6 — Connector). This page describes the client-side
+> download API of the `EBICO.Connector`: the generic download method, the convenience requests
+> (account statements/reports and status/protocol orders), the optional **parsing hooks**, the
+> client-side crypto pipeline (collect segments → reassemble → E002 decrypt → decompress) and the
+> three-phase download transaction including the **Receipt**. The basis is the
+> [client core](client-core.md) (#46) and the completed [onboarding](onboarding.md) (#47); the
+> opposite direction is the [upload API](upload.md) (#48), the overall design is in the
+> [Connector architecture](architecture.md).
 
-## Zweck
+## Purpose
 
-Nach abgeschlossenem Onboarding (INI/HIA/HPB und Aktivierung durch die Bank) kann ein Teilnehmer
-Bankdaten abrufen — Kontoauszüge/Reports (STA/VMK/C53/C52/C54) und administrative Downloads
-(HAC/HTD/HKD/HAA/HPD/PTK). Die Download-API führt die EBICS-Download-Transaktion aus **drei Phasen**:
-**Initialisation** (Auftragsmetadaten senden, Segmentanzahl + Segment 1 + verschlüsselten
-Transaktionsschlüssel empfangen), **Transfer** (die restlichen Segmente abrufen) und **Receipt**
-(den vollständigen, verwertbaren Empfang quittieren). Die entschlüsselten, dekomprimierten
-Auftragsdaten liefert die API als Roh-Bytes; ein optionaler Parsing-Hook kann sie in eine typisierte
-Form überführen.
+After completed onboarding (INI/HIA/HPB and activation by the bank) a subscriber can fetch bank
+data — account statements/reports (STA/VMK/C53/C52/C54) and administrative downloads
+(HAC/HTD/HKD/HAA/HPD/PTK). The download API runs the EBICS download transaction in **three phases**:
+**Initialisation** (send order metadata, receive segment count + segment 1 + encrypted transaction
+key), **Transfer** (fetch the remaining segments) and **Receipt** (acknowledge the complete, usable
+receipt). The decrypted, decompressed order data is delivered by the API as raw bytes; an optional
+parsing hook can convert it into a typed form.
 
-Die Gegenseite ist der Emulator: die
-[Download-Transaktion](../server/download-transaction.md) (#33), die
-[Kontoauszug-Orders](../server/statement-orders.md) (#40) und die
-[Status-/Protokoll-Orders](../server/status-protocol-orders.md) (#41) erzeugen die Inhalte
-serverseitig. Diese API ist der **inverse** Ablauf zur Upload-API.
+The counterpart is the emulator: the
+[download transaction](../server/download-transaction.md) (#33), the
+[account statement orders](../server/statement-orders.md) (#40) and the
+[status/protocol orders](../server/status-protocol-orders.md) (#41) produce the contents on the
+server side. This API is the **inverse** flow to the upload API.
 
 ```mermaid
 sequenceDiagram
-    participant C as Teilnehmer (Connector)
-    participant S as EBICS-Server (Bank)
-    C->>S: ebicsRequest — Initialisation (Download-BTF/OrderType, X002-signiert)
-    S-->>C: Transaction-ID + NumSegments + Segment 1 + DataEncryptionInfo
-    loop restliche Segmente (2 … NumSegments)
-        C->>S: ebicsRequest — Transfer (Segment n anfordern, X002-signiert)
-        S-->>C: Segment n
+    participant C as Subscriber (connector)
+    participant S as EBICS server (bank)
+    C->>S: ebicsRequest — Initialisation (download BTF/order type, X002-signed)
+    S-->>C: transaction ID + NumSegments + segment 1 + DataEncryptionInfo
+    loop remaining segments (2 … NumSegments)
+        C->>S: ebicsRequest — Transfer (request segment n, X002-signed)
+        S-->>C: segment n
     end
-    Note over C: Segmente reassemblieren, E002-entschlüsseln (privater Teilnehmer-Key),<br/>dekomprimieren, optionalen Parse-Hook anwenden
-    C->>S: ebicsRequest — Receipt (ReceiptCode 0 = positiv)
-    S-->>C: Abschluss-Returncode (011000)
+    Note over C: reassemble segments, E002-decrypt (private subscriber key),<br/>decompress, apply optional parse hook
+    C->>S: ebicsRequest — Receipt (ReceiptCode 0 = positive)
+    S-->>C: final return code (011000)
 ```
 
-## Öffentliche API
+## Public API
 
 ```csharp
 services.AddEbicoConnector(o => { /* Url, HostId, PartnerId, UserId, Version */ })
         .Services.AddEbicoDownload();
 ```
 
-### Convenience-Requests
+### Convenience requests
 
-Für die gängigen Downloads genügt ein sprechender Request; der Order-Typ ist fest hinterlegt:
+For the common downloads a descriptive request suffices; the order type is fixed:
 
 ```csharp
 var client = provider.GetRequiredService<IEbicsClient>();
@@ -72,33 +71,32 @@ else
 }
 ```
 
-**Kontoauszüge & Reports** (H005: `BTD` + BTF):
+**Account statements & reports** (H005: `BTD` + BTF):
 
-| Request | Order-Typ | Nachricht |
+| Request | Order type | Message |
 | --- | --- | --- |
-| `StaDownloadRequest` | `STA` — Kontoauszug | SWIFT `mt940` |
-| `VmkDownloadRequest` | `VMK` — Zwischensaldenreport | SWIFT `mt942` |
+| `StaDownloadRequest` | `STA` — account statement | SWIFT `mt940` |
+| `VmkDownloadRequest` | `VMK` — interim balance report | SWIFT `mt942` |
 | `C53DownloadRequest` | `C53` — Bank-to-Customer Statement | `camt.053` |
 | `C52DownloadRequest` | `C52` — Bank-to-Customer Account Report | `camt.052` |
 | `C54DownloadRequest` | `C54` — Debit/Credit Notification | `camt.054` |
 
-**Status-/Protokoll-Orders** (H005: `AdminOrderType`, **kein** BTF):
+**Status/protocol orders** (H005: `AdminOrderType`, **no** BTF):
 
-| Request | Order-Typ | Inhalt |
+| Request | Order type | Content |
 | --- | --- | --- |
-| `HtdDownloadRequest` | `HTD` | Kunden-/Teilnehmerdaten |
-| `HkdDownloadRequest` | `HKD` | Kundendaten inkl. aller Teilnehmer |
-| `HaaDownloadRequest` | `HAA` | verfügbare Order-Typen |
-| `HpdDownloadRequest` | `HPD` | Bankparameter |
-| `HacDownloadRequest` | `HAC` | Kundenprotokoll (XML) |
-| `PtkDownloadRequest` | `PTK` | Kundenprotokoll (Text) |
+| `HtdDownloadRequest` | `HTD` | customer/subscriber data |
+| `HkdDownloadRequest` | `HKD` | customer data incl. all subscribers |
+| `HaaDownloadRequest` | `HAA` | available order types |
+| `HpdDownloadRequest` | `HPD` | bank parameters |
+| `HacDownloadRequest` | `HAC` | customer protocol (XML) |
+| `PtkDownloadRequest` | `PTK` | customer protocol (text) |
 
-### Parsing-Hooks
+### Parsing hooks
 
-Jeder Request nimmt einen optionalen `Parse`-Delegaten. Er wird **nach dem Entschlüsseln und vor dem
-Receipt** auf die Roh-Bytes angewandt; sein Ergebnis liegt typsicher über `ParsedAs<T>()` vor. So
-bleibt der Connector formatagnostisch (er kennt weder ZIP noch camt), und der Aufrufer bestimmt die
-Zielform:
+Each request takes an optional `Parse` delegate. It is applied to the raw bytes **after decryption and
+before the Receipt**; its result is available type-safely via `ParsedAs<T>()`. This keeps the
+connector format-agnostic (it knows neither ZIP nor camt), and the caller determines the target form:
 
 ```csharp
 var result = await client.Send(new C53DownloadRequest
@@ -110,12 +108,12 @@ IReadOnlyList<StatementEntry>? entries = result.Value!.ParsedAs<IReadOnlyList<St
 byte[] raw = result.Value.OrderData.ToArray();             // die Roh-Bytes bleiben zugänglich
 ```
 
-Wirft der Hook eine Ausnahme, sendet der Connector ein **negatives Receipt** (der Server stellt die
-Daten erneut bereit) und reicht die Ausnahme weiter.
+If the hook throws an exception, the connector sends a **negative Receipt** (the server makes the
+data available again) and rethrows the exception.
 
-### Generische Download-Methode
+### Generic download method
 
-Für andere Auftragsarten oder feine Kontrolle dient `DownloadRequest`:
+For other order types or fine control, `DownloadRequest` serves:
 
 ```csharp
 // H005 über eine BTF …
@@ -128,97 +126,96 @@ await client.Send(new DownloadRequest { OrderType = "C53" });
 await client.Send(new DownloadRequest { FileFormat = "camt.053", Period = new DateRange(from, to) });
 ```
 
-Das Ergebnis ist stets ein `EbicsResult<DownloadResult>` mit der hex-kodierten `TransactionId`, der
-Segmentanzahl, den entschlüsselten `OrderData` und — bei gesetztem Hook — dem `Parsed`-Wert.
+The result is always an `EbicsResult<DownloadResult>` with the hex-encoded `TransactionId`, the
+segment count, the decrypted `OrderData` and — when a hook is set — the `Parsed` value.
 
-## Ablauf (clientseitig)
+## Flow (client-side)
 
-Der `DownloadExecutor` orchestriert je `Send`:
+The `DownloadExecutor` orchestrates per `Send`:
 
-1. **Keys laden** — nur Teilnehmerschlüssel: der private **E002**-Schlüssel (zum Entschlüsseln) und der
-   **X002**-Schlüssel (zum Signieren der Requests). Ein Bank-Schlüssel wird nicht benötigt (die Daten
-   sind für den Teilnehmer verschlüsselt).
-2. **Order-Identität** — versionsabhängig auflösen (siehe [Versions-Dispatch](#versions-dispatch)).
-3. **Initialisation** — versionsabhängiger `ebicsRequest`, unsigniert serialisiert, dann mit der
-   **X002-Authentifikationssignatur** (`AuthenticationSignature.Sign`) versehen und gesendet. Aus der
-   Antwort werden Returncode, `TransactionId`, `NumSegments`, `DataEncryptionInfo/TransactionKey` und
-   das **erste** Segment übernommen (Fehler-Returncode → `EbicsResult.Failure`).
-4. **Transfer** — für die Segmente 2 … `NumSegments` je ein X002-signierter `ebicsRequest`; die
-   gelieferten Order-Data-Segmente werden gesammelt.
-5. **Reassemblieren/Entschlüsseln/Dekomprimieren** — `EbicsSegmentation.Reassemble` →
-   `EncryptionE002.Decrypt` (RSA-OAEP über den Transaktionsschlüssel mit dem **privaten**
-   Teilnehmer-E002-Schlüssel, dann AES-128-CBC über die Auftragsdaten) → `EbicsCompression.Decompress`.
-   Schlägt dies fehl, wird ein **negatives Receipt** gesendet und eine `EbicsConnectorException` geworfen.
-6. **Parsing-Hook** (falls gesetzt) — auf die Roh-Bytes angewandt; bei Ausnahme negatives Receipt + rethrow.
-7. **Receipt** — X002-signierter `ebicsRequest` mit `ReceiptCode = 0` (positiv); der Server bestätigt
-   mit `011000` (`EBICS_DOWNLOAD_POSTPROCESS_DONE`).
-8. **Ergebnis** — `EbicsResult.Success(DownloadResult)`.
+1. **Load keys** — subscriber keys only: the private **E002** key (for decryption) and the
+   **X002** key (for signing the requests). A bank key is not needed (the data is encrypted for the
+   subscriber).
+2. **Order identity** — resolve depending on version (see [Version dispatch](#version-dispatch)).
+3. **Initialisation** — a version-dependent `ebicsRequest`, serialized unsigned, then furnished with
+   the **X002 authentication signature** (`AuthenticationSignature.Sign`) and sent. From the response
+   the return code, `TransactionId`, `NumSegments`, `DataEncryptionInfo/TransactionKey` and the
+   **first** segment are taken (error return code → `EbicsResult.Failure`).
+4. **Transfer** — for segments 2 … `NumSegments` one X002-signed `ebicsRequest` each; the delivered
+   order data segments are collected.
+5. **Reassemble/decrypt/decompress** — `EbicsSegmentation.Reassemble` →
+   `EncryptionE002.Decrypt` (RSA-OAEP over the transaction key with the **private** subscriber E002
+   key, then AES-128-CBC over the order data) → `EbicsCompression.Decompress`. If this fails, a
+   **negative Receipt** is sent and an `EbicsConnectorException` is thrown.
+6. **Parsing hook** (if set) — applied to the raw bytes; on exception negative Receipt + rethrow.
+7. **Receipt** — X002-signed `ebicsRequest` with `ReceiptCode = 0` (positive); the server confirms
+   with `011000` (`EBICS_DOWNLOAD_POSTPROCESS_DONE`).
+8. **Result** — `EbicsResult.Success(DownloadResult)`.
 
-Wiederverwendete Core-Primitives:
+Reused Core primitives:
 [`EbicsSegmentation`](../server/segmentation.md), [`EncryptionE002`](../protocol/encryption-e002.md),
 [`EbicsCompression`](../server/segmentation.md),
 [`AuthenticationSignature`](../protocol/auth-signature-x002.md),
 [`BtfOrderTypeCatalog`](../server/btf-framework.md), `KeyVersions`.
 
-## Versions-Dispatch
+## Version dispatch
 
-Je ein Envelope-Builder pro Version hinter einer Registry (Muster wie bei Upload/Onboarding):
+One envelope builder per version behind a registry (same pattern as with upload/onboarding):
 
-| Version | Order-Details |
+| Version | Order details |
 | --- | --- |
-| **H005** | Kontoauszüge: `AdminOrderType = "BTD"` + `BTDOrderParams/Service` (BTF, aus dem Order-Typ aufgelöst); Status-/Protokoll-Orders: `AdminOrderType = "HTD"` … **direkt** (kein BTF) |
-| **H003 / H004** | klassischer `OrderType` (z. B. `STA`, `HTD`) direkt, oder `FDL` + `FDLOrderParams/FileFormat`; optionaler Zeitraum in `FDLOrderParams`/`StandardOrderParams`; `OrderAttribute = DZHNN` |
+| **H005** | account statements: `AdminOrderType = "BTD"` + `BTDOrderParams/Service` (BTF, resolved from the order type); status/protocol orders: `AdminOrderType = "HTD"` … **directly** (no BTF) |
+| **H003 / H004** | classic `OrderType` (e.g. `STA`, `HTD`) directly, or `FDL` + `FDLOrderParams/FileFormat`; optional period in `FDLOrderParams`/`StandardOrderParams`; `OrderAttribute = DZHNN` |
 
-Der Zeitraum (`Period`) landet in den versionsspezifischen Order-Params (`BTDOrderParams` für H005,
-`FDLOrderParams`/`StandardOrderParams` für H003/H004) und wird nur gesendet, wenn beide Grenzen gesetzt
-sind. Auf H005 tragen administrative Order-Typen keinen Zeitraum (die Bindings sehen dort keine
-`DateRange` vor).
+The period (`Period`) ends up in the version-specific order params (`BTDOrderParams` for H005,
+`FDLOrderParams`/`StandardOrderParams` for H003/H004) and is only sent when both bounds are set. On
+H005 administrative order types carry no period (the bindings do not provide a `DateRange` there).
 
-## Fehlerbehandlung
+## Error handling
 
-- **Fachliche Returncodes** (z. B. `090005` keine Daten vorhanden, `091101` unbekannte Transaction-ID,
-  `091104` Segmentnummer überschritten) landen in `EbicsResult.Failure(ReturnCode, ReturnText)`.
-- **Technische/Konfigurationsfehler** werfen: fehlende Teilnehmerschlüssel (Onboarding nicht gelaufen)
-  → `EbicsConfigurationException`; unentschlüsselbare/-dekomprimierbare Daten → `EbicsConnectorException`
-  (mit vorherigem negativem Receipt); Transportfehler → `EbicsTransportException`.
-- Ein positives Receipt quittiert der Server mit `011000`; dieser Code steht dann in
+- **Business return codes** (e.g. `090005` no data available, `091101` unknown transaction ID,
+  `091104` segment number exceeded) end up in `EbicsResult.Failure(ReturnCode, ReturnText)`.
+- **Technical/configuration errors** throw: missing subscriber keys (onboarding not run)
+  → `EbicsConfigurationException`; non-decryptable/non-decompressible data → `EbicsConnectorException`
+  (with a preceding negative Receipt); transport errors → `EbicsTransportException`.
+- A positive Receipt is acknowledged by the server with `011000`; that code then stands in
   `EbicsResult.ReturnCode` (`IsSuccess == true`).
 
 ## Tests
 
-`tests/EBICO.Tests/Connector/Download/` prüft über alle drei Versionen (H003/H004/H005):
-Happy-Path-**Round-Trip** (der `FakeDownloadServer` kodiert den Payload exakt wie der Server —
-Komprimieren → E002-Verschlüsseln → Segmentieren — und der Client stellt die Original-Bytes wieder her),
-**Mehrsegment**-Downloads (Transfer-Count == `NumSegments − 1`), das **positive Receipt**, die korrekte
-Order-Identität aller Convenience-Requests (H003/H004 direkter Code · H005 `BTD`+BTF bzw.
-`AdminOrderType`), die Weitergabe des **Zeitraums**, den **Parsing-Hook** (`ParsedAs<T>()`), die
-generische `FDL`-Route sowie die Negativfälle (Init-`090005`, Transfer-`091101`, fehlender Teilnehmer-
-Enc-Key, nicht entschlüsselbare Daten und Parse-Fehler → jeweils **negatives Receipt**). Die
-Server-Antworten baut ein Tier-A-Fake mit dem echten `EbicsResponseFactory`.
+`tests/EBICO.Tests/Connector/Download/` checks across all three versions (H003/H004/H005):
+happy-path **round-trip** (the `FakeDownloadServer` encodes the payload exactly like the server —
+compress → E002 encrypt → segment — and the client restores the original bytes),
+**multi-segment** downloads (transfer count == `NumSegments − 1`), the **positive Receipt**, the
+correct order identity of all convenience requests (H003/H004 direct code · H005 `BTD`+BTF or
+`AdminOrderType`), the passing-through of the **period**, the **parsing hook** (`ParsedAs<T>()`), the
+generic `FDL` route as well as the negative cases (init `090005`, transfer `091101`, missing
+subscriber enc key, non-decryptable data and parse error → each a **negative Receipt**). The server
+responses are built by a tier-A fake with the real `EbicsResponseFactory`.
 
-## Spec-Vorbehalte
+## Spec caveats
 
-- Die **X002-Antwortsignatur** des Servers wird nicht geprüft (der Server antwortet unsigniert, M4).
-- Die Platzierung von `NumSegments` + Segment 1 in der Init-Antwort, der Segmente 2…N in den
-  Transfer-Antworten und der `DataEncryptionInfo` (nur in der Init-Antwort) ist gegen die offiziellen
-  EBICS-Annexe zu verifizieren (siehe [Download-Transaktion](../server/download-transaction.md)).
-- Das `SecurityMedium` (`"0000"`), die `OrderAttribute`-Wahl (`DZHNN`) und die Behandlung des Zeitraums
-  bei administrativen H005-Orders sind gegen die offiziellen Annexe zu verifizieren.
+- The server's **X002 response signature** is not checked (the server answers unsigned, M4).
+- The placement of `NumSegments` + segment 1 in the init response, of segments 2…N in the transfer
+  responses and of the `DataEncryptionInfo` (only in the init response) needs to be verified against
+  the official EBICS annexes (see [download transaction](../server/download-transaction.md)).
+- The `SecurityMedium` (`"0000"`), the `OrderAttribute` choice (`DZHNN`) and the handling of the
+  period for administrative H005 orders need to be verified against the official annexes.
 
-## Verwandte Doku
+## Related docs
 
-- [Connector-Architektur](architecture.md) — Send-Pipeline, Transaktions-Skelett (Init → Transfer → Receipt)
-- [Client-Kern & Konfiguration](client-core.md) — #46: Dispatch, Options/DI, Transport, Key-Store
-- [Upload-API (CCT/CDD/CDB/CIP)](upload.md) — #48: die Gegenrichtung
-- [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Voraussetzung (Teilnehmerschlüssel)
-- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: C53 als echter Round-Trip gegen den Server (statt gegen `FakeDownloadServer`)
-- [Server: Download-Transaktion](../server/download-transaction.md) — die Gegenseite (#33)
-- [Server: Kontoauszug-Orders](../server/statement-orders.md) — STA/VMK/C53/C52/C54-Erzeugung (#40)
-- [Server: Status-/Protokoll-Orders](../server/status-protocol-orders.md) — HAC/HTD/HKD/HAA/HPD/PTK (#41)
-- [Connector: VEU](veu.md) — #124: die VEU-Downloads HVU/HVZ/HVD/HVT (letztere beide über `DownloadRequest.Veu` bzw. eine `VeuOrderReference`)
-- [Verschlüsselung E002](../protocol/encryption-e002.md) · [Authentifikationssignatur X002](../protocol/auth-signature-x002.md) · [Segmentierung](../server/segmentation.md)
+- [Connector architecture](architecture.md) — send pipeline, transaction skeleton (Init → Transfer → Receipt)
+- [Client core & configuration](client-core.md) — #46: dispatch, options/DI, transport, key store
+- [Upload API (CCT/CDD/CDB/CIP)](upload.md) — #48: the opposite direction
+- [Onboarding flows INI / HIA / HPB](onboarding.md) — #47: prerequisite (subscriber keys)
+- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: C53 as a real round-trip against the server (instead of against `FakeDownloadServer`)
+- [Server: download transaction](../server/download-transaction.md) — the counterpart (#33)
+- [Server: account statement orders](../server/statement-orders.md) — STA/VMK/C53/C52/C54 generation (#40)
+- [Server: status/protocol orders](../server/status-protocol-orders.md) — HAC/HTD/HKD/HAA/HPD/PTK (#41)
+- [Connector: VEU](veu.md) — #124: the VEU downloads HVU/HVZ/HVD/HVT (the latter two via `DownloadRequest.Veu` or a `VeuOrderReference`)
+- [Encryption E002](../protocol/encryption-e002.md) · [Authentication signature X002](../protocol/auth-signature-x002.md) · [Segmentation](../server/segmentation.md)
 
 ---
 
-> Diese Seite ist die gepflegte Referenz. Bei Änderungen an der Download-API hier (und im
-> [Doku-Index](../index.md)) nachziehen.
+> This page is the maintained reference. On changes to the download API, update it here (and in the
+> [doc index](../index.md)).

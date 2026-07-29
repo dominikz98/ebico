@@ -1,33 +1,33 @@
-# Connector: Client-Kern & Konfiguration
+# Connector: Client core & configuration
 
-> Umsetzung von **Issue #46** (Milestone M6 — Connector). Diese Seite beschreibt
-> den Grundstein des `EBICO.Connector`: die öffentlichen Abstraktionen, die
-> Konfiguration, die DI-Registrierung und den eigenen Request-Dispatch. Der
-> übergeordnete Entwurf steht in der [Connector-Architektur](architecture.md);
-> die Entscheidung *kein MediatR* in
+> Implementation of **issue #46** (milestone M6 — Connector). This page
+> describes the foundation of the `EBICO.Connector`: the public abstractions,
+> the configuration, the DI registration and the own request dispatch. The
+> overarching design is in the [Connector architecture](architecture.md); the
+> decision *no MediatR* in
 > [ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md).
 
-## Zweck
+## Purpose
 
-Der Connector-Kern verdrahtet die Bausteine, auf denen die späteren M6-Issues
-(Onboarding INI/HIA/HPB, Upload, Download, NuGet-Packaging) aufsetzen. Eine
-aufrufende App kennt nur **eine** Einstiegsmethode — `IEbicsClient.Send(...)` —
-und bekommt ein typisiertes `EbicsResult<T>`. #46 liefert das *Skelett*
-(Abstraktionen + Konfiguration + Dispatch + Default-Transport + Key-Store);
-konkrete Requests/Handler kommen in Folge-Issues.
+The connector core wires up the building blocks on which the later M6 issues
+(onboarding INI/HIA/HPB, upload, download, NuGet packaging) build. A calling
+app knows only **one** entry method — `IEbicsClient.Send(...)` — and gets a
+typed `EbicsResult<T>`. #46 delivers the *skeleton* (abstractions +
+configuration + dispatch + default transport + key store); concrete
+requests/handlers come in follow-up issues.
 
-## Öffentliche Abstraktionen
+## Public abstractions
 
-Alle im Namespace `EBICO.Connector`:
+All in the namespace `EBICO.Connector`:
 
-| Typ | Rolle |
+| Type | Role |
 | --- | --- |
-| `IEbicsRequest<TResult>` | Marker: ein Request „kennt" seinen Ergebnistyp. |
-| `IEbicsClient` | Mediator; einzige Einstiegsmethode `Send<TResult>(request, ct)`. |
-| `IEbicsRequestHandler<TRequest, TResult>` | Ein Handler je konkretem Request-Typ. |
-| `EbicsContext` | Pro `Send` erzeugter Ausführungskontext (Connection, Keys, Transport, Version). |
-| `EbicsResult<T>` | Ergebnis-/Returncode-Typ (**vorläufig**, siehe unten). |
-| `EbicsConnectorException` | Basis-Exception; Ableitungen `EbicsConfigurationException`, `EbicsTransportException`. |
+| `IEbicsRequest<TResult>` | Marker: a request "knows" its result type. |
+| `IEbicsClient` | Mediator; single entry method `Send<TResult>(request, ct)`. |
+| `IEbicsRequestHandler<TRequest, TResult>` | One handler per concrete request type. |
+| `EbicsContext` | Execution context created per `Send` (connection, keys, transport, version). |
+| `EbicsResult<T>` | Result/return code type (**preliminary**, see below). |
+| `EbicsConnectorException` | Base exception; derivations `EbicsConfigurationException`, `EbicsTransportException`. |
 
 ```csharp
 public interface IEbicsClient
@@ -36,34 +36,34 @@ public interface IEbicsClient
 }
 ```
 
-## Konfiguration
+## Configuration
 
-`EbicsConnectionOptions` (Namespace `EBICO.Connector.Configuration`) hält die
-Verbindungsparameter als bindebare Strings:
+`EbicsConnectionOptions` (namespace `EBICO.Connector.Configuration`) holds the
+connection parameters as bindable strings:
 
-| Feld | Bedeutung |
+| Field | Meaning |
 | --- | --- |
-| `Url` | absolute HTTP(S)-URL des EBICS-Server-Endpunkts |
-| `HostId` | EBICS-`HostID` der Bank/des Servers |
-| `PartnerId` | EBICS-`PartnerID` (Kunde) |
-| `UserId` | EBICS-`UserID` (Teilnehmer) |
-| `Version` | Ziel-Protokollversion (`EbicsVersion`, Default `H005`) |
-| `AllowedOrderTypes` | optionale clientseitige Allow-List erlaubter (klassischer) OrderType-Codes (z. B. `CCT`, `C53`); **leer = keine clientseitige Prüfung** (Server bleibt Autorität) |
+| `Url` | absolute HTTP(S) URL of the EBICS server endpoint |
+| `HostId` | EBICS `HostID` of the bank/server |
+| `PartnerId` | EBICS `PartnerID` (customer) |
+| `UserId` | EBICS `UserID` (subscriber) |
+| `Version` | target protocol version (`EbicsVersion`, default `H005`) |
+| `AllowedOrderTypes` | optional client-side allow-list of permitted (classic) OrderType codes (e.g. `CCT`, `C53`); **empty = no client-side check** (the server remains the authority) |
 
-Vor der Nutzung werden die Optionen validiert und in die unveränderliche
-`EbicsConnection` überführt: die IDs werden über die validierten Core-Typen
-(`HostId`/`PartnerId`/`UserId` aus `EBICO.Core.Domain`) geparst, die Version über
-die `EbicsVersions`-Registry an ihre `EbicsVersionInfo` gebunden.
+Before use, the options are validated and converted into the immutable
+`EbicsConnection`: the IDs are parsed via the validated Core types
+(`HostId`/`PartnerId`/`UserId` from `EBICO.Core.Domain`), the version is bound to
+its `EbicsVersionInfo` via the `EbicsVersions` registry.
 
-Die Validierung läuft über den Options-Mechanismus
+Validation runs through the options mechanism
 (`EbicsConnectionOptionsValidator : IValidateOptions<EbicsConnectionOptions>`):
-Bei ungültiger Konfiguration wirft die erste Auflösung der `EbicsConnection` eine
-`OptionsValidationException` mit allen gefundenen Problemen (fehlende/ungültige
-URL, ungültige Identifier, unbekannte Version). Direkte Aufrufe von
-`EbicsConnection.FromOptions(...)` werfen bei Ungültigkeit eine
-`EbicsConfigurationException`.
+on an invalid configuration the first resolution of the `EbicsConnection` throws
+an `OptionsValidationException` with all problems found (missing/invalid URL,
+invalid identifiers, unknown version). Direct calls of
+`EbicsConnection.FromOptions(...)` throw an `EbicsConfigurationException` on
+invalidity.
 
-## DI-Registrierung
+## DI registration
 
 ```csharp
 services.AddEbicoConnector(o =>
@@ -78,115 +78,115 @@ services.AddEbicoConnector(o =>
 .AddStandardResilienceHandler();   // optional; Resilienz-Paket beim Aufrufer
 ```
 
-`AddEbicoConnector(...)` registriert die Options + ihren Validator, die
-`EbicsConnection`, den Default-`InMemoryKeyStore`, den `HttpClientTransport`, den
-`IEbicsClient` sowie einen **Named** `HttpClient`
-(`EbicoConnector.HttpClientName`). Rückgabe ist der `IHttpClientBuilder` dieses
-Named Clients — Timeouts und Resilienz werden also direkt daran konfiguriert und
-bleiben so aus dem Connector-Kern heraus (Details:
-[Architektur → DI-Registrierung](architecture.md#di-registrierung)).
+`AddEbicoConnector(...)` registers the options + their validator, the
+`EbicsConnection`, the default `InMemoryKeyStore`, the `HttpClientTransport`, the
+`IEbicsClient` as well as a **named** `HttpClient`
+(`EbicoConnector.HttpClientName`). The return value is the `IHttpClientBuilder`
+of this named client — so timeouts and resilience are configured directly on it
+and thus stay out of the connector core (details:
+[Architecture → DI registration](architecture.md#di-registration)).
 
 ## Transport
 
-`ITransport` (Namespace `EBICO.Connector.Transport`) ist die schmale
-Transport-Abstraktion: `SendAsync(EbicsHttpRequest, ct)` → `EbicsHttpResponse`.
-Der Default `HttpClientTransport` bezieht seinen `HttpClient` über
-`IHttpClientFactory` (Named Client), sendet den serialisierten XML-Envelope per
-`POST` (`Content-Type: text/xml; charset=utf-8`) an die konfigurierte URL und
-reicht den `CancellationToken` durch. Nicht-Erfolgs-Status und
-HTTP-/Netzwerkfehler werden als `EbicsTransportException` geworfen — technische
-Fehler sind Exceptions, fachliche Returncodes landen im `EbicsResult<T>`.
+`ITransport` (namespace `EBICO.Connector.Transport`) is the narrow transport
+abstraction: `SendAsync(EbicsHttpRequest, ct)` → `EbicsHttpResponse`. The
+default `HttpClientTransport` obtains its `HttpClient` via `IHttpClientFactory`
+(named client), sends the serialized XML envelope via `POST`
+(`Content-Type: text/xml; charset=utf-8`) to the configured URL and passes the
+`CancellationToken` through. Non-success statuses and HTTP/network errors are
+thrown as `EbicsTransportException` — technical errors are exceptions, business
+return codes end up in the `EbicsResult<T>`.
 
-## Schlüsselspeicher
+## Key store
 
-`IKeyStore` (Namespace `EBICO.Connector.Keys`) liefert Schlüsselmaterial
-(`RsaKeyMaterial` aus `EBICO.Core.Crypto`), adressiert über `KeyOwner`
-(`Subscriber`/`Bank`) und `KeyPurpose` (`Signature`/`Encryption`/
+`IKeyStore` (namespace `EBICO.Connector.Keys`) provides key material
+(`RsaKeyMaterial` from `EBICO.Core.Crypto`), addressed via `KeyOwner`
+(`Subscriber`/`Bank`) and `KeyPurpose` (`Signature`/`Encryption`/
 `Authentication`):
 
-- **`InMemoryKeyStore`** — thread-safe, Default-Registrierung, ideal für Tests.
-- **`FileKeyStore`** — eine Datei je Schlüssel unter einem konfigurierten
-  Verzeichnis; Teilnehmer-Keys als PKCS#8 (privat), Bank-Keys als
-  SubjectPublicKeyInfo (public), über das vorhandene `RsaKeyImportExport`.
-  **Sicherheitshinweis:** private Schlüssel liegen *unverschlüsselt* auf Platte —
-  nur für Entwicklung/einfache Setups; produktiv einen verschlüsselten Store oder
-  HSM verwenden (spätere Issues).
+- **`InMemoryKeyStore`** — thread-safe, default registration, ideal for tests.
+- **`FileKeyStore`** — one file per key under a configured directory; subscriber
+  keys as PKCS#8 (private), bank keys as SubjectPublicKeyInfo (public), via the
+  existing `RsaKeyImportExport`. **Security note:** private keys lie
+  *unencrypted* on disk — only for development/simple setups; in production use
+  an encrypted store or HSM (later issues).
 
-Im Skelett ist der Store implizit auf die eine konfigurierte
-Subscriber-Verbindung bezogen; Mehr-Teilnehmer-Scoping folgt später.
+In the skeleton the store is implicitly scoped to the one configured subscriber
+connection; multi-subscriber scoping follows later.
 
-## Dispatch (ohne MediatR)
+## Dispatch (without MediatR)
 
-`Send<TResult>(IEbicsRequest<TResult>)` kennt statisch nur den Ergebnistyp, nicht
-den konkreten Request-Typ. Der Client löst den passenden
-`IEbicsRequestHandler<TRequest, TResult>` deshalb über einen **eigenen** Dispatch
-auf (kein MediatR, [ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)):
+`Send<TResult>(IEbicsRequest<TResult>)` statically knows only the result type,
+not the concrete request type. The client therefore resolves the appropriate
+`IEbicsRequestHandler<TRequest, TResult>` via an **own** dispatch (no MediatR,
+[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)):
 
-1. Zur Laufzeit wird über `request.GetType()` ein typgebundener Wrapper
-   (`RequestHandlerWrapper<TRequest, TResult>`) erzeugt und in einem
-   `ConcurrentDictionary<Type, object>` gecacht — Reflection nur beim ersten
-   Auftreten eines Request-Typs, danach ein virtueller Aufruf.
-2. Pro `Send` öffnet der Client einen DI-Scope, löst `EbicsConnection`,
-   `IKeyStore` und `ITransport` auf, baut den `EbicsContext` und ruft den Wrapper.
-3. Der Wrapper holt den Handler aus dem Scope. Fehlt er, wirft er eine
+1. At runtime, a type-bound wrapper
+   (`RequestHandlerWrapper<TRequest, TResult>`) is created via
+   `request.GetType()` and cached in a `ConcurrentDictionary<Type, object>` —
+   reflection only on the first occurrence of a request type, thereafter a
+   virtual call.
+2. Per `Send` the client opens a DI scope, resolves `EbicsConnection`,
+   `IKeyStore` and `ITransport`, builds the `EbicsContext` and calls the wrapper.
+3. The wrapper fetches the handler from the scope. If it is missing, it throws an
    `EbicsConfigurationException`.
 
-Handler werden von späteren Issues als
-`services.AddSingleton<IEbicsRequestHandler<TReq, TRes>, THandler>()` registriert
-(im Test über einen Fake-Handler).
+Handlers are registered by later issues as
+`services.AddSingleton<IEbicsRequestHandler<TReq, TRes>, THandler>()` (in tests
+via a fake handler).
 
-## Versionsbindung
+## Version binding
 
-Die Zielversion aus `o.Version` wird über die Core-`EbicsVersions`-Registry an
-ihre `EbicsVersionInfo` gebunden und im `EbicsContext.Version` bereitgestellt;
-darauf setzen Envelope-Namespaces und Header-Aufbau der Handler auf
-([Versions-Dispatch](../protocol/version-dispatch.md)).
+The target version from `o.Version` is bound to its `EbicsVersionInfo` via the
+Core `EbicsVersions` registry and provided in `EbicsContext.Version`; the
+handlers' envelope namespaces and header structure build on it
+([Version dispatch](../protocol/version-dispatch.md)).
 
-## Clientseitige Validierung (Stufe 1)
+## Client-side validation (stage 1)
 
-Bevor ein Upload/Download Schlüssel lädt, Krypto rechnet oder den Transport
-anfasst, läuft die **Send-Pipeline-Stufe 1** — der statische
-`RequestValidator` (Namespace `EBICO.Connector.Validation`), verdrahtet am Anfang
-von `UploadExecutor`/`DownloadExecutor`. Onboarding (INI/HIA/HPB) läuft **nicht**
-über die Executoren und wird daher nie hier validiert. Zwei Verantwortlichkeiten
-mit bewusst getrennter Fehlersemantik:
+Before an upload/download loads keys, computes crypto or touches the transport,
+**send pipeline stage 1** runs — the static `RequestValidator` (namespace
+`EBICO.Connector.Validation`), wired at the start of
+`UploadExecutor`/`DownloadExecutor`. Onboarding (INI/HIA/HPB) does **not** run
+through the executors and is therefore never validated here. Two
+responsibilities with deliberately separated error semantics:
 
-- **Struktur/BTF (immer aktiv):** Die Order-Identität muss für Version und
-  Richtung auflösbar sein (H005 `BTU`/`BTD` + BTF, H003/H004 klassischer OrderType
-  oder `FUL`/`FDL` + FileFormat); ein im BTF-Katalog bekannter Code darf nicht in
-  die falsche Richtung genutzt werden (z. B. `STA` als Upload); die Upload-Payload
-  darf nicht leer und eine explizit gesetzte Segmentgröße muss positiv sein. Ein
-  Verstoß ist ein Programmier-/Konfigfehler → **`EbicsConfigurationException`**.
-- **Berechtigung (opt-in):** Ist `AllowedOrderTypes` gesetzt, wird ein Request,
-  dessen **effektiver klassischer** OrderType-Code nicht in der Liste steht, lokal
-  abgewiesen — ohne Server-Roundtrip (fail-fast) — als
+- **Structure/BTF (always active):** The order identity must be resolvable for
+  version and direction (H005 `BTU`/`BTD` + BTF, H003/H004 classic OrderType or
+  `FUL`/`FDL` + FileFormat); a code known in the BTF catalog must not be used in
+  the wrong direction (e.g. `STA` as an upload); the upload payload must not be
+  empty and an explicitly set segment size must be positive. A violation is a
+  programming/config error → **`EbicsConfigurationException`**.
+- **Authorisation (opt-in):** If `AllowedOrderTypes` is set, a request whose
+  **effective classic** OrderType code is not in the list is rejected locally —
+  without a server round-trip (fail-fast) — as
   `EbicsResult<T>.Failure("090003", …)` (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`),
-  genau wie es die Bank melden würde. Der Schlüssel ist der effektive klassische
-  Code (H005 `CCT` matcht `"CCT"`, **nicht** den Draht-Code `"BTU"`); administrative
-  Codes (HTD/…) unterliegen der Liste ebenfalls. Eine **leere** Liste (Default)
-  überspringt die Prüfung und überlässt die Autorisierung dem Server — die Bank
-  bleibt in jedem Fall die Autorität; die Allow-List ist nur eine Vorab-Absicherung.
+  exactly as the bank would report it. The key is the effective classic code
+  (H005 `CCT` matches `"CCT"`, **not** the wire code `"BTU"`); administrative
+  codes (HTD/…) are subject to the list as well. An **empty** list (default)
+  skips the check and leaves authorisation to the server — the bank remains the
+  authority in any case; the allow-list is only a pre-check.
 
-Grundsatzentscheidung (statischer Helfer, Fehlersemantik-Asymmetrie, bewusste
-Divergenz zur strikten Server-Durchsetzung aus ADR-0016):
+Fundamental decision (static helper, error-semantics asymmetry, deliberate
+divergence from the strict server enforcement of ADR-0016):
 [ADR-0025](../adr/0025-clientseitige-sende-validierung.md).
 
-## `EbicsResult<T>` — vorläufig
+## `EbicsResult<T>` — preliminary
 
-`EbicsResult<T>` trennt fachlichen Erfolg (mit Wert), fachlichen Returncode (kein
-Fehler) und technische Fehler (Exception). Instanzen werden über
-`EbicsResult<T>.Success(value, [code], [text])` bzw.
-`EbicsResult<T>.Failure(code, [text])` erzeugt.
+`EbicsResult<T>` separates business success (with a value), a business return
+code (no error) and technical errors (exception). Instances are created via
+`EbicsResult<T>.Success(value, [code], [text])` or
+`EbicsResult<T>.Failure(code, [text])`.
 
-> **Vorläufig:** Die endgültige Form und der vollständige EBICS-Returncode-Katalog
-> werden in **#36 (M4)** definiert; die hier eingeführte connector-lokale Form
-> hält #46 self-contained und wird mit #36 abgeglichen.
+> **Preliminary:** The final form and the complete EBICS return code catalog are
+> defined in **#36 (M4)**; the connector-local form introduced here keeps #46
+> self-contained and is reconciled with #36.
 
 ## Tests
 
-`tests/EBICO.Tests/Connector/` deckt ab: `EbicsResult`-Semantik,
-Options-Validierung (Happy Path + Negativfälle), `EbicsConnection`-Auflösung,
-In-Memory-/Datei-KeyStore-Round-Trips, den Dispatch (Fake-Handler; kein Handler →
-`EbicsConfigurationException`) und den `HttpClientTransport` gegen einen
-gestubbten `HttpMessageHandler` (POST/Content-Type/Payload, Nicht-Erfolg →
-`EbicsTransportException`, Cancellation).
+`tests/EBICO.Tests/Connector/` covers: `EbicsResult` semantics, options
+validation (happy path + negative cases), `EbicsConnection` resolution,
+in-memory/file key store round-trips, the dispatch (fake handler; no handler →
+`EbicsConfigurationException`) and the `HttpClientTransport` against a stubbed
+`HttpMessageHandler` (POST/Content-Type/payload, non-success →
+`EbicsTransportException`, cancellation).

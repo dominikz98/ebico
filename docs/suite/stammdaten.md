@@ -1,25 +1,25 @@
-# Suite: Stammdaten-Verwaltung (Banken / Partner / Teilnehmer)
+# Suite: Master-Data Management (Banks / Partners / Subscribers)
 
-> Umsetzung von **Issue #53** (Milestone M7 — Suite). Baut auf dem UI-Grundgerüst
-> ([#52](ui-shell.md)) auf und ist die Schreib-Oberfläche über die server-seitige
-> **Stammdatenverwaltung** aus [#30](../server/master-data.md): sie treibt den
-> `IMasterDataManager` (`EBICO.Server`) **in-process** an, gemäß
+> Implementation of **Issue #53** (Milestone M7 — Suite). Builds on the UI shell
+> ([#52](ui-shell.md)) and is the write surface over the server-side
+> **master-data management** from [#30](../server/master-data.md): it drives the
+> `IMasterDataManager` (`EBICO.Server`) **in-process**, per
 > [ADR-0009](../adr/0009-blazor-render-mode.md).
 
-## Zweck
+## Purpose
 
-Die Seite `/stammdaten` verwaltet die Stammdaten des Emulators: **Banken** (Kreditinstitute /
-EBICS-Hosts), **Partner** (Kunden) und **Teilnehmer**. Sie deckt Anlegen, Bearbeiten und
-(kaskadierendes) Löschen ab, macht den **Teilnehmer-Status** sichtbar/änderbar und erlaubt das
-Editieren der **Berechtigungen** eines Teilnehmers. Sie löst die read-only Übersicht des
-Grundgerüsts (#52) ab.
+The `/stammdaten` page manages the emulator's master data: **banks** (credit institutions /
+EBICS hosts), **partners** (customers) and **subscribers**. It covers creating, editing and
+(cascading) deleting, makes the **subscriber state** visible/changeable and allows
+editing a subscriber's **authorisations**. It replaces the read-only overview of the
+shell (#52).
 
-## Anbindung: in-process statt HTTP
+## Binding: in-process instead of HTTP
 
-Statt einer eigenen HTTP-API (die es server-seitig als Admin-API zwar gibt, siehe
-[master-data.md](../server/master-data.md)) nutzt die Suite den State-Layer aus `EBICO.Server`
-**direkt über DI** — die von [ADR-0009](../adr/0009-blazor-render-mode.md) vorgesehene
-In-Process-Anbindung. Dazu referenziert `EBICO.Suite` jetzt `EBICO.Server` (Suite → Server → Core).
+Instead of its own HTTP API (which does exist server-side as an admin API, see
+[master-data.md](../server/master-data.md)) the Suite uses the state layer from `EBICO.Server`
+**directly via DI** — the in-process binding envisaged by [ADR-0009](../adr/0009-blazor-render-mode.md).
+To this end `EBICO.Suite` now references `EBICO.Server` (Suite → Server → Core).
 
 ```csharp
 // Program.cs — Server-Zustand in-process
@@ -32,29 +32,29 @@ var app = builder.Build();
 await EmulatorStateSeeder.SeedAsync(app.Services);   // Sample-Stammdaten in den In-Memory-Store
 ```
 
-| Typ | Rolle |
+| Type | Role |
 | --- | --- |
-| `IMasterDataManager` (Server) | Schreib-/Verwaltungslogik: CRUD, referentielle Integrität, Kaskaden, Lifecycle, Permissions |
-| `EmulatorStateProvider` | Live-Read-Model: `GetBanks/Partners/SubscribersAsync` aus dem `IEbicsStateStore`; `GetKeysAsync` weiterhin aus den Sample-Daten |
-| `EmulatorStateSeeder` | füllt den (leeren) In-Memory-Store beim Start mit Beispiel-Stammdaten (Banken → Partner → Teilnehmer) |
+| `IMasterDataManager` (Server) | Write/management logic: CRUD, referential integrity, cascades, lifecycle, permissions |
+| `EmulatorStateProvider` | Live read model: `GetBanks/Partners/SubscribersAsync` from the `IEbicsStateStore`; `GetKeysAsync` still from the sample data |
+| `EmulatorStateSeeder` | fills the (empty) in-memory store at startup with sample master data (banks → partners → subscribers) |
 
-Der Store ist In-Memory (Zustand geht bei Neustart verloren). Schlüsselmaterial ist noch kein Teil
-des Server-Stores (späteres M3/M4-Issue), daher liefert `GetKeysAsync` weiterhin die
-deterministischen Beispiel-Schlüssel für die Schlüssel-Ansicht ([#55](schluessel-ansicht.md)).
+The store is in-memory (state is lost on restart). Key material is not yet part
+of the server store (a later M3/M4 issue), so `GetKeysAsync` still returns the
+deterministic sample keys for the key view ([#55](schluessel-ansicht.md)).
 
-## Render-Modus
+## Render mode
 
-Die Seite selbst ist **Static SSR**; die drei Verwaltungsbereiche sind **interaktive Inseln**
-(`<BankManager @rendermode="InteractiveServer" />` usw.), der Render-Modus wird am Einbettungsort
-gesetzt (ADR-0009, „Interaktivität pro Komponente"). Formulare nutzen einfaches Bootstrap mit
-`@bind`/`@onclick` und melden Ergebnisse über Bootstrap-Alerts zurück — keine Exceptions in der UI.
+The page itself is **Static SSR**; the three management areas are **interactive islands**
+(`<BankManager @rendermode="InteractiveServer" />` etc.), the render mode is set at the embedding
+site (ADR-0009, "interactivity per component"). Forms use plain Bootstrap with
+`@bind`/`@onclick` and report results back via Bootstrap alerts — no exceptions in the UI.
 
-## Konsistenz zwischen den Inseln (#126)
+## Consistency between the islands (#126)
 
-Die drei Inseln sind **eigenständige Komponenten mit je eigener Zustandskopie**, schreiben aber durch
-denselben `IMasterDataManager` — und die Beziehungen kaskadieren. Ohne Benachrichtigung entwertet
-deshalb jede Mutation in einer Insel die anderen beiden still (neue Bank fehlt in den Auswahlfeldern,
-kaskadierend gelöschte Zeilen bleiben als Karteileichen stehen). Dafür gibt es
+The three islands are **independent components each with their own state copy**, but they write through
+the same `IMasterDataManager` — and the relationships cascade. Without notification, therefore, every
+mutation in one island silently invalidates the other two (a new bank is missing from the selection fields,
+cascade-deleted rows remain as dead entries). For this there is
 **`IMasterDataChangeNotifier`** ([ADR-0031](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)):
 
 ```csharp
@@ -62,115 +62,115 @@ kaskadierend gelöschte Zeilen bleiben als Karteileichen stehen). Dafür gibt es
 builder.Services.AddSingleton<IMasterDataChangeNotifier, MasterDataChangeNotifier>();
 ```
 
-Regeln für jede Komponente, die Stammdaten anzeigt:
+Rules for every component that displays master data:
 
-1. In `OnInitializedAsync` **abonnieren**, in `Dispose` das Abo **zurückgeben**
+1. **Subscribe** in `OnInitializedAsync`, **release** the subscription in `Dispose`
    (`@implements IDisposable`).
-2. Nach **jeder** erfolgreichen Mutation `await Changes.NotifyChangedAsync()`.
-3. Im Handler über **`InvokeAsync`** auf den eigenen Renderer zurückwechseln — die Benachrichtigung
-   kommt auf dem Thread des auslösenden Circuits an, nicht auf dem eigenen.
-4. Nach dem Neuladen **transiente UI-Zustände prüfen**: ein offenes Formular darf keine gelöschte
-   Bank mehr anbieten, eine Löschbestätigung für einen kaskadierten Datensatz ist gegenstandslos, ein
-   Detailbereich ohne Datensatz schließt sich. Neuladen allein repariert nur die Tabellen.
+2. After **every** successful mutation, `await Changes.NotifyChangedAsync()`.
+3. In the handler, switch back to your own renderer via **`InvokeAsync`** — the notification
+   arrives on the thread of the triggering circuit, not on your own.
+4. After reloading, **check transient UI states**: an open form must no longer offer a deleted
+   bank, a delete confirmation for a cascaded record is moot, a
+   detail area without a record closes itself. Reloading alone only repairs the tables.
 
-> **Wer das Abo vergisst, veraltet wieder still** — es gibt dafür keinen Wächter außer den Tests in
+> **Whoever forgets the subscription goes stale silently again** — there is no guard for this other than the tests in
 > `StammdatenIslandSyncTests`.
 
-Weil der Notifier ein Singleton ist, konvergieren auch **mehrere Browser-Sitzungen**: der Zustand
-dahinter ist prozessweit geteilt, die Benachrichtigung ist es damit ebenso.
+Because the notifier is a singleton, **multiple browser sessions** also converge: the state
+behind it is shared process-wide, and so is the notification.
 
-## Anlegen ist nicht Überschreiben (#126)
+## Creating is not overwriting (#126)
 
-Die `Save*`-Operationen des Managers sind **idempotente Upserts**
-([master-data.md](../server/master-data.md)) — richtig für die API, aber gefährlich hinter einem
-Formular, das „Anlegen" heißt. Ein `SaveSubscriberAsync(new Subscriber(...))` auf eine bereits
-belegte Identität setzte den Teilnehmer auf `New` zurück und verwarf alle Berechtigungen, gemeldet mit
-einer grünen Erfolgsmeldung. Die Create-Pfade prüfen die Identität deshalb **vorher**
-(`GetBankAsync`/`GetPartnerAsync`/`GetSubscriberAsync`) und weisen die Kollision mit einem Hinweis auf
-„Bearbeiten" bzw. „Details" ab. Die Edit-Pfade sind unberührt — dort *ist* Überschreiben gewollt.
+The manager's `Save*` operations are **idempotent upserts**
+([master-data.md](../server/master-data.md)) — correct for the API, but dangerous behind a
+form called "create". A `SaveSubscriberAsync(new Subscriber(...))` onto an already
+occupied identity reset the subscriber to `New` and discarded all authorisations, reported with
+a green success message. The create paths therefore check the identity **beforehand**
+(`GetBankAsync`/`GetPartnerAsync`/`GetSubscriberAsync`) and reject the collision with a pointer to
+"edit" or "details". The edit paths are untouched — there overwriting *is* intended.
 
-Die Mehrmandanten-Semantik bleibt erhalten: derselbe `PartnerID` an einer anderen Bank bzw. dieselbe
-`UserID` bei einem anderen Partner ist eine **andere** Identität und wird nicht als Kollision gewertet.
+The multi-tenant semantics are preserved: the same `PartnerID` at a different bank or the same
+`UserID` under a different partner is a **different** identity and is not counted as a collision.
 
-## Sortierung
+## Sorting
 
-Der Store liefert Dictionary-Reihenfolge (`_banks.Values.ToArray()`), also keine zugesagte Ordnung —
-in der UI sprangen Zeilen dadurch beim Anlegen/Löschen an unvorhersehbare Stellen. Die Komponenten
-sortieren daher selbst (Banken nach `HostID`, Partner nach `(HostID, PartnerID)`, Teilnehmer nach
-`(HostID, PartnerID, UserID)`, ordinal). Der Store bleibt bewusst „dumm" — die Sortierung ist eine
-Darstellungsfrage.
+The store returns dictionary order (`_banks.Values.ToArray()`), i.e. no guaranteed ordering —
+in the UI, rows would jump to unpredictable places when creating/deleting. The components
+therefore sort themselves (banks by `HostID`, partners by `(HostID, PartnerID)`, subscribers by
+`(HostID, PartnerID, UserID)`, ordinal). The store deliberately stays "dumb" — sorting is a
+presentation concern.
 
-## Aufbau
+## Structure
 
-| Komponente | Inhalt | Operationen |
+| Component | Content | Operations |
 | --- | --- | --- |
-| `BankManager` | Liste HostID / Name / Versionen | Anlegen, Bearbeiten (HostID read-only), Löschen (**Kaskade**: Partner + Teilnehmer) |
-| `PartnerManager` | Liste HostID / PartnerID / Name | Anlegen (Bank per Dropdown), Bearbeiten (Name), Löschen (**Kaskade**: Teilnehmer) |
-| `SubscriberManager` | Liste HostID / PartnerID / UserID / Status / Typ + Detail | Anlegen (Bank+Partner per Dropdown), Status ändern, Berechtigungen editieren, Löschen |
+| `BankManager` | List of HostID / name / versions | Create, edit (HostID read-only), delete (**cascade**: partners + subscribers) |
+| `PartnerManager` | List of HostID / PartnerID / name | Create (bank via dropdown), edit (name), delete (**cascade**: subscribers) |
+| `SubscriberManager` | List of HostID / PartnerID / UserID / status / type + detail | Create (bank+partner via dropdown), change status, edit authorisations, delete |
 
-Eingaben werden über `HostId/PartnerId/UserId/SystemId.TryCreate` validiert (freundliche Meldung
-statt Exception). Beim Bearbeiten sind die ID-Felder gesperrt (sie sind die Store-Keys —
-Umbenennen = neu anlegen). Partner/Teilnehmer werden über **Dropdowns** aus den vorhandenen
-Banken/Partnern erzeugt, sodass keine verwaisten Datensätze entstehen (der Manager würde
-referenzverletzende Anlagen ohnehin mit `UnknownBankException`/`UnknownPartnerException` abweisen).
+Inputs are validated via `HostId/PartnerId/UserId/SystemId.TryCreate` (friendly message
+instead of exception). When editing, the ID fields are locked (they are the store keys —
+renaming = creating anew). Partners/subscribers are created via **dropdowns** from the existing
+banks/partners, so that no orphaned records arise (the manager would reject
+reference-violating creations with `UnknownBankException`/`UnknownPartnerException` anyway).
 
-## Teilnehmer-Status
+## Subscriber state
 
-Die Statuswechsel gehen über `IMasterDataManager.TransitionSubscriberAsync`, das den
-Lebenszyklus in `Subscriber.Transition` validiert. Die UI zeigt nur die **erlaubten** Übergänge
-des aktuellen Zustands als Buttons:
+State transitions go through `IMasterDataManager.TransitionSubscriberAsync`, which validates the
+lifecycle in `Subscriber.Transition`. The UI shows only the **permitted** transitions
+of the current state as buttons:
 
-| Aktueller Status | Aktionen |
+| Current state | Actions |
 | --- | --- |
-| `New` | Initialisieren (→ `Initialized`), Sperren (→ `Suspended`) |
-| `Initialized` | Aktivieren (→ `Ready`), Sperren (→ `Suspended`) |
-| `Ready` | Sperren (→ `Suspended`) |
-| `Suspended` | Reaktivieren (→ `Ready`) |
+| `New` | Initialise (→ `Initialized`), Suspend (→ `Suspended`) |
+| `Initialized` | Activate (→ `Ready`), Suspend (→ `Suspended`) |
+| `Ready` | Suspend (→ `Suspended`) |
+| `Suspended` | Reactivate (→ `Ready`) |
 
-Ein unzulässiger Übergang (`InvalidSubscriberStateTransitionException`) wird defensiv abgefangen
-und als Fehler-Alert angezeigt.
+An impermissible transition (`InvalidSubscriberStateTransitionException`) is caught defensively
+and shown as an error alert.
 
-## Berechtigungen
+## Authorisations
 
-Im Detailbereich eines Teilnehmers lassen sich Berechtigungen (Auftragstyp/BTF × Signaturklasse
-`E`/`A`/`B`/`T`) als Zeilen hinzufügen/entfernen; „Berechtigungen speichern" ersetzt die gesamte
-Menge über `SetPermissionsAsync`. OrderType/BTF ist derzeit ein freier String (typisiertes Modell
+In a subscriber's detail area, authorisations (order type/BTF × signature class
+`E`/`A`/`B`/`T`) can be added/removed as rows; "save authorisations" replaces the entire
+set via `SetPermissionsAsync`. OrderType/BTF is currently a free string (typed model
 → M5).
 
-## EBICS-Versionsbezug
+## EBICS version reference
 
-Identitäten (ID-Muster/-Länge) und Signaturklassen sind über **H003/H004/H005 identisch**; die
-Stammdatenverwaltung ist damit versionsunabhängig. `Bank.SupportedVersions` (Checkboxen im
-Bank-Formular) hält je Host die angebotenen Versionen (Default: alle).
+Identities (ID patterns/lengths) and signature classes are **identical across H003/H004/H005**; the
+master-data management is thus version-independent. `Bank.SupportedVersions` (checkboxes in the
+bank form) holds the offered versions per host (default: all).
 
 ## Tests
 
-`tests/EBICO.Tests/Suite/` (bUnit + xUnit v3 + AwesomeAssertions; die Komponententests verdrahten
-den **echten** `MasterDataManager` über einen `InMemoryEbicsStateStore`):
+`tests/EBICO.Tests/Suite/` (bUnit + xUnit v3 + AwesomeAssertions; the component tests wire up
+the **real** `MasterDataManager` via an `InMemoryEbicsStateStore`):
 
-- `EmulatorStateProviderTests` — die Read-Model-Brücke liefert Store-Inhalt und spiegelt
-  Live-Mutationen; `GetKeysAsync` delegiert an die Sample-Schlüssel.
-- `EmulatorStateSeederTests` — der Seeder legt die Beispiel-Stammdaten in Reihenfolge an und ist
+- `EmulatorStateProviderTests` — the read-model bridge returns store content and reflects
+  live mutations; `GetKeysAsync` delegates to the sample keys.
+- `EmulatorStateSeederTests` — the seeder creates the sample master data in order and is
   idempotent.
-- `BankManagerTests` — Rendern, Anlegen, ungültige HostID → Warnung, Löschen.
-- `PartnerManagerTests` — Anlegen über Bank-Dropdown, „ohne Bank"-Sperre, Löschen.
-- `SubscriberManagerTests` — Anlegen über abhängige Dropdowns, Status-Übergang, Berechtigung
-  hinzufügen/speichern, Löschen.
-- `MasterDataChangeNotifierTests` — der Broadcast-Kontrakt: jeder Abonnent wird erreicht, `Dispose`
-  meldet wirklich ab (und ist idempotent), ein fehlschlagender Abonnent stoppt die übrigen nicht.
-- `StammdatenIslandSyncTests` — die #126-Regression. Mehrere Komponenten in **einem**
-  `BunitContext` teilen den DI-Container und damit Store und Notifier, was den Insel-Aufbau der Seite
-  nachbildet: neue Bank erscheint in beiden Auswahlfeldern (auch in einem *bereits geöffneten*
-  Formular), gelöschte Bank verschwindet daraus, Kaskaden räumen die Geschwister-Tabellen, ein
-  Detailbereich über einem kaskadierten Teilnehmer schließt sich, und die Tabellen sind sortiert.
-- `StammdatenCreateCollisionTests` — Anlegen auf eine belegte Identität wird abgewiesen und lässt
-  Status/Berechtigungen unangetastet; Bearbeiten speichert weiterhin; gleiche `PartnerID`/`UserID` bei
-  anderer Bank/anderem Partner bleibt erlaubt.
+- `BankManagerTests` — render, create, invalid HostID → warning, delete.
+- `PartnerManagerTests` — create via bank dropdown, "without bank" lock, delete.
+- `SubscriberManagerTests` — create via dependent dropdowns, state transition, add/save
+  authorisation, delete.
+- `MasterDataChangeNotifierTests` — the broadcast contract: every subscriber is reached, `Dispose`
+  really unsubscribes (and is idempotent), a failing subscriber does not stop the others.
+- `StammdatenIslandSyncTests` — the #126 regression. Multiple components in **one**
+  `BunitContext` share the DI container and thus the store and notifier, which reproduces the island layout of the page:
+  a new bank appears in both selection fields (even in an *already open*
+  form), a deleted bank disappears from them, cascades clear the sibling tables, a
+  detail area over a cascaded subscriber closes itself, and the tables are sorted.
+- `StammdatenCreateCollisionTests` — creating onto an occupied identity is rejected and leaves
+  status/authorisations untouched; editing still saves; the same `PartnerID`/`UserID` at
+  a different bank/different partner remains allowed.
 
-## Verwandtes
+## Related
 
-- [UI-Grundgerüst & Navigation](ui-shell.md)
-- [Server: Stammdatenverwaltung (#30)](../server/master-data.md) — die genutzte Manager-/Store-Schicht
-- [Domänenmodell](../protocol/domain-model.md) — Aggregate, IDs, Berechtigungen, Zustände
-- [ADR-0009 — Blazor Render-Modus (In-Process-Zustand)](../adr/0009-blazor-render-mode.md)
-- [ADR-0031 — Änderungsbenachrichtigung zwischen den Stammdaten-Inseln](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)
+- [UI shell & navigation](ui-shell.md)
+- [Server: master-data management (#30)](../server/master-data.md) — the manager/store layer used
+- [Domain model](../protocol/domain-model.md) — aggregates, IDs, authorisations, states
+- [ADR-0009 — Blazor render mode (in-process state)](../adr/0009-blazor-render-mode.md)
+- [ADR-0031 — Change notification between the master-data islands](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)

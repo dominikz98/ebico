@@ -1,42 +1,42 @@
-# Connector: Onboarding-Flows INI / HIA / HPB
+# Connector: Onboarding flows INI / HIA / HPB
 
-> Umsetzung von **Issue #47** (Milestone M6 — Connector). Diese Seite beschreibt die
-> clientseitigen Onboarding-Flows des `EBICO.Connector`: die Schlüsselgenerierung, das Senden von
-> INI und HIA, das Abrufen und Verifizieren der Bankschlüssel per HPB sowie den INI-/HIA-Brief.
-> Grundlage ist der [Client-Kern](client-core.md) (#46); der Gesamtentwurf steht in der
-> [Connector-Architektur](architecture.md).
+> Implementation of **issue #47** (milestone M6 — Connector). This page describes the
+> client-side onboarding flows of the `EBICO.Connector`: the key generation, the sending of
+> INI and HIA, the fetching and verification of the bank keys via HPB as well as the INI/HIA letter.
+> The basis is the [client core](client-core.md) (#46); the overall design is in the
+> [Connector architecture](architecture.md).
 
-## Zweck
+## Purpose
 
-Bevor ein Teilnehmer fachliche Aufträge (Upload/Download) senden kann, muss der Schlüsselaustausch
-abgeschlossen sein:
+Before a subscriber can send business orders (upload/download), the key exchange must be
+complete:
 
-1. **Schlüsselgenerierung** — der Teilnehmer erzeugt drei RSA-Paare: Signatur (`A00x`),
-   Authentifikation (`X002`) und Verschlüsselung (`E002`).
-2. **INI** — sendet den öffentlichen **Signaturschlüssel** (ungesichert).
-3. **HIA** — sendet die öffentlichen **Authentifikations- und Verschlüsselungsschlüssel** (ungesichert).
-4. **INI-/HIA-Brief** — wird ausgedruckt, unterschrieben und (per Post/Fax) an die Bank übermittelt.
-   Die Bank gleicht die darin gedruckten Schlüssel-Hashes mit den per INI/HIA empfangenen ab.
-5. **HPB** — der Teilnehmer holt die öffentlichen **Bankschlüssel** (X002/E002) ab, verifiziert sie
-   gegen den Bankbrief (Hash-Abgleich) und legt sie ab.
+1. **Key generation** — the subscriber generates three RSA pairs: signature (`A00x`),
+   authentication (`X002`) and encryption (`E002`).
+2. **INI** — sends the public **signature key** (unsecured).
+3. **HIA** — sends the public **authentication and encryption keys** (unsecured).
+4. **INI/HIA letter** — is printed, signed and transmitted (by post/fax) to the bank.
+   The bank compares the key hashes printed in it with the ones received via INI/HIA.
+5. **HPB** — the subscriber fetches the public **bank keys** (X002/E002), verifies them
+   against the bank letter (hash comparison) and stores them.
 
 ```mermaid
 sequenceDiagram
-    participant C as Teilnehmer (Connector)
-    participant S as EBICS-Server (Bank)
-    C->>S: INI — öffentlicher A00x-Signaturschlüssel (ungesichert)
-    S-->>C: Returncode
-    C->>S: HIA — öffentliche X002/E002-Schlüssel (ungesichert)
-    S-->>C: Returncode
-    Note over C,S: INI-/HIA-Brief mit Schlüssel-Hashes manuell zur Bank;<br/>Bank aktiviert den Teilnehmer.
-    C->>S: HPB — Abruf der Bankschlüssel (X002-signiert)
-    S-->>C: X002/E002 der Bank (E002-verschlüsselt)
-    Note over C: Bank-Hashes gegen Bankbrief verifizieren, dann im IKeyStore ablegen.
+    participant C as Subscriber (connector)
+    participant S as EBICS server (bank)
+    C->>S: INI — public A00x signature key (unsecured)
+    S-->>C: return code
+    C->>S: HIA — public X002/E002 keys (unsecured)
+    S-->>C: return code
+    Note over C,S: INI/HIA letter with key hashes sent to the bank manually;<br/>the bank activates the subscriber.
+    C->>S: HPB — fetch the bank keys (X002-signed)
+    S-->>C: bank's X002/E002 (E002-encrypted)
+    Note over C: verify bank hashes against the bank letter, then store in the IKeyStore.
 ```
 
-## Öffentliche API
+## Public API
 
-Alle Requests folgen dem Mediator-Muster (`IEbicsRequest<TResult>`; siehe [Client-Kern](client-core.md)):
+All requests follow the mediator pattern (`IEbicsRequest<TResult>`; see [client core](client-core.md)):
 
 ```csharp
 services.AddEbicoConnector(o => { /* Url, HostId, PartnerId, UserId, Version */ })
@@ -61,84 +61,84 @@ var hpb = await client.Send(new HpbRequest
 });
 ```
 
-| Typ | Rolle |
+| Type | Role |
 | --- | --- |
-| `ISubscriberKeyGenerator` | Erzeugt A00x/E002/X002, legt sie im `IKeyStore` (`KeyOwner.Subscriber`) ab. **Explizit**, einmalig, außerhalb von `Send`. |
-| `IniRequest` / `IniResult` | INI senden; Ergebnis trägt Version, Fingerprint (wire + Brief-Format) und den Brief. |
-| `HiaRequest` / `HiaResult` | HIA senden; analog, für Auth- und Enc-Schlüssel. |
-| `HpbRequest` / `HpbResult` | Bankschlüssel abrufen; optionale erwartete Fingerprints + Trust-Anker (H005). Ergebnis trägt die `BankKeys`. |
-| `InitializationLetter` | `{ Text, byte[]? Pdf }` — Ergebnis der Brief-Erzeugung. |
-| `EbicsOnboardingException` | Sicherheits-/Integritätsfehler (Hash-Mismatch, Zertifikatsfehler, fehlerhafte Antwort). |
+| `ISubscriberKeyGenerator` | Generates A00x/E002/X002, stores them in the `IKeyStore` (`KeyOwner.Subscriber`). **Explicit**, one-time, outside of `Send`. |
+| `IniRequest` / `IniResult` | Send INI; the result carries version, fingerprint (wire + letter format) and the letter. |
+| `HiaRequest` / `HiaResult` | Send HIA; analogous, for auth and enc keys. |
+| `HpbRequest` / `HpbResult` | Fetch bank keys; optional expected fingerprints + trust anchor (H005). The result carries the `BankKeys`. |
+| `InitializationLetter` | `{ Text, byte[]? Pdf }` — result of the letter generation. |
+| `EbicsOnboardingException` | Security/integrity error (hash mismatch, certificate error, malformed response). |
 
-## Versions-Dispatch (H003/H004/H005)
+## Version dispatch (H003/H004/H005)
 
-Die Envelope- und PubKeyInfo-Typen sind **pro Version eigene CLR-Klassen** und unterscheiden sich
-auf drei Achsen:
+The envelope and PubKeyInfo types are **their own CLR classes per version** and differ
+on three axes:
 
-| Achse | H003 / H004 (reine Schlüssel) | H005 (zertifikatsbasiert) |
+| Axis | H003 / H004 (pure keys) | H005 (certificate-based) |
 | --- | --- | --- |
-| PubKey-Repräsentation | `PubKeyValue`/`RSAKeyValue` (Modulus/Exponent) | nur `X509Data` (Zertifikat) |
-| Order-Details | `OrderType` + `OrderAttribute` | `AdminOrderType` |
-| INI-OrderData-Namespace | `S001` | `S002` |
+| PubKey representation | `PubKeyValue`/`RSAKeyValue` (modulus/exponent) | only `X509Data` (certificate) |
+| Order details | `OrderType` + `OrderAttribute` | `AdminOrderType` |
+| INI OrderData namespace | `S001` | `S002` |
 
-Gekapselt wird das in **einem `IOnboardingEnvelopeBuilder` pro Version** hinter einer
-`IOnboardingEnvelopeBuilderRegistry` (Muster wie `EbicsVersions`/`KeyVersions`). Der Builder baut die
-Requests **und** parst die versionsspezifischen Antworten, sodass die drei Handler
-versionsagnostisch bleiben (`IEbicsRequestEnvelope`, `KeyManagementResponseView`, `BankKeys`).
-H003/H004 teilen sich die Basis `OnboardingEnvelopeBuilderBase`; H005 nutzt X.509. Für H005 erzeugt
-der Handler pro Schlüssel ein kurzlebiges self-signed Zertifikat (`SelfSignedCertificateFactory`).
+This is encapsulated in **one `IOnboardingEnvelopeBuilder` per version** behind an
+`IOnboardingEnvelopeBuilderRegistry` (same pattern as `EbicsVersions`/`KeyVersions`). The builder
+builds the requests **and** parses the version-specific responses, so that the three handlers stay
+version-agnostic (`IEbicsRequestEnvelope`, `KeyManagementResponseView`, `BankKeys`). H003/H004 share
+the base `OnboardingEnvelopeBuilderBase`; H005 uses X.509. For H005 the handler generates a
+short-lived self-signed certificate per key (`SelfSignedCertificateFactory`).
 
-## Ablauf je Flow (Handler)
+## Process per flow (handlers)
 
-- **INI/HIA** (`IniRequestHandler`, `HiaRequestHandler`): Schlüssel aus `IKeyStore` holen →
-  OrderData (`SignaturePubKeyOrderData` bzw. `HIARequestOrderData`) bauen → **komprimieren**
-  (`EbicsCompression`, ZIP/zlib) → base64 → `ebicsUnsecuredRequest` → serialisieren → Transport →
-  Antwort parsen → Returncode → `EbicsResult` (+ Brief).
-- **HPB** (`HpbRequestHandler`): `ebicsNoPubKeyDigestsRequest` bauen → serialisieren →
-  **X002-Authentifikationssignatur** (`AuthenticationSignature.Sign`) setzen → Transport → Returncode →
-  **E002-entschlüsseln** (`EncryptionE002.Decrypt`, privater Teilnehmer-E002-Schlüssel) →
-  **dekomprimieren** → `HPBResponseOrderData` parsen → **Fingerprint-Abgleich**
-  (`PublicKeyFingerprint.Verify`) gegen den Bankbrief → optional X.509-Kettenprüfung
-  (`X509CertificateVerifier`, H005) → Bankschlüssel im `IKeyStore` (`KeyOwner.Bank`) ablegen.
+- **INI/HIA** (`IniRequestHandler`, `HiaRequestHandler`): fetch keys from `IKeyStore` →
+  build OrderData (`SignaturePubKeyOrderData` or `HIARequestOrderData`) → **compress**
+  (`EbicsCompression`, ZIP/zlib) → base64 → `ebicsUnsecuredRequest` → serialize → transport →
+  parse response → return code → `EbicsResult` (+ letter).
+- **HPB** (`HpbRequestHandler`): build `ebicsNoPubKeyDigestsRequest` → serialize →
+  set the **X002 authentication signature** (`AuthenticationSignature.Sign`) → transport → return
+  code → **E002 decrypt** (`EncryptionE002.Decrypt`, private subscriber E002 key) →
+  **decompress** → parse `HPBResponseOrderData` → **fingerprint comparison**
+  (`PublicKeyFingerprint.Verify`) against the bank letter → optional X.509 chain check
+  (`X509CertificateVerifier`, H005) → store bank keys in the `IKeyStore` (`KeyOwner.Bank`).
 
-**Fehlergrenze:** fachliche Returncodes → `EbicsResult.Failure` (kein Wurf); technische bzw.
-Sicherheitsfehler (Hash-Mismatch, Zertifikatsfehler) → `EbicsOnboardingException`. Bei einem
-Mismatch werden die Bankschlüssel **nicht** gespeichert.
+**Error boundary:** business return codes → `EbicsResult.Failure` (no throw); technical or
+security errors (hash mismatch, certificate error) → `EbicsOnboardingException`. On a mismatch the
+bank keys are **not** stored.
 
-## Wiederverwendete Core-Bausteine
+## Reused Core building blocks
 
-`EbicsXmlSerializer` (Serialisierung, neu: `SerializeOrderData`), `EbicsCompression` (neu),
+`EbicsXmlSerializer` (serialization, new: `SerializeOrderData`), `EbicsCompression` (new),
 `PublicKeyFingerprint` (Compute/Verify/ToLetterFormat), `AuthenticationSignature` (X002),
-`EncryptionE002` (Hybrid), `RsaKeyMaterial` (neu: `Generate`), `RsaKeyImportExport`,
-`SelfSignedCertificateFactory` (neu) + `EbicsCertificateProfile` (neu, geteilt mit dem
+`EncryptionE002` (hybrid), `RsaKeyMaterial` (new: `Generate`), `RsaKeyImportExport`,
+`SelfSignedCertificateFactory` (new) + `EbicsCertificateProfile` (new, shared with the
 `X509CertificateVerifier`), `KeyVersions`, `CertificateRequirements`.
 
-## INI-/HIA-Brief (Text + PDF)
+## INI/HIA letter (text + PDF)
 
-`IInitializationLetterRenderer` erzeugt den Brief aus einem reinen `InitializationLetterModel`
-(Datum injiziert über `TimeProvider`, daher deterministisch). Der `TextInitializationLetterRenderer`
-ist abhängigkeitsfrei; der per `AddEbicoOnboarding()` registrierte `PdfInitializationLetterRenderer`
-liefert zusätzlich ein PDF via **QuestPDF** (Community-Lizenz, [ADR-0010](../adr/0010-pdf-bibliothek.md)).
-Der Fingerprint erscheint im Brief in der Gruppen-Hex-Darstellung von
-`PublicKeyFingerprint.ToLetterFormat` (8 Byte je Zeile).
+`IInitializationLetterRenderer` generates the letter from a pure `InitializationLetterModel`
+(date injected via `TimeProvider`, therefore deterministic). The `TextInitializationLetterRenderer`
+is dependency-free; the `PdfInitializationLetterRenderer` registered via `AddEbicoOnboarding()`
+additionally produces a PDF via **QuestPDF** (community license, [ADR-0010](../adr/0010-pdf-bibliothek.md)).
+The fingerprint appears in the letter in the grouped hex representation of
+`PublicKeyFingerprint.ToLetterFormat` (8 bytes per line).
 
-## Spec-Vorbehalte
+## Spec caveats
 
-In Seams gekapselt und gegen die offiziellen EBICS-Annexe zu verifizieren:
-Kompressionsverfahren (zlib vs. raw DEFLATE, `EbicsCompression`); Zuordnung `S001`↔H003/H004 bzw.
-`S002`↔H005 der INI-OrderData; ob H005-INI `A005` oder `A006` als Default nimmt; `OrderAttribute`
-(`DZNNN`/`DZHNN`) und `SecurityMedium` (`0000`) bei H003/H004; Return-Code-Quelle
-(`Body/ReturnCode` primär). Die X.509-KeyUsage-Profile liegen zentral in `EbicsCertificateProfile`.
+Encapsulated in seams and to be verified against the official EBICS annexes:
+compression method (zlib vs. raw DEFLATE, `EbicsCompression`); the mapping `S001`↔H003/H004 or
+`S002`↔H005 of the INI OrderData; whether H005 INI takes `A005` or `A006` as the default;
+`OrderAttribute` (`DZNNN`/`DZHNN`) and `SecurityMedium` (`0000`) for H003/H004; return code source
+(`Body/ReturnCode` primary). The X.509 KeyUsage profiles are centralized in `EbicsCertificateProfile`.
 
 ## Tests
 
-`tests/EBICO.Tests/` — Tier-A (selbst konstruierte Graphen, keine proprietären Samples):
-Schlüsselgenerierung, `EbicsCompression`-Round-Trip, `SelfSignedCertificateFactory` (KeyUsage +
-Verifier), Brief (Text-Assertions + PDF-Smoke), INI/HIA-Handler **je Version** (Round-Trip: Request
-bauen → OrderData dekomprimieren/parsen → eingebetteter Schlüssel = Store-Schlüssel; OK-/Fehler-
-Returncode), HPB-Handler (Entschlüsselung + Ablage; **Hash-Mismatch → Exception, nichts gespeichert**;
-Fehler-Returncode → `Failure`). Der `FakeTransport` stellt die simulierten Bankantworten.
+`tests/EBICO.Tests/` — tier-A (self-constructed graphs, no proprietary samples):
+key generation, `EbicsCompression` round-trip, `SelfSignedCertificateFactory` (KeyUsage +
+verifier), letter (text assertions + PDF smoke), INI/HIA handler **per version** (round-trip: build
+request → decompress/parse OrderData → embedded key = store key; OK/error return code), HPB handler
+(decryption + storage; **hash mismatch → exception, nothing stored**; error return code →
+`Failure`). The `FakeTransport` provides the simulated bank responses.
 
-Seit **#57** laufen INI/HIA/HPB zusätzlich als echter Round-Trip gegen den in-process gehosteten
-`EBICO.Server` — inkl. echter Statusmaschine (`New → Initialized → Ready`) und Bankschlüssel-Abruf:
-[E2E: Connector ↔ Server](../development/e2e-connector-server.md).
+Since **#57** INI/HIA/HPB additionally run as a real round-trip against the in-process hosted
+`EBICO.Server` — including the real state machine (`New → Initialized → Ready`) and bank key
+fetching: [E2E: Connector ↔ Server](../development/e2e-connector-server.md).

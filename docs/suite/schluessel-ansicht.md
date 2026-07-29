@@ -1,50 +1,50 @@
-# Suite: Schlüssel-/Zertifikats-Ansicht
+# Suite: Key/Certificate View
 
-> Umsetzung von **Issue #55** (Milestone M7 — Suite). Baut auf dem UI-Grundgerüst
-> ([#52](ui-shell.md)) und den Krypto-Bausteinen aus M2 auf: Public-Key-Fingerprints
-> ([#22](../protocol/public-key-fingerprint.md)), Schlüsselrepräsentation
-> ([#18](../protocol/key-representation.md)) und Zertifikatsverifizierung
+> Implementation of **Issue #55** (Milestone M7 — Suite). Builds on the UI shell
+> ([#52](ui-shell.md)) and the crypto building blocks from M2: public-key fingerprints
+> ([#22](../protocol/public-key-fingerprint.md)), key representation
+> ([#18](../protocol/key-representation.md)) and certificate verification
 > ([#23](../protocol/certificate-verification-x509.md)).
 
-## Zweck
+## Purpose
 
-Die Seite `/schluessel` ist die Schlüssel-/Zertifikats-Ansicht der Inspektor-UI. Sie macht die
-öffentlichen Schlüssel der Bank und Teilnehmer mit ihren SHA-256-Fingerprints sichtbar und
-stellt zwei Werkzeuge bereit: den **INI-Brief-Vergleich** (der manuelle Fingerprint-Abgleich, den
-eine Bank bei INI-Eingang durchführt) und **Test-CA/Schlüssel-Werkzeuge** zum Erzeugen von
-RSA-Test-Schlüsseln und self-signed Test-Zertifikaten.
+The `/schluessel` page is the key/certificate view of the inspector UI. It makes the
+public keys of the bank and subscribers visible along with their SHA-256 fingerprints and
+provides two tools: the **INI-letter comparison** (the manual fingerprint check that
+a bank performs when an INI arrives) and **test-CA/key tools** for generating
+RSA test keys and self-signed test certificates.
 
-Sämtliche Krypto-Operationen laufen über die vorhandenen Primitive in `EBICO.Core.Crypto`; die
-Suite referenziert nur `EBICO.Core`.
+All crypto operations run through the existing primitives in `EBICO.Core.Crypto`; the
+Suite references only `EBICO.Core`.
 
-## Render-Modus
+## Render mode
 
-Die Seite selbst ist **Static SSR** (reine Anzeige, lädt die Schlüssel in `OnInitializedAsync`).
-Die beiden Werkzeuge sind **interaktive Inseln**: der Render-Modus wird am Einbettungsort gesetzt
-(`<IniLetterComparisonTool @rendermode="InteractiveServer" />`), nicht in den Komponenten selbst —
-gemäß [ADR-0009](../adr/0009-blazor-render-mode.md) („Interaktivität pro Komponente"). Es sind die
-ersten interaktiven Komponenten der Suite.
+The page itself is **Static SSR** (pure display, loads the keys in `OnInitializedAsync`).
+The two tools are **interactive islands**: the render mode is set at the embedding site
+(`<IniLetterComparisonTool @rendermode="InteractiveServer" />`), not in the components themselves —
+per [ADR-0009](../adr/0009-blazor-render-mode.md) ("interactivity per component"). They are the
+first interactive components of the Suite.
 
-## Aufbau
+## Structure
 
-| Abschnitt | Inhalt | Datenquelle |
+| Section | Content | Data source |
 | --- | --- | --- |
-| Bekannte Schlüssel & Fingerprints | Tabelle Inhaber / Zweck (A/E/X) / Version / Fingerprint (SHA-256, INI-Brief-Format) | `IEmulatorStateProvider.GetKeysAsync` |
-| Schlüsselversionen (Referenz) | Katalog A004/A005/A006, E001/E002, X001/X002 mit Legacy-Flag, Padding und erlaubten EBICS-Versionen | `EBICO.Core.Crypto.KeyVersions` |
-| INI-Brief-Vergleich | interaktives Werkzeug (Insel) | `PublicKeyFingerprint.Verify` |
-| Test-CA & Schlüssel-Werkzeuge | interaktives Werkzeug (Insel) | `RsaKeyMaterial.Generate`, `SelfSignedCertificateFactory`, `X509CertificateVerifier` |
+| Known keys & fingerprints | Table of owner / purpose (A/E/X) / version / fingerprint (SHA-256, INI-letter format) | `IEmulatorStateProvider.GetKeysAsync` |
+| Key versions (reference) | Catalogue of A004/A005/A006, E001/E002, X001/X002 with legacy flag, padding and permitted EBICS versions | `EBICO.Core.Crypto.KeyVersions` |
+| INI-letter comparison | interactive tool (island) | `PublicKeyFingerprint.Verify` |
+| Test CA & key tools | interactive tool (island) | `RsaKeyMaterial.Generate`, `SelfSignedCertificateFactory`, `X509CertificateVerifier` |
 
-Datenanbindung wie bei Dashboard/Stammdaten über das Read-Model `IEmulatorStateProvider`, hier um
-`GetKeysAsync()` erweitert. Die Schlüssel kommen aus den serverseitigen Key-Stores: die
-Teilnehmer-Schlüssel (A/E/X) aus `IServerKeyStore` (wie sie INI/HIA beim Onboarding ablegen) und das
-Bank-Keypaar (X/E) aus `IServerBankKeyStore` (wie es HPB zurückgibt) — in-process gebunden gemäß
-[ADR-0009](../adr/0009-blazor-render-mode.md). Da die Suite keine EBICS-Pipeline betreibt, füllt der
-`KeyStoreSeeder` diese Stores beim Start aus deterministischem Beispielmaterial (`KeyStoreSeedData`,
-fest eingebettete 2048-Bit-Public-Keys); die Fingerprints berechnet `KeyViewFactory` per
-`PublicKeyFingerprint.Compute` vor. Bank-Schlüssel werden nur für die geseedeten Hosts gelesen, damit
-das Rendern der Seite kein frisches (nicht-reproduzierbares) Bank-Keypaar erzeugt.
+Data binding as with dashboard/master data via the read model `IEmulatorStateProvider`, here extended by
+`GetKeysAsync()`. The keys come from the server-side key stores: the
+subscriber keys (A/E/X) from `IServerKeyStore` (as INI/HIA store them during onboarding) and the
+bank key pair (X/E) from `IServerBankKeyStore` (as HPB returns it) — bound in-process per
+[ADR-0009](../adr/0009-blazor-render-mode.md). Since the Suite does not run an EBICS pipeline, the
+`KeyStoreSeeder` fills these stores at startup with deterministic sample material (`KeyStoreSeedData`,
+firmly embedded 2048-bit public keys); the fingerprints are precomputed by `KeyViewFactory` via
+`PublicKeyFingerprint.Compute`. Bank keys are only read for the seeded hosts, so that
+rendering the page does not create a fresh (non-reproducible) bank key pair.
 
-Das neue DTO:
+The new DTO:
 
 ```csharp
 public sealed record KeyView
@@ -57,68 +57,67 @@ public sealed record KeyView
 }
 ```
 
-## Fingerprints & INI-Brief-Vergleich
+## Fingerprints & INI-letter comparison
 
-Der Fingerprint wird für die Anzeige mit `PublicKeyFingerprint.ToLetterFormat` als gruppiertes
-Großbuchstaben-Hex (acht Bytes je Zeile) gerendert — genau die Darstellung des INI-Briefs.
+The fingerprint is rendered for display with `PublicKeyFingerprint.ToLetterFormat` as grouped
+uppercase hex (eight bytes per line) — exactly the representation of the INI letter.
 
-Der INI-Brief-Vergleich wählt einen bekannten Schlüssel (oder nimmt einen eingefügten Public Key
-im PEM-Format via `RsaKeyImportExport.ImportFromPem`), liest den aus dem Brief abgetippten
-Fingerprint (Hex, Leerzeichen/Zeilenumbrüche erlaubt — geparst durch `FingerprintFormat.TryParseHex`)
-und prüft ihn **konstantzeitig** mit `PublicKeyFingerprint.Verify(key, expectedDigest)`. Ergebnis:
-Übereinstimmung, Abweichung (mit Anzeige des tatsächlichen Fingerprints) oder freundliche
-Fehlermeldung bei ungültiger Eingabe — nie eine Exception.
+The INI-letter comparison selects a known key (or takes a pasted public key
+in PEM format via `RsaKeyImportExport.ImportFromPem`), reads the
+fingerprint copied from the letter (hex, spaces/line breaks allowed — parsed by `FingerprintFormat.TryParseHex`)
+and checks it **in constant time** with `PublicKeyFingerprint.Verify(key, expectedDigest)`. Result:
+match, mismatch (with display of the actual fingerprint) or a friendly
+error message on invalid input — never an exception.
 
-## Test-CA & Schlüssel-Werkzeuge
+## Test CA & key tools
 
-- **Schlüssel erzeugen:** `RsaKeyMaterial.Generate()` (2048 Bit) → zeigt Fingerprint und
-  Public-Key-PEM (`RsaKeyImportExport.ExportPublicKeyPem`).
-- **Test-Zertifikat erzeugen:** `SelfSignedCertificateFactory.Create(key, purpose, subject, …)` →
-  Verifikation mit `X509CertificateVerifier.Verify(cert, { cert }, purpose)` (Default
-  `CustomRootTrust` + `NoCheck`, d. h. das self-signed Zertifikat gilt als eigener Vertrauensanker)
-  → zeigt Verdikt, Subject, Gültigkeit und Thumbprint.
-- **Download:** Public-Key-, Private-Key- (`ExportPkcs8Pem`) und Zertifikat-PEM
-  (`ExportCertificatePem`) werden per JS-Interop (`wwwroot/download.js`, Funktion `ebicoDownload`)
-  als Datei heruntergeladen.
+- **Generate key:** `RsaKeyMaterial.Generate()` (2048 bit) → shows fingerprint and
+  public-key PEM (`RsaKeyImportExport.ExportPublicKeyPem`).
+- **Generate test certificate:** `SelfSignedCertificateFactory.Create(key, purpose, subject, …)` →
+  verification with `X509CertificateVerifier.Verify(cert, { cert }, purpose)` (default
+  `CustomRootTrust` + `NoCheck`, i.e. the self-signed certificate acts as its own trust anchor)
+  → shows verdict, subject, validity and thumbprint.
+- **Download:** public-key, private-key (`ExportPkcs8Pem`) and certificate PEM
+  (`ExportCertificatePem`) are downloaded as a file via JS interop (`wwwroot/download.js`, function `ebicoDownload`).
 
-> **⚠️ Nur für Tests:** die erzeugten Schlüssel/Zertifikate sind Testmaterial für die
-> Onboarding-Flows, kein Produktivschlüsselmaterial.
+> **⚠️ For testing only:** the generated keys/certificates are test material for the
+> onboarding flows, not production key material.
 
-## EBICS-Versionsbezug
+## EBICS version reference
 
-| Zweck | Schlüsselversionen | Zertifikate |
+| Purpose | Key versions | Certificates |
 | --- | --- | --- |
-| Signatur (A) | A004 (legacy, H003/H004), A005 (alle), A006 (nur H005) | H005: `X509Data` statt `RSAKeyValue` |
-| Verschlüsselung (E) | E001 (legacy, H003/H004), E002 (alle) | — |
-| Authentifikation (X) | X001 (legacy, H003/H004), X002 (alle) | — |
+| Signature (A) | A004 (legacy, H003/H004), A005 (all), A006 (H005 only) | H005: `X509Data` instead of `RSAKeyValue` |
+| Encryption (E) | E001 (legacy, H003/H004), E002 (all) | — |
+| Authentication (X) | X001 (legacy, H003/H004), X002 (all) | — |
 
-Der Fingerprint ist versionsagnostisch (er sieht nur `RsaKeyMaterial`); die Zertifikats-Werkzeuge
-zielen auf H005 (EBICS 3.0), wo Schlüssel als Zertifikate ausgetauscht werden.
+The fingerprint is version-agnostic (it only sees `RsaKeyMaterial`); the certificate tools
+target H005 (EBICS 3.0), where keys are exchanged as certificates.
 
 ## Tests
 
-`tests/EBICO.Tests/Suite/` deckt ab:
+`tests/EBICO.Tests/Suite/` covers:
 
-- `SampleEmulatorStateProviderTests` — `GetKeysAsync` liefert die Beispielschlüssel; die
-  Fingerprint-Texte stimmen mit der Core-Berechnung überein; stabil über Aufrufe.
-- `KeyStoreSeederTests` — der `KeyStoreSeeder` legt die Teilnehmer-Schlüssel (A006/E002/X002) im
-  `IServerKeyStore` und das Bank-Keypaar (X002/E002, public-only) im `IServerBankKeyStore` ab und ist
+- `SampleEmulatorStateProviderTests` — `GetKeysAsync` returns the sample keys; the
+  fingerprint texts match the core computation; stable across calls.
+- `KeyStoreSeederTests` — the `KeyStoreSeeder` stores the subscriber keys (A006/E002/X002) in the
+  `IServerKeyStore` and the bank key pair (X002/E002, public-only) in the `IServerBankKeyStore` and is
   idempotent.
-- `EmulatorStateProviderTests` — `GetKeysAsync` liest genau die geseedeten Schlüssel aus den Stores
-  (fünf Einträge, erwartete Inhaber/Versionen, Fingerprint == Core-Berechnung); ein Teilnehmer ohne
-  hinterlegte Schlüssel bzw. eine nicht geseedete Bank erzeugt keinen Eintrag.
-- `FingerprintFormatTests` — Parsen von Hex mit Whitespace/Groß-Klein, Round-Trip gegen
-  `ToLetterFormat`, Ablehnung ungültiger Eingaben.
-- `SchluesselPageTests` (bUnit) — die Seite rendert die Schlüssel-Fingerprints und den
-  KeyVersions-Katalog.
-- `IniLetterComparisonToolTests` (bUnit) — passender Fingerprint → Erfolg, abweichender → Fehler,
-  ungültiger → Warnung.
-- `TestKeyToolTests` (bUnit) — Schlüssel/Zertifikat erzeugen, gültig-Verdikt, Download über
-  JS-Interop.
+- `EmulatorStateProviderTests` — `GetKeysAsync` reads exactly the seeded keys from the stores
+  (five entries, expected owners/versions, fingerprint == core computation); a subscriber without
+  stored keys or a non-seeded bank produces no entry.
+- `FingerprintFormatTests` — parsing hex with whitespace/case, round-trip against
+  `ToLetterFormat`, rejection of invalid input.
+- `SchluesselPageTests` (bUnit) — the page renders the key fingerprints and the
+  KeyVersions catalogue.
+- `IniLetterComparisonToolTests` (bUnit) — matching fingerprint → success, mismatching → error,
+  invalid → warning.
+- `TestKeyToolTests` (bUnit) — generate key/certificate, valid verdict, download via
+  JS interop.
 
-## Verwandtes
+## Related
 
-- [UI-Grundgerüst & Navigation](ui-shell.md)
-- [Public-Key-Fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md)
-- [Schlüsselpaare & -repräsentation (A/E/X)](../protocol/key-representation.md)
-- [Zertifikatsverifizierung (X.509)](../protocol/certificate-verification-x509.md)
+- [UI shell & navigation](ui-shell.md)
+- [Public-key fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md)
+- [Key pairs & representation (A/E/X)](../protocol/key-representation.md)
+- [Certificate verification (X.509)](../protocol/certificate-verification-x509.md)

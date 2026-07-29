@@ -97,7 +97,7 @@ public class BranchProtectionDocTests
     {
         var ci = ReadRepoFile("docs", "development", "ci.md");
 
-        ci.Should().Contain("## Branch-Protection", "the target state of the unversioned repo setting must be documented");
+        ci.Should().Contain("## Branch protection", "the target state of the unversioned repo setting must be documented");
         ci.Should().Contain("enforce_admins", "the admin binding is the decisive setting in a solo repo");
         ci.Should().Contain("strict", "required checks are configured strict (branch must be up to date)");
         ci.Should().Contain("0028-branch-protection-main.md", "the section must reference its ADR");

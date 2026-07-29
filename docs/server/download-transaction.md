@@ -1,89 +1,89 @@
-# Server: Download-Transaktion (Initialisation + Transfer + Receipt)
+# Server: Download transaction (Initialisation + Transfer + Receipt)
 
-> Umsetzung von **Issue #33** (Milestone M4 — Server: Transaction Engine). Diese Seite
-> beschreibt die serverseitige **Sendemaschine** für einen EBICS-Download: die
-> dreiphasige Transaktion aus **Initialisation** (Datenbereitstellung, Komprimieren,
-> E002-Verschlüsseln, Segmentieren, Transaktions-ID-Vergabe, erstes Segment),
-> **Transfer** (Ausliefern der restlichen Segmente) und **Receipt** (Auswertung der
-> Client-Quittung).
+> Implementation of **Issue #33** (Milestone M4 — Server: Transaction Engine). This page
+> describes the server-side **send engine** for an EBICS download: the
+> three-phase transaction consisting of **Initialisation** (data provisioning, compression,
+> E002 encryption, segmentation, transaction-ID assignment, first segment),
+> **Transfer** (delivering the remaining segments) and **Receipt** (evaluation of the
+> client acknowledgement).
 >
-> Bewusst **enthalten**: die Transaktions-Zustandsmaschine (`DownloadTransactionEngine`), der
-> In-Memory-Transaktionsspeicher (`IDownloadTransactionStore`), die serverseitige
-> **Datenbereitstellung** (`IDownloadDataProvider` + Admin-API), das Komprimieren
-> (`EbicsCompression`)/E002-Verschlüsseln (`EncryptionE002`)/Segmentieren
-> (`EbicsSegmentation.Split`) der Order-Data, das Phasen-Routing in der Pipeline (inkl.
-> Upload/Download-Unterscheidung), die **Receipt**-Verarbeitung (positiv/negativ) und das
-> Auslösen der Transaktions-/Quittungs-Returncodes. Angebunden an die generischen
-> Download-OrderTypes **FDL** (H003/H004) und **BTD** (H005).
-> Bewusst **noch nicht**: die **Signatur** der Antwort (X002 = M4; die Antwort ist unsigniert);
-> **Recovery/Timeouts** und die Eviction verwaister Transaktionen (#35); ein echter
-> persistenter Auftragsdatenspeicher (der `IDownloadDataProvider` ist In-Memory, austauschbar).
-> Die **auftragstypspezifische Datengenerierung** (FDL-`FileFormat`/BTD-BTF → aufgelöster Order-Typ,
-> synthetische Kontoauszüge/Reports mit Zeitraum-Filter) wurde mit den
-> [Download-Orders (#40)](statement-orders.md) nachgereicht.
+> Deliberately **included**: the transaction state machine (`DownloadTransactionEngine`), the
+> in-memory transaction store (`IDownloadTransactionStore`), the server-side
+> **data provisioning** (`IDownloadDataProvider` + admin API), the compression
+> (`EbicsCompression`)/E002 encryption (`EncryptionE002`)/segmentation
+> (`EbicsSegmentation.Split`) of the order data, the phase routing in the pipeline (incl.
+> upload/download distinction), the **receipt** processing (positive/negative) and the
+> triggering of the transaction/acknowledgement return codes. Wired to the generic
+> download OrderTypes **FDL** (H003/H004) and **BTD** (H005).
+> Deliberately **not yet**: the **signature** of the response (X002 = M4; the response is unsigned);
+> **recovery/timeouts** and the eviction of orphaned transactions (#35); a real
+> persistent order-data store (the `IDownloadDataProvider` is in-memory, replaceable).
+> The **order-type-specific data generation** (FDL `FileFormat`/BTD BTF → resolved order type,
+> synthetic account statements/reports with period filter) was delivered later with the
+> [download orders (#40)](statement-orders.md).
 
-## Zweck
+## Purpose
 
-Ein EBICS-Download überträgt Auftragsdaten in **drei Phasen**. In der **Initialisation** fordert
-der Client Daten an (Order-Typ, Teilnehmer); der Server **stellt die Daten bereit**, komprimiert
-und E002-verschlüsselt sie für den **Verschlüsselungsschlüssel des Teilnehmers** (wie bei HPB),
-**segmentiert** den Chiffretext, vergibt eine **Transaction-ID** und liefert `NumSegments` +
-Segment 1 zurück. In der **Transfer**-Phase holt der Client die Segmente 2…N ab. In der
-**Receipt**-Phase quittiert der Client den Empfang (`ReceiptCode` 0 = positiv, 1 = negativ); der
-Server schließt die Nachbearbeitung ab.
+An EBICS download transfers order data in **three phases**. In the **Initialisation** the
+client requests data (order type, subscriber); the server **provides the data**, compresses
+and E002-encrypts it for the **subscriber's encryption key** (as with HPB),
+**segments** the ciphertext, assigns a **Transaction-ID** and returns `NumSegments` +
+segment 1. In the **Transfer** phase the client fetches segments 2…N. In the
+**Receipt** phase the client acknowledges receipt (`ReceiptCode` 0 = positive, 1 = negative); the
+server completes the post-processing.
 
-#33 spiegelt die [Upload-Transaktion](upload-transaction.md) (#32) in die Gegenrichtung: sie
-komponiert dieselben policy-freien Primitiven ([Segmentierung](segmentation.md),
-[E002](../protocol/encryption-e002.md), [Kompression](segmentation.md)) — hier in **Senderichtung**
-(`Split`/`Compress`/`Encrypt` statt `Reassemble`/`Decrypt`/`Decompress`) — zu einer
-Zustandsmaschine. Der Server→Client-Nutzdatenpfad ist derselbe wie bei
-[HPB](hpb.md), nur mehrsegmentig und in eine Transaktion eingebettet.
+#33 mirrors the [upload transaction](upload-transaction.md) (#32) in the opposite direction: it
+composes the same policy-free primitives ([segmentation](segmentation.md),
+[E002](../protocol/encryption-e002.md), [compression](segmentation.md)) — here in the **send direction**
+(`Split`/`Compress`/`Encrypt` instead of `Reassemble`/`Decrypt`/`Decompress`) — into a
+state machine. The server→client payload path is the same as with
+[HPB](hpb.md), only multi-segment and embedded in a transaction.
 
-## Datenbereitstellung serverseitig
+## Server-side data provisioning
 
-Woher die Download-Daten kommen, kapselt `IDownloadDataProvider` (`EBICO.Server.State`). Der Default
-`InMemoryDownloadDataProvider` hält je **(Teilnehmer, Order-Typ)** eine **FIFO-Queue** von
-Klartext-Order-Data. Eine Download-Initialisation **entnimmt** (`TryDequeueAsync`) das nächste
-Element; ist die Queue leer, antwortet die Engine mit `090005` (`EBICS_NO_DOWNLOAD_DATA_AVAILABLE`).
+Where the download data comes from is encapsulated by `IDownloadDataProvider` (`EBICO.Server.State`). The default
+`InMemoryDownloadDataProvider` holds per **(subscriber, order type)** a **FIFO queue** of
+plaintext order data. A download initialisation **dequeues** (`TryDequeueAsync`) the next
+element; if the queue is empty, the engine answers with `090005` (`EBICS_NO_DOWNLOAD_DATA_AVAILABLE`).
 
-**Verbrauchssemantik:** die Initialisation entnimmt die Daten sofort. Eine **positive** Quittung
-(`011000`) lässt sie entnommen (verbraucht) — ein erneuter Download liefert `090005`. Eine
-**negative** Quittung (`011001`) **stellt die Daten wieder ein** (`EnqueueAsync`), sodass sie erneut
-abgerufen werden können.
+**Consumption semantics:** the initialisation dequeues the data immediately. A **positive** acknowledgement
+(`011000`) leaves it dequeued (consumed) — a repeated download yields `090005`. A
+**negative** acknowledgement (`011001`) **re-enqueues the data** (`EnqueueAsync`), so that it can be
+fetched again.
 
-Daten werden über die **Admin-API** eingestellt (unauthentifiziert, nur lokal/Emulator, wie die
-[Stammdaten-Admin-API](master-data.md)):
+Data is enqueued via the **admin API** (unauthenticated, local/emulator only, like the
+[master-data admin API](master-data.md)):
 
-| Methode | Pfad | Wirkung |
+| Method | Path | Effect |
 | --- | --- | --- |
-| `POST` | `…/subscribers/{userId}/downloads/{orderType}` | Body `{"base64Data":"…"}` → Order-Data (base64) einreihen; Antwort `{"pending":n}` |
-| `GET` | `…/subscribers/{userId}/downloads/{orderType}` | Anzahl wartender Payloads: `{"pending":n}` |
+| `POST` | `…/subscribers/{userId}/downloads/{orderType}` | Body `{"base64Data":"…"}` → enqueue order data (base64); response `{"pending":n}` |
+| `GET` | `…/subscribers/{userId}/downloads/{orderType}` | Number of waiting payloads: `{"pending":n}` |
 
-(voller Pfad: `/admin/banks/{hostId}/partners/{partnerId}/subscribers/{userId}/downloads/{orderType}`;
-ungültiges Base64 → HTTP 400). Ein echter Auftragsdatenspeicher kann via `TryAddSingleton` vor
-`AddEbicoServer` untergeschoben werden.
+(full path: `/admin/banks/{hostId}/partners/{partnerId}/subscribers/{userId}/downloads/{orderType}`;
+invalid base64 → HTTP 400). A real order-data store can be substituted via `TryAddSingleton` before
+`AddEbicoServer`.
 
-## Ablauf
+## Flow
 
-Der Server routet die Phase in der Pipeline **vor** dem Resolver: `phase=Receipt` ist Download-only;
-ein `ebicsRequest` mit `TransactionID` (bzw. `phase=Transfer`) geht an die Download-Engine, **wenn**
-die ID einer Download-Transaktion gehört (`OwnsTransaction`), sonst an die Upload-Engine; ein
-`ebicsRequest` mit `phase=Initialisation` und Order-Typ **FDL/BTD** startet einen Download.
+The server routes the phase in the pipeline **before** the resolver: `phase=Receipt` is download-only;
+an `ebicsRequest` with `TransactionID` (or `phase=Transfer`) goes to the download engine, **if**
+the ID belongs to a download transaction (`OwnsTransaction`), otherwise to the upload engine; an
+`ebicsRequest` with `phase=Initialisation` and order type **FDL/BTD** starts a download.
 
 ### Phase 1 — Initialisation
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Identität | `HostID`/`PartnerID`/`UserID` prüfen; Teilnehmer muss existieren und `Ready` sein (sonst `091002`) |
-| 2. Enc-Schlüssel | Verschlüsselungsschlüssel (`E00x`) des Teilnehmers aus `IServerKeyStore` (fehlt → `091002`) |
-| 3. Datenbereitstellung | nächste Order-Data via `IDownloadDataProvider.TryDequeueAsync` (leer → `090005`, keine Transaktion) |
-| 4. Aufbereiten | `EbicsCompression.Compress` → `EncryptionE002.Encrypt` (für den Teilnehmer-Enc-Key) → `PublicKeyFingerprint.Compute` |
-| 5. Segmentieren | `EbicsSegmentation.Split(ciphertext, SegmentSizeBytes)`; `NumSegments > MaxDownloadSegments` → `091114` (Daten werden zurückgestellt) |
-| 6. Transaktion anlegen | 16-Byte-`TransactionID` erzeugen, Zustand (Subscriber, OrderType, Segmente, Enc-Info, Klartext für Re-Enqueue) im `IDownloadTransactionStore` |
-| 7. Antwort | `ebicsResponse`, `phase=Initialisation`, `TransactionID`, `NumSegments`, `SegmentNumber=1`, `DataTransfer` (DataEncryptionInfo + Segment 1), `EBICS_OK` |
+| 1. Identity | Check `HostID`/`PartnerID`/`UserID`; subscriber must exist and be `Ready` (otherwise `091002`) |
+| 2. Enc key | Encryption key (`E00x`) of the subscriber from `IServerKeyStore` (missing → `091002`) |
+| 3. Data provisioning | Next order data via `IDownloadDataProvider.TryDequeueAsync` (empty → `090005`, no transaction) |
+| 4. Prepare | `EbicsCompression.Compress` → `EncryptionE002.Encrypt` (for the subscriber's enc key) → `PublicKeyFingerprint.Compute` |
+| 5. Segment | `EbicsSegmentation.Split(ciphertext, SegmentSizeBytes)`; `NumSegments > MaxDownloadSegments` → `091114` (data is re-enqueued) |
+| 6. Create transaction | Generate 16-byte `TransactionID`, state (subscriber, OrderType, segments, enc info, plaintext for re-enqueue) in the `IDownloadTransactionStore` |
+| 7. Response | `ebicsResponse`, `phase=Initialisation`, `TransactionID`, `NumSegments`, `SegmentNumber=1`, `DataTransfer` (DataEncryptionInfo + segment 1), `EBICS_OK` |
 
 ```xml
-<!-- Request (gekürzt) -->
+<!-- Request (abridged) -->
 <ebicsRequest Version="H004" ...>
   <header authenticate="true">
     <static>
@@ -95,7 +95,7 @@ die ID einer Download-Transaktion gehört (`OwnsTransaction`), sonst an die Uplo
   <body/>
 </ebicsRequest>
 
-<!-- Response (gekürzt) -->
+<!-- Response (abridged) -->
 <ebicsResponse Version="H004" ...>
   <header><static><TransactionID>…</TransactionID><NumSegments>3</NumSegments></static>
     <mutable><TransactionPhase>Initialisation</TransactionPhase>
@@ -112,31 +112,31 @@ die ID einer Download-Transaktion gehört (`OwnsTransaction`), sonst an die Uplo
 </ebicsResponse>
 ```
 
-### Phase 2 — Transfer (Segmente 2…N)
+### Phase 2 — Transfer (segments 2…N)
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Transaktion finden | `Static/TransactionID` → Hex-Lookup im Store (fehlt → `091101`) |
-| 2. Segmentnummer prüfen | `Mutable/SegmentNumber` in `[1, NumSegments]` (0/fehlt → `091112`, > N → `091104`) |
-| 3. Segment liefern | Segment k aus dem Zustand; `lastSegment` serverseitig aus `k == NumSegments` |
-| 4. Antwort | `ebicsResponse`, `phase=Transfer`, `TransactionID`, `SegmentNumber`, `DataTransfer/OrderData` (**kein** DataEncryptionInfo, **kein** NumSegments), `EBICS_OK` |
+| 1. Find transaction | `Static/TransactionID` → hex lookup in the store (missing → `091101`) |
+| 2. Check segment number | `Mutable/SegmentNumber` in `[1, NumSegments]` (0/missing → `091112`, > N → `091104`) |
+| 3. Deliver segment | Segment k from the state; `lastSegment` derived server-side from `k == NumSegments` |
+| 4. Response | `ebicsResponse`, `phase=Transfer`, `TransactionID`, `SegmentNumber`, `DataTransfer/OrderData` (**no** DataEncryptionInfo, **no** NumSegments), `EBICS_OK` |
 
-Das `DataEncryptionInfo` (Transaktionsschlüssel + Digest) reist **nur** in der Init-Antwort; die
-Transfer-Antworten tragen ausschließlich das jeweilige `OrderData`-Segment. Der Client reassembliert
-alle Segmente (Init-Segment 1 + Transfer 2…N), entschlüsselt mit dem einmalig gelieferten
-Transaktionsschlüssel (RSA-OAEP mit seinem privaten Enc-Key) und dekomprimiert.
+The `DataEncryptionInfo` (transaction key + digest) travels **only** in the init response; the
+transfer responses carry only the respective `OrderData` segment. The client reassembles
+all segments (init segment 1 + transfer 2…N), decrypts with the once-delivered
+transaction key (RSA-OAEP with its private enc key) and decompresses.
 
-### Phase 3 — Receipt (Quittung)
+### Phase 3 — Receipt (acknowledgement)
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Transaktion finden | `Static/TransactionID` → Hex-Lookup (fehlt → `091101`) |
-| 2. Quittung lesen | `body/TransferReceipt/ReceiptCode` (fehlt → `091112`) |
-| 3. Nachbearbeitung | Transaktion entfernen; `ReceiptCode=0` → Daten bleiben verbraucht; sonst Daten via Provider wieder einreihen |
-| 4. Antwort | `ebicsResponse`, `phase=Receipt`, `TransactionID`, `011000` (positiv) bzw. `011001` (negativ) |
+| 1. Find transaction | `Static/TransactionID` → hex lookup (missing → `091101`) |
+| 2. Read acknowledgement | `body/TransferReceipt/ReceiptCode` (missing → `091112`) |
+| 3. Post-processing | Remove transaction; `ReceiptCode=0` → data stays consumed; otherwise re-enqueue data via provider |
+| 4. Response | `ebicsResponse`, `phase=Receipt`, `TransactionID`, `011000` (positive) or `011001` (negative) |
 
 ```xml
-<!-- Receipt-Request (gekürzt) -->
+<!-- Receipt-Request (abridged) -->
 <ebicsRequest Version="H004" ...>
   <header authenticate="true">
     <static><HostID>EBICOHOST</HostID><TransactionID>…</TransactionID></static>
@@ -146,87 +146,87 @@ Transaktionsschlüssel (RSA-OAEP mit seinem privaten Enc-Key) und dekomprimiert.
 </ebicsRequest>
 ```
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-| Situation | Phase | Returncode | Ablage |
+| Situation | Phase | Return code | Placement |
 | --- | --- | --- | --- |
-| Erfolg (Init/Transfer) | Init/Transfer | `000000` EBICS_OK | Header + Body |
-| positive Quittung | Receipt | `011000` EBICS_DOWNLOAD_POSTPROCESS_DONE | Header |
-| negative Quittung | Receipt | `011001` EBICS_DOWNLOAD_POSTPROCESS_SKIPPED | Header |
-| Teilnehmer unbekannt/nicht `Ready`/kein Enc-Key | Init | `091002` EBICS_INVALID_USER_OR_USER_STATE | Body |
-| keine Download-Daten vorhanden | Init | `090005` EBICS_NO_DOWNLOAD_DATA_AVAILABLE | Body |
+| Success (Init/Transfer) | Init/Transfer | `000000` EBICS_OK | Header + Body |
+| positive acknowledgement | Receipt | `011000` EBICS_DOWNLOAD_POSTPROCESS_DONE | Header |
+| negative acknowledgement | Receipt | `011001` EBICS_DOWNLOAD_POSTPROCESS_SKIPPED | Header |
+| Subscriber unknown/not `Ready`/no enc key | Init | `091002` EBICS_INVALID_USER_OR_USER_STATE | Body |
+| No download data available | Init | `090005` EBICS_NO_DOWNLOAD_DATA_AVAILABLE | Body |
 | `NumSegments` > `MaxDownloadSegments` | Init | `091114` EBICS_MAX_SEGMENTS_EXCEEDED | Body |
-| unbekannte/entfernte `TransactionID` | Transfer/Receipt | `091101` EBICS_TX_UNKNOWN_TXID | Body |
-| `SegmentNumber` fehlt / 0 bzw. Receipt ohne `ReceiptCode` | Transfer/Receipt | `091112` EBICS_INVALID_REQUEST_CONTENT | Body |
+| Unknown/removed `TransactionID` | Transfer/Receipt | `091101` EBICS_TX_UNKNOWN_TXID | Body |
+| `SegmentNumber` missing / 0 or receipt without `ReceiptCode` | Transfer/Receipt | `091112` EBICS_INVALID_REQUEST_CONTENT | Body |
 | `SegmentNumber` > `NumSegments` | Transfer | `091104` EBICS_TX_SEGMENT_NUMBER_EXCEEDED | Body |
 
-Die Header-/Body-Ablage folgt automatisch aus `EbicsReturnCode.Kind` (`EbicsResponseFactory.Split`):
-`011000`/`011001` sind **technisch** → Header, die übrigen **fachlich** → Body. Es waren **keine**
-neuen Returncodes nötig — alle liegen bereits im [Katalog](../protocol/return-codes.md). Alle Fälle
-werden mit **HTTP 200** und dem Returncode im `ebicsResponse` beantwortet (siehe
-[Grundregel](host.md)).
+The header/body placement follows automatically from `EbicsReturnCode.Kind` (`EbicsResponseFactory.Split`):
+`011000`/`011001` are **technical** → header, the others **functional** → body. **No**
+new return codes were needed — all already exist in the [catalog](../protocol/return-codes.md). All cases
+are answered with **HTTP 200** and the return code in the `ebicsResponse` (see
+[base rule](host.md)).
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **Phasen-/Feld-Verteilung.** Dass `NumSegments` + Segment 1 in der Init-Antwort reisen, die
-  Segmente 2…N im Transfer, und `DataEncryptionInfo` **nur** in der Init-Antwort, ist die kanonische
-  Lesart und **gegen den offiziellen EBICS-Annex zu verifizieren**. Ebenso das `SegmentNumber=1`-Echo
-  in der Init-Antwort.
-- **ReceiptCode-Semantik.** `0 = positiv → 011000`, `≠0 = negativ → 011001` ist die angenommene
-  Zuordnung; gegen den Annex zu verifizieren.
-- **Unsignierte Antwort.** Die Antwort ist **nicht** signiert (X002 = M4); es wird keine
-  Order-Signatur erzeugt. Vertraulichkeit besteht dennoch (Order-Data für den Teilnehmer-Enc-Key
-  verschlüsselt).
-- **Segmentgröße roh vs. base64.** `SegmentSizeBytes` misst Roh-Bytes; der Bezug der EBICS-Segment-
-  grenze (roh vs. base64) ist offen (siehe [Segmentierung](segmentation.md)).
-- **Verwaiste Transaktionen.** Der Idle-Timeout und die Eviction (lazy beim Zugriff + Hintergrund-
-  Sweeper) sind in **[#35](transaction-recovery.md)** umgesetzt: bricht der Client nach Init/Transfer
-  ohne Receipt ab, läuft die Transaktion ab und wird entfernt — die bereits entnommenen Daten werden
-  dabei **wieder eingereiht** (wie bei einer negativen Quittung), gehen also nicht verloren.
+- **Phase/field distribution.** That `NumSegments` + segment 1 travel in the init response, the
+  segments 2…N in the transfer, and `DataEncryptionInfo` **only** in the init response, is the canonical
+  reading and **to be verified against the official EBICS annex**. Likewise the `SegmentNumber=1` echo
+  in the init response.
+- **ReceiptCode semantics.** `0 = positive → 011000`, `≠0 = negative → 011001` is the assumed
+  assignment; to be verified against the annex.
+- **Unsigned response.** The response is **not** signed (X002 = M4); no
+  order signature is produced. Confidentiality is nonetheless present (order data encrypted for the
+  subscriber's enc key).
+- **Segment size raw vs. base64.** `SegmentSizeBytes` measures raw bytes; the reference of the EBICS segment
+  boundary (raw vs. base64) is open (see [segmentation](segmentation.md)).
+- **Orphaned transactions.** The idle timeout and the eviction (lazy on access + background
+  sweeper) are implemented in **[#35](transaction-recovery.md)**: if the client aborts after init/transfer
+  without a receipt, the transaction expires and is removed — the already dequeued data is then
+  **re-enqueued** (as with a negative acknowledgement), so it is not lost.
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-Die Byte-Pipeline ist versionsagnostisch; nur die Envelope-/Header-Details unterscheiden sich:
+The byte pipeline is version-agnostic; only the envelope/header details differ:
 
-| Aspekt | H003 / H004 | H005 |
+| Aspect | H003 / H004 | H005 |
 | --- | --- | --- |
-| Download-Order-Typ | `OrderDetails/OrderType` = **FDL** | `OrderDetails/AdminOrderType` = **BTD** |
-| Order-Parameter | `FDLOrderParams` | `BTDOrderParams` (BTF) |
-| Transaktions-Header | `TransactionID`/`NumSegments`/`SegmentNumber`+`lastSegment` — strukturgleich | dito |
-| Response-`DataTransfer` | `DataEncryptionInfo` + `OrderData` — strukturgleich | dito |
+| Download order type | `OrderDetails/OrderType` = **FDL** | `OrderDetails/AdminOrderType` = **BTD** |
+| Order parameters | `FDLOrderParams` | `BTDOrderParams` (BTF) |
+| Transaction header | `TransactionID`/`NumSegments`/`SegmentNumber`+`lastSegment` — structurally identical | ditto |
+| Response `DataTransfer` | `DataEncryptionInfo` + `OrderData` — structurally identical | ditto |
 
-Genau **ein** `OrderData`-Element pro Transfer-Nachricht (Binding). Die `TransactionID` ist 16 Byte
-(`hexBinary`); intern Store-Key als Hex-String.
+Exactly **one** `OrderData` element per transfer message (binding). The `TransactionID` is 16 bytes
+(`hexBinary`); internally the store key is a hex string.
 
 ## Tests
 
-`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; Request-XML aus committeten Core-Bindings,
-keine proprietären Fixtures):
+`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; request XML from committed Core bindings,
+no proprietary fixtures):
 
-- `DownloadTransactionTests` (`[Theory]` über H003/H004/H005) — **Happy Path 1 Segment** (Init →
-  `TransactionID` + `NumSegments=1` + `DataTransfer`; das gelieferte Segment wird mit dem **privaten**
-  Teilnehmer-Enc-Key entschlüsselt und dekomprimiert == Original; Receipt(0) → `011000`, Store leer)
-  und **N Segmente** (kleine `SegmentSizeBytes` erzwingt mehrere Segmente; alle reassembliert +
-  entschlüsselt == Original; nur die Init trägt `DataEncryptionInfo`). Negativfälle: keine Daten
-  (`090005`), Teilnehmer nicht `Ready` (`091002`), unbekannte `TransactionID` (`091101`),
-  `SegmentNumber` > N (`091104`) bzw. 0 (`091112`), Receipt unbekannte TxID (`091101`).
-  **Verbrauch:** nach Receipt(0) → erneuter Download `090005`; nach Receipt(1) → Daten wieder
-  verfügbar. **Routing-Regression:** parallele Upload- + Download-TxID landen je bei der richtigen
-  Engine (`OwnsTransaction`-Disambiguierung).
+- `DownloadTransactionTests` (`[Theory]` over H003/H004/H005) — **happy path 1 segment** (Init →
+  `TransactionID` + `NumSegments=1` + `DataTransfer`; the delivered segment is decrypted with the **private**
+  subscriber enc key and decompressed == original; Receipt(0) → `011000`, store empty)
+  and **N segments** (small `SegmentSizeBytes` forces multiple segments; all reassembled +
+  decrypted == original; only the init carries `DataEncryptionInfo`). Negative cases: no data
+  (`090005`), subscriber not `Ready` (`091002`), unknown `TransactionID` (`091101`),
+  `SegmentNumber` > N (`091104`) or 0 (`091112`), receipt with unknown TxID (`091101`).
+  **Consumption:** after Receipt(0) → repeated download `090005`; after Receipt(1) → data available
+  again. **Routing regression:** parallel upload + download TxID each land at the correct
+  engine (`OwnsTransaction` disambiguation).
 - `DownloadTransactionStoreTests` — `InMemoryDownloadTransactionStore` (Create/TryGet/Remove/Count,
-  Hex-Keying, Duplikat-Create, `GetSegment`-Grenzen) und `InMemoryDownloadDataProvider`
-  (Enqueue/Dequeue-FIFO, Count, leere Queue, Isolation je (Teilnehmer, Order-Typ)).
-- `EbicsEndpointIntegrationTests` — Download über den HTTP-Endpoint (`WebApplicationFactory`):
-  Order-Data via **Admin-API**-`POST` einstellen → `POST /ebics` Init → Entschlüsselung == Original →
-  Receipt(0) → `011000`; die Admin-Queue ist danach leer (Verbrauch).
+  hex keying, duplicate create, `GetSegment` bounds) and `InMemoryDownloadDataProvider`
+  (enqueue/dequeue FIFO, count, empty queue, isolation per (subscriber, order type)).
+- `EbicsEndpointIntegrationTests` — download via the HTTP endpoint (`WebApplicationFactory`):
+  enqueue order data via **admin API** `POST` → `POST /ebics` Init → decryption == original →
+  Receipt(0) → `011000`; the admin queue is empty afterwards (consumption).
 
-## Verwandte Doku
+## Related documentation
 
-- [Upload-Transaktion (Initialisation + Transfer)](upload-transaction.md) — das gespiegelte Pendant (Empfangsrichtung)
-- [Segmentierung, Kompression & Base64-Pipeline](segmentation.md) — die genutzten Byte-Primitiven (Senderichtung: `Split`)
-- [Verschlüsselung E002](../protocol/encryption-e002.md) — hybride Verschlüsselung für den Teilnehmer-Enc-Key
-- [HPB — Abruf der Bankschlüssel](hpb.md) — Vorbild für den verschlüsselten Server→Client-Nutzdatenfluss (einsegmentig)
-- [Stammdatenverwaltung & Admin-API](master-data.md) — Muster der unauthentifizierten Admin-API
-- [Hostable Server-Grundgerüst](host.md) — Pipeline, Fehlerabbildung, `EbicoServerOptions`
-- [EBICS-Returncode-Katalog](../protocol/return-codes.md) — die ausgelösten Transaktions-/Quittungs-Codes
-- [ADR-0014 (Download-Transaktions-Engine)](../adr/0014-download-transaktions-engine.md) — dedizierte Engine, Routing-Disambiguierung, Provider & Verbrauchssemantik
+- [Upload transaction (Initialisation + Transfer)](upload-transaction.md) — the mirrored counterpart (receive direction)
+- [Segmentation, compression & base64 pipeline](segmentation.md) — the byte primitives used (send direction: `Split`)
+- [Encryption E002](../protocol/encryption-e002.md) — hybrid encryption for the subscriber's enc key
+- [HPB — retrieval of the bank keys](hpb.md) — model for the encrypted server→client payload flow (single-segment)
+- [Master data management & admin API](master-data.md) — pattern of the unauthenticated admin API
+- [Hostable server skeleton](host.md) — pipeline, error mapping, `EbicoServerOptions`
+- [EBICS return-code catalog](../protocol/return-codes.md) — the triggered transaction/acknowledgement codes
+- [ADR-0014 (download transaction engine)](../adr/0014-download-transaktions-engine.md) — dedicated engine, routing disambiguation, provider & consumption semantics

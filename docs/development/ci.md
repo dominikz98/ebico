@@ -1,89 +1,89 @@
-# CI-Pipeline (GitHub Actions)
+# CI pipeline (GitHub Actions)
 
-Beschreibt den Continuous-Integration-Workflow (`.github/workflows/ci.yml`).
-Gehört zu Issue **#7 — CI-Pipeline (GitHub Actions)** (Milestone M0).
+Describes the continuous integration workflow (`.github/workflows/ci.yml`).
+Belongs to issue **#7 — CI pipeline (GitHub Actions)** (Milestone M0).
 
 ## Trigger
 
-- `pull_request` — jeder PR wird gebaut und getestet (Gate vor dem Merge).
-- `push` auf `main` — Validierung des Hauptzweigs nach dem Merge.
+- `pull_request` — every PR is built and tested (gate before the merge).
+- `push` to `main` — validation of the main branch after the merge.
 
-Eine `concurrency`-Gruppe bricht ältere, noch laufende Läufe desselben
-Branches/PRs ab, sobald ein neuer Commit kommt.
+A `concurrency` group cancels older, still-running runs of the same
+branch/PR as soon as a new commit arrives.
 
 ## Jobs
 
 ### `build-test`
 
 1. **Checkout** (`actions/checkout`).
-2. **Setup .NET** (`actions/setup-dotnet`) — installiert das SDK aus
-   [`global.json`](../../global.json) (SDK-Version-Pinning).
-3. **NuGet-Cache** (`actions/cache`) — Cache von `~/.nuget/packages`, Key über
-   `hashFiles('**/*.csproj', 'Directory.Packages.props')`. Ändern sich
-   Abhängigkeiten, ändert sich der Key.
+2. **Setup .NET** (`actions/setup-dotnet`) — installs the SDK from
+   [`global.json`](../../global.json) (SDK version pinning).
+3. **NuGet cache** (`actions/cache`) — caches `~/.nuget/packages`, key via
+   `hashFiles('**/*.csproj', 'Directory.Packages.props')`. If dependencies
+   change, the key changes.
 4. **Restore** (`dotnet restore`).
-5. **Build** (`-c Release --no-restore`) — `TreatWarningsAsErrors=true` aus
-   `Directory.Build.props` macht jede neue Warnung zum Fehler (DoD).
-6. **Test** (`--no-build`) — Coverage via `--collect:"XPlat Code Coverage"`
-   (coverlet) + TRX-Logger.
-7. **Artefakte**: `coverage.cobertura.xml` (Coverage) und `*.trx` (Testbericht)
-   werden hochgeladen — auch bei rotem Lauf (`if: always()`).
+5. **Build** (`-c Release --no-restore`) — `TreatWarningsAsErrors=true` from
+   `Directory.Build.props` turns every new warning into an error (DoD).
+6. **Test** (`--no-build`) — coverage via `--collect:"XPlat Code Coverage"`
+   (coverlet) + TRX logger.
+7. **Artifacts**: `coverage.cobertura.xml` (coverage) and `*.trx` (test report)
+   are uploaded — even on a red run (`if: always()`).
 
 ### `docs-link-check`
 
-Prüft mit [lychee](https://github.com/lycheeverse/lychee-action) **relative**
-Doku-Links (Docs-as-Code). Läuft bewusst **offline** (`--offline`): externe URLs
-(z. B. die vielen `ebics.org`-Links in `docs/protocol/schema-sources.md`) werden
-nicht geprüft, um flakige Netz-Requests zu vermeiden. Tote relative Links (etwa
-nach dem Verschieben einer Doku-Seite) lassen den Job fehlschlagen.
+Uses [lychee](https://github.com/lycheeverse/lychee-action) to check **relative**
+documentation links (docs-as-code). It runs deliberately **offline** (`--offline`): external URLs
+(e.g. the many `ebics.org` links in `docs/protocol/schema-sources.md`) are
+not checked, to avoid flaky network requests. Dead relative links (for instance
+after moving a documentation page) fail the job.
 
 ### `pack`
 
-Packt (nach `build-test`) die veröffentlichten Bibliotheken **`EBICO.Core`** und
-**`EBICO.Connector`** in Release nach `./artifacts` und lädt `*.nupkg` + `*.snupkg`
-als Artefakt `nuget` hoch (Issue #50). Der Job validiert die echte **Packbarkeit**
-(README, XML-Doc, Symbole, SourceLink, Lizenz-Expression) — ein fehlendes
-Paket-README bräche ihn z. B. mit `NU5039`. Die CalVer-BUILD-Komponente kommt aus
-`github.run_number` (`-p:EbicoBuildNumber=…`), siehe
-[packaging.md](../connector/packaging.md) und
-[ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md). **Build-only:** kein
-Registry-Push — das gehört zur Publish-Pipeline (M9 / #62), analog zum
-`container-build`-Job.
+Packs (after `build-test`) the published libraries **`EBICO.Core`** and
+**`EBICO.Connector`** in Release into `./artifacts` and uploads `*.nupkg` + `*.snupkg`
+as the artifact `nuget` (issue #50). The job validates the real **packability**
+(README, XML doc, symbols, SourceLink, license expression) — a missing
+package README would break it, for example, with `NU5039`. The CalVer BUILD component comes from
+`github.run_number` (`-p:EbicoBuildNumber=…`), see
+[packaging.md](../connector/packaging.md) and
+[ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md). **Build-only:** no
+registry push — that belongs to the publish pipeline (M9 / #62), analogous to the
+`container-build` job.
 
-## Release-Workflow (`release.yml`)
+## Release workflow (`release.yml`)
 
-Der Push/Publish läuft **getrennt** von der CI in `.github/workflows/release.yml` (M9 / #62,
-[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Trigger ist **nicht** `main`/PR, sondern
-das Pushen eines **Tags `v*.*.*`** — die CI-Jobs oben bleiben davon unberührt. Der Job `release`:
+The push/publish runs **separately** from CI in `.github/workflows/release.yml` (M9 / #62,
+[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Its trigger is **not** `main`/PR, but
+pushing a **tag `v*.*.*`** — the CI jobs above stay unaffected by it. The `release` job:
 
-1. **Version aus dem Tag** ableiten und gegen das CalVer-Muster prüfen (`v2026.7.42` → `2026.7.42`).
-2. **Build + Test** in Release mit `-p:Version=<version>` (überschreibt die datumsbasierte CalVer-Zahl;
-   re-verifiziert die DoD).
-3. **Pack** `EBICO.Core` + `EBICO.Connector` mit derselben Version → `./artifacts`.
-4. **Push nach nuget.org** (`dotnet nuget push`, Secret `NUGET_API_KEY`, `--skip-duplicate`; `.snupkg`
-   automatisch mit).
-5. **GHCR-Container-Push** `ghcr.io/dominikz98/ebico-server:{VERSION}` + `:latest` (via `GITHUB_TOKEN`).
-6. **GitHub-Release** mit auto-generierten Notes und den NuGet-Artefakten (`gh release create --generate-notes`).
+1. **Derive the version from the tag** and check it against the CalVer pattern (`v2026.7.42` → `2026.7.42`).
+2. **Build + Test** in Release with `-p:Version=<version>` (overrides the date-based CalVer number;
+   re-verifies the DoD).
+3. **Pack** `EBICO.Core` + `EBICO.Connector` with the same version → `./artifacts`.
+4. **Push to nuget.org** (`dotnet nuget push`, secret `NUGET_API_KEY`, `--skip-duplicate`; `.snupkg`
+   automatically included).
+5. **GHCR container push** `ghcr.io/dominikz98/ebico-server:{VERSION}` + `:latest` (via `GITHUB_TOKEN`).
+6. **GitHub release** with auto-generated notes and the NuGet artifacts (`gh release create --generate-notes`).
 
-Der Workflow ist **inert**, bis Maintainer das Secret `NUGET_API_KEY` setzen und einen Tag pushen — der
-bloße Merge publiziert nichts. Schritt-für-Schritt: [Release-Runbook](release.md).
+The workflow is **inert** until maintainers set the secret `NUGET_API_KEY` and push a tag — a
+mere merge publishes nothing. Step by step: [Release runbook](release.md).
 
-## Branch-Protection für `main`
+## Branch protection for `main`
 
-Die CI-Jobs oben sind erst dann ein echtes **Gate**, wenn GitHub den Merge blockiert,
-solange sie nicht grün sind. Ohne Schutzregel ist ein roter PR mergebar und ein direkter
-Push auf `main` möglich — die Definition of Done („CI grün") wäre allein durch Disziplin
-abgesichert. Deshalb ist `main` per **Branch-Protection-Regel** geschützt (Issue #3,
+The CI jobs above only become a real **gate** once GitHub blocks the merge
+while they are not green. Without a protection rule a red PR is mergeable and a direct
+push to `main` is possible — the Definition of Done ("CI green") would be secured
+by discipline alone. That is why `main` is protected by a **branch protection rule** (issue #3,
 [ADR-0028](../adr/0028-branch-protection-main.md)).
 
-Die Regel lebt in den **Repo-Settings**, nicht im Repo-Inhalt — sie ist per Definition
-nicht versionierbar. Dieser Abschnitt ist daher die maßgebliche Beschreibung des
-Soll-Zustands; ein Guard-Test (`BranchProtectionDocTests`) hält wenigstens die Liste der
-Required Checks mit `ci.yml` synchron.
+The rule lives in the **repo settings**, not in the repo content — by definition it is
+not versionable. This section is therefore the authoritative description of the
+target state; a guard test (`BranchProtectionDocTests`) at least keeps the list of
+required checks in sync with `ci.yml`.
 
-### Required Status Checks
+### Required status checks
 
-Genau die Jobs aus `ci.yml` — sie laufen auf jedem `pull_request`:
+Exactly the jobs from `ci.yml` — they run on every `pull_request`:
 
 <!-- required-checks:start -->
 - `Build & Test`
@@ -92,52 +92,52 @@ Genau die Jobs aus `ci.yml` — sie laufen auf jedem `pull_request`:
 - `Pack (NuGet, build-only)`
 <!-- required-checks:end -->
 
-Als Check-Kontext zählt der **Anzeigename** (`name:`) des Jobs, nicht der YAML-Schlüssel.
-Wird ein Job umbenannt, hinzugefügt oder entfernt, muss die Liste hier **und** die
-Repo-Einstellung nachgezogen werden.
+What counts as the check context is the job's **display name** (`name:`), not the YAML key.
+If a job is renamed, added or removed, the list here **and** the
+repo setting must be updated.
 
-> **Nicht** aufgenommen: der Job `Publish (NuGet + Container)` aus
-> [`release.yml`](#release-workflow-releaseyml). Er feuert ausschließlich auf `v*.*.*`-Tags
-> und würde als Required Check auf jedem PR ewig als „Expected — Waiting for status" hängen
-> und den Merge dauerhaft blockieren.
+> **Not** included: the job `Publish (NuGet + Container)` from
+> [`release.yml`](#release-workflow-releaseyml). It fires exclusively on `v*.*.*` tags
+> and would, as a required check on every PR, hang forever as "Expected — Waiting for status"
+> and permanently block the merge.
 
-### Weitere Einstellungen
+### Further settings
 
-| Einstellung | Wert | Warum |
+| Setting | Value | Why |
 | --- | --- | --- |
-| `strict` (Branch muss aktuell sein) | **an** | Verhindert das semantische Merge-Loch: zwei PRs, je einzeln grün, können sich gegenseitig brechen. |
-| Direkte Pushes auf `main` | **blockiert** | Änderungen laufen ausnahmslos über einen PR (siehe Workflow-Konvention „ein Issue → ein Branch → ein PR"). |
-| `enforce_admins` | **an** | EBICO ist faktisch ein Solo-Repo; ohne Admin-Bindung wäre die Regel für den einzigen Committer wirkungslos. |
-| Required approving reviews | **aus** | Ein Solo-Repo kann den eigenen PR nicht selbst approven — die Regel würde jeden Merge blockieren. Die Review-Pflicht bleibt als DoD-Punkt in der PR-Checkliste. |
-| Force-Push / Branch löschen | **blockiert** | Historie von `main` bleibt linear und nachvollziehbar. |
+| `strict` (branch must be up to date) | **on** | Prevents the semantic merge hole: two PRs, each green on its own, can break each other. |
+| Direct pushes to `main` | **blocked** | Changes go through a PR without exception (see the workflow convention "one issue → one branch → one PR"). |
+| `enforce_admins` | **on** | EBICO is effectively a solo repo; without admin binding the rule would be ineffective for the sole committer. |
+| Required approving reviews | **off** | A solo repo cannot approve its own PR — the rule would block every merge. The review obligation remains as a DoD item in the PR checklist. |
+| Force-push / delete branch | **blocked** | The history of `main` stays linear and traceable. |
 
-Setzen bzw. prüfen lässt sich der Zustand über die API:
+The state can be set or checked via the API:
 
 ```bash
 gh api repos/:owner/:repo/branches/main/protection            # Ist-Zustand
 gh api repos/:owner/:repo/branches/main/protection --method PUT --input protection.json
 ```
 
-**Bei rotem Gate:** Lässt ein defekter oder hängender Check keinen Merge mehr zu, ist der
-Weg *nicht* der Force-Push, sondern die Regel in den Settings kurz zu deaktivieren, den
-Fix zu mergen und sie sofort wieder zu aktivieren.
+**On a red gate:** If a broken or hanging check no longer allows a merge, the
+way forward is *not* the force-push, but to briefly disable the rule in the settings, merge the
+fix and re-enable it immediately.
 
-## Reproduzierbarkeit ohne Lock-Files
+## Reproducibility without lock files
 
-Es werden **keine** `packages.lock.json` verwendet. Reproduzierbare Restores
-kommen aus der zentralen Paketverwaltung: alle Versionen sind in
-`Directory.Packages.props` exakt gepinnt, inkl. transitiver Pakete
-(`CentralPackageTransitivePinningEnabled=true`). Hintergrund: Das implizite
-Blazor-Asset-Paket `Microsoft.AspNetCore.App.Internal.Assets` hängt am
-SDK-Runtime-Patch, wodurch eingecheckte Lock-Files `--locked-mode` zwischen
-Maschinen mit unterschiedlichem SDK-Patch brechen (NU1004). Details:
+**No** `packages.lock.json` are used. Reproducible restores
+come from central package management: all versions are pinned exactly in
+`Directory.Packages.props`, including transitive packages
+(`CentralPackageTransitivePinningEnabled=true`). Background: the implicit
+Blazor asset package `Microsoft.AspNetCore.App.Internal.Assets` depends on the
+SDK runtime patch, which makes checked-in lock files break `--locked-mode` between
+machines with a different SDK patch (NU1004). Details:
 [solution-layout.md](solution-layout.md).
 
-## Später
+## Later
 
-- **Externer Link-Check** als nicht-blockierender `schedule`-Job (nächtlich).
+- **External link check** as a non-blocking `schedule` job (nightly).
 
-> **Erledigt (M9 / #62):** Der authentifizierte **Publish/Push** ist seit #62 im
-> [Release-Workflow](#release-workflow-releaseyml) umgesetzt (nuget.org + GHCR, tag-getrieben,
-> [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Der build-only `pack`-Job in `ci.yml`
-> bleibt als Regressionsschutz erhalten.
+> **Done (M9 / #62):** The authenticated **publish/push** has been implemented since #62 in the
+> [release workflow](#release-workflow-releaseyml) (nuget.org + GHCR, tag-driven,
+> [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). The build-only `pack` job in `ci.yml`
+> remains in place as regression protection.

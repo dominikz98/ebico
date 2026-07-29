@@ -1,56 +1,56 @@
-# Server: Upload-Transaktion (Initialisation + Transfer)
+# Server: Upload transaction (initialisation + transfer)
 
-> Umsetzung von **Issue #32** (Milestone M4 — Server: Transaction Engine). Diese Seite
-> beschreibt die serverseitige **Empfangsmaschine** für einen EBICS-Upload: die
-> zweiphasige Transaktion aus **Initialisation** (Transaktions-ID-Vergabe, Zustandsaufbau)
-> und **Transfer** (segmentweiser Empfang, Reassemblierung, Entschlüsselung, Dekompression).
+> Implementation of **Issue #32** (Milestone M4 — Server: Transaction Engine). This page
+> describes the server-side **receive engine** for an EBICS upload: the two-phase transaction
+> consisting of **initialisation** (transaction-ID assignment, state setup) and **transfer**
+> (segment-wise receipt, reassembly, decryption, decompression).
 >
-> Bewusst **enthalten**: die Transaktions-Zustandsmaschine (`UploadTransactionEngine`), der
-> In-Memory-Transaktionsspeicher (`IUploadTransactionStore`), die 16-Byte-Transaktions-ID,
-> das Phasen-Routing in der Pipeline, das Puffern/Reassemblieren der Segmente
-> (`EbicsSegmentation.Reassemble`), Entschlüsselung (`EncryptionE002`) und Dekompression
-> (`EbicsCompression`) der reassemblierten Order-Data, sowie das Auslösen der
-> Transaktions-/Segment-Returncodes. Angebunden an die generischen Upload-OrderTypes
-> **FUL** (H003/H004) und **BTU** (H005).
-> Bewusst **noch nicht**: die **Signaturprüfung des OrderData** (ES / A00x) — die
-> `SignatureData` aus der Initialisation wird **einbehalten**, aber **nicht** kryptografisch
-> verifiziert (siehe Spec-Vorbehalte, Folge-Issue); die **Download**-Transaktion inkl.
-> Receipt-Phase ([#33](download-transaction.md)); **Recovery/Timeouts** und die Eviction verwaister Transaktionen (#35);
-> die X002-Request-Signaturprüfung (Verify-Stufe bleibt No-Op).
+> Deliberately **included**: the transaction state machine (`UploadTransactionEngine`), the
+> in-memory transaction store (`IUploadTransactionStore`), the 16-byte transaction ID,
+> the phase routing in the pipeline, the buffering/reassembly of the segments
+> (`EbicsSegmentation.Reassemble`), decryption (`EncryptionE002`) and decompression
+> (`EbicsCompression`) of the reassembled order data, as well as the triggering of the
+> transaction/segment return codes. Wired to the generic upload order types
+> **FUL** (H003/H004) and **BTU** (H005).
+> Deliberately **not yet**: the **signature verification of the order data** (ES / A00x) — the
+> `SignatureData` from the initialisation is **retained**, but **not** cryptographically
+> verified (see spec caveats, follow-up issue); the **download** transaction incl.
+> receipt phase ([#33](download-transaction.md)); **recovery/timeouts** and the eviction of orphaned transactions (#35);
+> the X002 request signature verification (the verify stage remains a no-op).
 
-## Zweck
+## Purpose
 
-Ein EBICS-Upload überträgt Auftragsdaten in **zwei Phasen**. In der **Initialisation** kündigt
-der Client die Transaktion an (Order-Typ, Anzahl Segmente, verschlüsselter Transaktionsschlüssel,
-elektronische Unterschrift); der Server vergibt eine **Transaction-ID** und legt den
-Transaktionszustand an. In der **Transfer**-Phase liefert der Client die Order-Data als
-`base64(encrypt(compress(orderDataXml)))`, aufgeteilt in **Segmente** — ein
-`DataTransfer/OrderData` je Nachricht. Beim letzten Segment reassembliert der Server die Segmente,
-entschlüsselt sie mit dem Transaktionsschlüssel und dekomprimiert sie zur Klartext-Order-Data.
+An EBICS upload transfers order data in **two phases**. In the **initialisation** the client
+announces the transaction (order type, number of segments, encrypted transaction key,
+electronic signature); the server assigns a **transaction ID** and sets up the
+transaction state. In the **transfer** phase the client delivers the order data as
+`base64(encrypt(compress(orderDataXml)))`, split into **segments** — one
+`DataTransfer/OrderData` per message. On the last segment the server reassembles the segments,
+decrypts them with the transaction key and decompresses them into the plaintext order data.
 
-#32 komponiert dazu die bereits vorhandenen, policy-freien Primitiven aus #34/M2/M3
-([Segmentierung](segmentation.md), [E002](../protocol/encryption-e002.md),
-[Kompression](segmentation.md)) zu einer **Zustandsmaschine** und liefert das **Wann/Wer**
-(Phasen, Transaction-ID, Envelope, Segment-Policy), das die Primitiven bewusst offen ließen.
+For this, #32 composes the already existing, policy-free primitives from #34/M2/M3
+([segmentation](segmentation.md), [E002](../protocol/encryption-e002.md),
+[compression](segmentation.md)) into a **state machine** and provides the **when/who**
+(phases, transaction ID, envelope, segment policy) that the primitives deliberately left open.
 
-## Ablauf
+## Flow
 
-Der Server unterscheidet die Phase am `TransactionPhase`-Feld des `ebicsRequest` (und — robust
-gegen ein fehlendes Feld — an der Präsenz einer `TransactionID` im Static-Header). Ein
-`ebicsRequest` mit `phase=Initialisation` und Order-Typ **FUL/BTU** startet die Transaktion; jeder
-`ebicsRequest` mit `TransactionID` setzt sie fort. Alle übrigen `ebicsRequest`
-(HCA/HCS/SPR …) laufen unverändert über den Single-Shot-Handler-Resolver.
+The server distinguishes the phase by the `TransactionPhase` field of the `ebicsRequest` (and — robust
+against a missing field — by the presence of a `TransactionID` in the static header). An
+`ebicsRequest` with `phase=Initialisation` and order type **FUL/BTU** starts the transaction; every
+`ebicsRequest` with `TransactionID` continues it. All other `ebicsRequest`
+(HCA/HCS/SPR …) run unchanged over the single-shot handler resolver.
 
 ### Phase 1 — Initialisation
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Identität | `HostID`/`PartnerID`/`UserID` prüfen; Teilnehmer muss existieren und `Ready` sein (sonst `091002`) |
-| 2. Segmentzahl | `Static/NumSegments` muss ≥ 1 und ≤ `EbicoServerOptions.MaxUploadSegments` sein (sonst `091114`) |
-| 3. Transaktionsschlüssel | `DataTransfer/DataEncryptionInfo/TransactionKey` mit dem **privaten** Bank-Enc-Key entschlüsseln (`EncryptionE002.DecryptTransactionKey`) |
-| 4. ES einbehalten | `DataTransfer/SignatureData` roh im Zustand ablegen (Verifikation zurückgestellt) |
-| 5. Transaktion anlegen | 16-Byte-`TransactionID` erzeugen, Zustand (Subscriber, OrderType, NumSegments, txKey, ES) im `IUploadTransactionStore` speichern |
-| 6. Antwort | `ebicsResponse`, `phase=Initialisation`, `TransactionID`, `EBICS_OK` |
+| 1. Identity | check `HostID`/`PartnerID`/`UserID`; the subscriber must exist and be `Ready` (otherwise `091002`) |
+| 2. Segment count | `Static/NumSegments` must be ≥ 1 and ≤ `EbicoServerOptions.MaxUploadSegments` (otherwise `091114`) |
+| 3. Transaction key | decrypt `DataTransfer/DataEncryptionInfo/TransactionKey` with the **private** bank enc key (`EncryptionE002.DecryptTransactionKey`) |
+| 4. Retain ES | store `DataTransfer/SignatureData` raw in the state (verification deferred) |
+| 5. Create transaction | generate a 16-byte `TransactionID`, store the state (subscriber, OrderType, NumSegments, txKey, ES) in the `IUploadTransactionStore` |
+| 6. Response | `ebicsResponse`, `phase=Initialisation`, `TransactionID`, `EBICS_OK` |
 
 ```xml
 <!-- Request (gekürzt) -->
@@ -78,102 +78,102 @@ gegen ein fehlendes Feld — an der Präsenz einer `TransactionID` im Static-Hea
 </ebicsResponse>
 ```
 
-### Phase 2 — Transfer (je Segment 1…N)
+### Phase 2 — Transfer (per segment 1…N)
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Transaktion finden | `Static/TransactionID` → Hex-Lookup im Store (fehlt → `091101`) |
-| 2. Segmentnummer prüfen | `Mutable/SegmentNumber` in `[1, NumSegments]` (0 → `091112`, > N → `091104`) |
-| 3. Segment puffern | Order-Data-Bytes unter `SegmentNumber` ablegen; Duplikat → `091103` |
-| 4. Vollzähligkeit | bei `lastSegment=true`: alle `NumSegments` da? (sonst `011101`) |
-| 5. Dekodieren | `Reassemble` → `EncryptionE002.DecryptOrderData(txKey)` → `EbicsCompression.Decompress` (Fehler → `090004`) |
-| 6. Antwort | `ebicsResponse`, `phase=Transfer`, `TransactionID`, `SegmentNumber`, `EBICS_OK` |
+| 1. Find transaction | `Static/TransactionID` → hex lookup in the store (missing → `091101`) |
+| 2. Check segment number | `Mutable/SegmentNumber` in `[1, NumSegments]` (0 → `091112`, > N → `091104`) |
+| 3. Buffer segment | store order-data bytes under `SegmentNumber`; duplicate → `091103` |
+| 4. Completeness | on `lastSegment=true`: are all `NumSegments` present? (otherwise `011101`) |
+| 5. Decode | `Reassemble` → `EncryptionE002.DecryptOrderData(txKey)` → `EbicsCompression.Decompress` (error → `090004`) |
+| 6. Response | `ebicsResponse`, `phase=Transfer`, `TransactionID`, `SegmentNumber`, `EBICS_OK` |
 
-`Reassemble` konkateniert die Segmente in **Segmentnummer-Reihenfolge** (`SortedDictionary`), die
-Reihenfolge des Eintreffens ist egal. Die reassemblierte, entschlüsselte und dekomprimierte
-Klartext-Order-Data wird auf der abgeschlossenen Transaktion (`UploadTransaction.OrderData`)
-festgehalten — die auftragstypspezifische Weiterverarbeitung ist Folge-Arbeit.
+`Reassemble` concatenates the segments in **segment-number order** (`SortedDictionary`); the
+order of arrival is irrelevant. The reassembled, decrypted and decompressed
+plaintext order data is held on the completed transaction (`UploadTransaction.OrderData`)
+— the order-type-specific further processing is follow-up work.
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-| Situation | Returncode | Ablage |
+| Situation | Return code | Placement |
 | --- | --- | --- |
-| Erfolg (Init/Transfer) | `000000` EBICS_OK | Header + Body |
-| Teilnehmer unbekannt / nicht `Ready` | `091002` EBICS_INVALID_USER_OR_USER_STATE | Body |
-| `NumSegments` fehlt / 0 bzw. Segmentnummer 0 | `091112` EBICS_INVALID_REQUEST_CONTENT | Body |
+| Success (init/transfer) | `000000` EBICS_OK | Header + Body |
+| Subscriber unknown / not `Ready` | `091002` EBICS_INVALID_USER_OR_USER_STATE | Body |
+| `NumSegments` missing / 0 or segment number 0 | `091112` EBICS_INVALID_REQUEST_CONTENT | Body |
 | `NumSegments` > `MaxUploadSegments` | `091114` EBICS_MAX_SEGMENTS_EXCEEDED | Body |
-| unbekannte / abgelaufene `TransactionID` | `091101` EBICS_TX_UNKNOWN_TXID | Body |
+| unknown / expired `TransactionID` | `091101` EBICS_TX_UNKNOWN_TXID | Body |
 | `SegmentNumber` > `NumSegments` | `091104` EBICS_TX_SEGMENT_NUMBER_EXCEEDED | Body |
-| doppeltes Segment (Replay) | `091103` EBICS_TX_MESSAGE_REPLAY | Body |
-| `lastSegment` vor Vollzähligkeit | `011101` EBICS_TX_SEGMENT_NUMBER_UNDERRUN | Header |
-| Order-Data nicht entschlüsselbar/dekomprimierbar | `090004` EBICS_INVALID_ORDER_DATA_FORMAT | Body |
+| duplicate segment (replay) | `091103` EBICS_TX_MESSAGE_REPLAY | Body |
+| `lastSegment` before completeness | `011101` EBICS_TX_SEGMENT_NUMBER_UNDERRUN | Header |
+| Order data not decryptable/decompressable | `090004` EBICS_INVALID_ORDER_DATA_FORMAT | Body |
 
-Die Transaktions-/Segment-Codes sind **Kontrollfluss** und werden von der Engine direkt gesetzt; die
-Dekodier-Fehler (Entschlüsselung/Dekompression) laufen über `OrderDataFault` → den bestehenden
-`EbicsErrorMapper` (`090004`). Alle Fälle werden mit **HTTP 200** und dem Returncode im
-`ebicsResponse` beantwortet (siehe [Grundregel im Host-Grundgerüst](host.md)).
+The transaction/segment codes are **control flow** and are set directly by the engine; the
+decode errors (decryption/decompression) run over `OrderDataFault` → the existing
+`EbicsErrorMapper` (`090004`). All cases are answered with **HTTP 200** and the return code in the
+`ebicsResponse` (see [ground rule in the host skeleton](host.md)).
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **ES-Verifikation zurückgestellt.** Die elektronische Unterschrift (`SignatureData`, A005/A006)
-  wird eingelesen und im Transaktionszustand einbehalten, aber **nicht** geprüft — konsistent mit den
-  einphasigen Key-Handlern (HCA/HCS). Die Order-Data ist damit entschlüsselt, aber nicht
-  authentifiziert. Nachziehen via `BankSignature.Verify` in einem Folge-Issue.
-- **Init/Transfer-Aufteilung.** Dass die `SignatureData`/`DataEncryptionInfo` in der Initialisation
-  und die `OrderData`-Segmente ausschließlich im Transfer reisen (kein Segment in der Init), ist die
-  kanonische Lesart und **gegen den offiziellen EBICS-Annex zu verifizieren**.
-- **BTF `SignatureFlag` (H005).** Ob für einen konkreten BTU-Auftrag überhaupt eine ES gefordert ist,
-  steuert spec-seitig `BTUOrderParams/SignatureFlag`; #32 wertet das noch nicht aus.
-- **S001 `OrderSignature` vs. `OrderSignatureData`.** Für die spätere ES-Prüfung ist festzulegen,
-  welchen der beiden S001-Träger der Sender befüllt (S002 kennt nur `OrderSignatureData`).
-- **Segmentgröße roh vs. base64.** `SegmentSizeBytes` misst Roh-Bytes; der Bezug der EBICS-Segment-
-  grenze (roh vs. base64) ist offen (siehe [Segmentierung](segmentation.md)).
-- **Response-Felder.** `NumSegments` wird in der Upload-Antwort nicht gesetzt (laut Schema
-  Download-only); ob der Transfer-Response `SegmentNumber` echoen muss, ist zu verifizieren (wird
-  gesetzt, wenn vorhanden). Die Antwort ist weiterhin **unsigniert** (X002 = M4).
-- **Verwaiste Transaktionen.** Der Idle-Timeout und die Eviction (lazy beim Zugriff + Hintergrund-
-  Sweeper) sind in **[#35](transaction-recovery.md)** umgesetzt: nach der Initialisation abgebrochene
-  Uploads laufen ab und werden entfernt; ein Transfer gegen eine abgelaufene ID liefert `091101`.
+- **ES verification deferred.** The electronic signature (`SignatureData`, A005/A006)
+  is read in and retained in the transaction state, but **not** verified — consistent with the
+  single-phase key handlers (HCA/HCS). The order data is thus decrypted, but not
+  authenticated. To be added later via `BankSignature.Verify` in a follow-up issue.
+- **Init/transfer split.** That the `SignatureData`/`DataEncryptionInfo` travel in the initialisation
+  and the `OrderData` segments exclusively in the transfer (no segment in the init) is the
+  canonical reading and **must be verified against the official EBICS annex**.
+- **BTF `SignatureFlag` (H005).** Whether an ES is required at all for a concrete BTU order
+  is controlled spec-side by `BTUOrderParams/SignatureFlag`; #32 does not yet evaluate this.
+- **S001 `OrderSignature` vs. `OrderSignatureData`.** For the later ES check it must be determined
+  which of the two S001 carriers the sender populates (S002 knows only `OrderSignatureData`).
+- **Segment size raw vs. base64.** `SegmentSizeBytes` measures raw bytes; the reference of the EBICS segment
+  boundary (raw vs. base64) is open (see [segmentation](segmentation.md)).
+- **Response fields.** `NumSegments` is not set in the upload response (per schema
+  download-only); whether the transfer response must echo `SegmentNumber` is to be verified (it is
+  set when present). The response is still **unsigned** (X002 = M4).
+- **Orphaned transactions.** The idle timeout and eviction (lazy on access + background
+  sweeper) are implemented in **[#35](transaction-recovery.md)**: uploads aborted after the initialisation
+  expire and are removed; a transfer against an expired ID yields `091101`.
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-Die Byte-Pipeline ist versionsagnostisch; nur die Envelope-/Header-Details unterscheiden sich:
+The byte pipeline is version-agnostic; only the envelope/header details differ:
 
-| Aspekt | H003 / H004 | H005 |
+| Aspect | H003 / H004 | H005 |
 | --- | --- | --- |
-| Upload-Order-Typ | `OrderDetails/OrderType` = **FUL** | `OrderDetails/AdminOrderType` = **BTU** |
-| Order-Parameter | `FULOrderParams` | `BTUOrderParams` (BTF) |
-| ES-Schema | S001 (`OrderSignatureData`/`OrderSignature`) | S002 (`OrderSignatureData`) |
-| Transaktions-Header | `NumSegments`/`TransactionID`/`SegmentNumber`+`lastSegment` — strukturgleich | dito |
+| Upload order type | `OrderDetails/OrderType` = **FUL** | `OrderDetails/AdminOrderType` = **BTU** |
+| Order parameters | `FULOrderParams` | `BTUOrderParams` (BTF) |
+| ES schema | S001 (`OrderSignatureData`/`OrderSignature`) | S002 (`OrderSignatureData`) |
+| Transaction header | `NumSegments`/`TransactionID`/`SegmentNumber`+`lastSegment` — structurally identical | ditto |
 
-Genau **ein** `OrderData`-Element pro Transfer-Nachricht (Binding) — mehrere Segmente je Nachricht
-sind strukturell ausgeschlossen. Die `TransactionID` ist 16 Byte (`hexBinary`); intern wird sie als
-Hex-String verschlüsselt (Store-Key).
+Exactly **one** `OrderData` element per transfer message (binding) — multiple segments per message
+are structurally excluded. The `TransactionID` is 16 bytes (`hexBinary`); internally it is encoded as
+a hex string (store key).
 
 ## Tests
 
-`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; Request-XML aus committeten Core-Bindings,
-keine proprietären Fixtures):
+`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; request XML from committed core bindings,
+no proprietary fixtures):
 
-- `UploadTransactionTests` (`[Theory]` über H003/H004/H005) — **Happy Path 1 Segment** (Init →
-  `TransactionID` + `phase=Initialisation`; Transfer → `phase=Transfer`, Order-Data im Store ==
-  Original) und **N Segmente** (Reassemblierung über mehrere Nachrichten). Der Transfer-Response
-  wird deserialisiert und `TransactionPhase == Transfer` geprüft (schließt den
-  `host.md`-Serialisierungs-Vorbehalt). Negativfälle: unbekannte `TransactionID` (`091101`),
-  Segmentnummer > `NumSegments` (`091104`), Duplikat (`091103`), `lastSegment` vor Vollzähligkeit
-  (`011101`), Teilnehmer nicht `Ready` (`091002`), unentschlüsselbare Order-Data (`090004`).
+- `UploadTransactionTests` (`[Theory]` over H003/H004/H005) — **happy path 1 segment** (init →
+  `TransactionID` + `phase=Initialisation`; transfer → `phase=Transfer`, order data in the store ==
+  original) and **N segments** (reassembly over several messages). The transfer response
+  is deserialised and `TransactionPhase == Transfer` is checked (closes the
+  `host.md` serialisation caveat). Negative cases: unknown `TransactionID` (`091101`),
+  segment number > `NumSegments` (`091104`), duplicate (`091103`), `lastSegment` before completeness
+  (`011101`), subscriber not `Ready` (`091002`), undecryptable order data (`090004`).
 - `UploadTransactionStoreTests` — `InMemoryUploadTransactionStore` (Create/TryGet/Remove/Count,
-  Hex-Keying, Duplikat-Create, null-Guards) und die Segmentpuffer-Logik von `UploadTransaction`
-  (Buffered/Ready/Duplicate/Underrun, Reassemblierung in Segmentreihenfolge).
-- `EbicsEndpointIntegrationTests` — Upload über den HTTP-Endpoint (`WebApplicationFactory`,
-  `POST /ebics`): Init → `TransactionID` aus der Antwort → Transfer → `EBICS_OK`, Order-Data im Store.
+  hex keying, duplicate create, null guards) and the segment-buffer logic of `UploadTransaction`
+  (Buffered/Ready/Duplicate/Underrun, reassembly in segment order).
+- `EbicsEndpointIntegrationTests` — upload over the HTTP endpoint (`WebApplicationFactory`,
+  `POST /ebics`): init → `TransactionID` from the response → transfer → `EBICS_OK`, order data in the store.
 
-## Verwandte Doku
+## Related documentation
 
-- [Download-Transaktion (Initialisation + Transfer + Receipt)](download-transaction.md) — das gespiegelte Pendant (Senderichtung)
-- [Segmentierung, Kompression & Base64-Pipeline](segmentation.md) — die genutzten Byte-Primitiven
-- [Verschlüsselung E002](../protocol/encryption-e002.md) — Transaktionsschlüssel- & Order-Data-Entschlüsselung
-- [Hostable Server-Grundgerüst](host.md) — Pipeline, Fehlerabbildung, `EbicoServerOptions`
-- [Schlüsselwechsel & Sperrung (HCA/HCS/SPR/HSA)](hca-hcs-spr-hsa.md) — Vorbild für den einphasigen, verschlüsselten Upload
-- [EBICS-Returncode-Katalog](../protocol/return-codes.md) — die ausgelösten Transaktions-/Segment-Codes
-- [ADR-0013 (Upload-Transaktions-Engine)](../adr/0013-upload-transaktions-engine.md) — dedizierte Engine statt Resolver, In-Memory-Transaktionsspeicher
+- [Download transaction (initialisation + transfer + receipt)](download-transaction.md) — the mirrored counterpart (send direction)
+- [Segmentation, compression & base64 pipeline](segmentation.md) — the byte primitives used
+- [Encryption E002](../protocol/encryption-e002.md) — transaction-key & order-data decryption
+- [Hostable server skeleton](host.md) — pipeline, error mapping, `EbicoServerOptions`
+- [Key change & suspension (HCA/HCS/SPR/HSA)](hca-hcs-spr-hsa.md) — model for the single-phase, encrypted upload
+- [EBICS return code catalog](../protocol/return-codes.md) — the triggered transaction/segment codes
+- [ADR-0013 (upload transaction engine)](../adr/0013-upload-transaktions-engine.md) — dedicated engine instead of resolver, in-memory transaction store

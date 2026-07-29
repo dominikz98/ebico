@@ -1,50 +1,49 @@
-# Server: INI — Senden der Signaturschlüssel (A00x)
+# Server: INI — Sending the signature keys (A00x)
 
-> Umsetzung von **Issue #26** (Milestone M3 — Server: Key Management). Diese Seite
-> beschreibt den ersten fachlichen **Order-Handler** des Emulators: den Empfang des
-> öffentlichen bankfachlichen **Signaturschlüssels** (A00x) eines Teilnehmers per **INI**,
-> das serverseitige **Speichern** des Schlüssels und den Lebenszyklus-Übergang
-> **`New → Initialized`**.
+> Implementation of **Issue #26** (Milestone M3 — Server: Key Management). This page
+> describes the emulator's first business **order handler**: receiving a subscriber's
+> public bank-technical **signature key** (A00x) via **INI**, the server-side **storage**
+> of the key, and the lifecycle transition **`New → Initialized`**.
 >
-> Bewusst **enthalten**: OrderType-`INI`-Verarbeitung für H003/H004/H005, Extraktion und
-> Speicherung des A00x-Schlüssels, Antwort als `ebicsKeyManagementResponse`, Returncodes
-> für die Fehlerfälle (bereits initialisiert, unbekannter Teilnehmer, defekte Order-Data).
-> Bewusst **noch nicht**: HIA/HPB (#27/#28), Antwort-Signatur (X002, M4), Persistenz des
-> Schlüssel-Stores (In-Memory bleibt Default), Zertifikatsketten-Prüfung bei H005 (M8),
-> vollständiger Returncode-Katalog (#36/M4).
+> Deliberately **included**: OrderType-`INI` processing for H003/H004/H005, extraction and
+> storage of the A00x key, response as `ebicsKeyManagementResponse`, return codes
+> for the error cases (already initialised, unknown subscriber, malformed order data).
+> Deliberately **not yet**: HIA/HPB (#27/#28), response signature (X002, M4), persistence of the
+> key store (in-memory remains the default), certificate-chain checking for H005 (M8),
+> the complete return code catalogue (#36/M4).
 
-## Zweck
+## Purpose
 
-INI ist der erste Schritt der Teilnehmer-Initialisierung: der Client sendet einen
-**ungesicherten** `ebicsUnsecuredRequest`, dessen Order-Data das selbstbeschreibende
-`SignaturePubKeyOrderData`-Dokument mit dem öffentlichen Signaturschlüssel (Version
-A004/A005/A006 — „A00x") trägt. Der Server nimmt den Schlüssel entgegen, legt ihn ab
-und markiert den Teilnehmer als `Initialized`. Das Grundgerüst (#25, siehe
-[host.md](host.md)) hatte hierfür die Pipeline-Erweiterungspunkte vorbereitet; #26
-füllt den ersten davon.
+INI is the first step of subscriber initialisation: the client sends an
+**unsecured** `ebicsUnsecuredRequest` whose order data carries the self-describing
+`SignaturePubKeyOrderData` document with the public signature key (version
+A004/A005/A006 — "A00x"). The server accepts the key, stores it,
+and marks the subscriber as `Initialized`. The skeleton (#25, see
+[host.md](host.md)) had prepared the pipeline extension points for this; #26
+fills the first of them.
 
-Der Client-Gegenpart (Schlüsselerzeugung, INI senden) ist im Connector umgesetzt
-(siehe [Onboarding-Flows](../connector/onboarding.md)) und liefert genau die Order-Data,
-die dieser Handler konsumiert.
+The client counterpart (key generation, sending INI) is implemented in the connector
+(see [Onboarding flows](../connector/onboarding.md)) and delivers exactly the order data
+that this handler consumes.
 
-## Ablauf
+## Flow
 
-Die Pipeline (`EbicsRequestPipeline`) erkennt den ungesicherten Request, zieht den
-OrderType `INI` aus dem Header und leitet an den versionspassenden Handler weiter. Der
-versionsagnostische Ablauf liegt in `IniOrderHandlerBase`, die versionsspezifische
-Schlüssel-Extraktion in `H003`/`H004`/`H005IniOrderHandler`:
+The pipeline (`EbicsRequestPipeline`) recognises the unsecured request, pulls the
+OrderType `INI` from the header and forwards it to the version-matching handler. The
+version-agnostic flow lives in `IniOrderHandlerBase`, the version-specific
+key extraction in `H003`/`H004`/`H005IniOrderHandler`:
 
-| Schritt | Aktion |
+| Step | Action |
 | --- | --- |
-| 1. Extraktion | `Body/DataTransfer/OrderData` (base64 vom Binding dekodiert) → `EbicsCompression.Decompress` → `EbicsXmlSerializer.Deserialize<SignaturePubKeyOrderData>` |
-| 2. Schlüssel | H003/H004: `PubKeyValue/RSAKeyValue` (Modulus/Exponent) → `RsaKeyImportExport.ImportRsaKeyValue`. H005: `X509Data` → `RsaKeyImportExport.ImportPublicKeyFromCertificate` |
-| 3. Versionsprüfung | `SignatureVersion` muss eine A00x-Version und für die Protokollversion zulässig sein (`KeyVersions.EnsurePermitted`) |
-| 4. Teilnehmer | `IMasterDataManager.GetSubscriberAsync` — muss existieren und im Zustand `New` sein |
-| 5. Speichern | öffentlicher Schlüssel → `IServerKeyStore.StoreAsync` (gekeyt auf Teilnehmer × `KeyPurpose.Signature`) |
-| 6. Status | `IMasterDataManager.TransitionSubscriberAsync(…, Initialized)` |
-| 7. Antwort | `ebicsKeyManagementResponse` mit `000000`/`000000` (`EbicsResponseFactory.BuildKeyManagementResponse`) |
+| 1. Extraction | `Body/DataTransfer/OrderData` (base64 decoded by the binding) → `EbicsCompression.Decompress` → `EbicsXmlSerializer.Deserialize<SignaturePubKeyOrderData>` |
+| 2. Key | H003/H004: `PubKeyValue/RSAKeyValue` (Modulus/Exponent) → `RsaKeyImportExport.ImportRsaKeyValue`. H005: `X509Data` → `RsaKeyImportExport.ImportPublicKeyFromCertificate` |
+| 3. Version check | `SignatureVersion` must be an A00x version and permitted for the protocol version (`KeyVersions.EnsurePermitted`) |
+| 4. Subscriber | `IMasterDataManager.GetSubscriberAsync` — must exist and be in state `New` |
+| 5. Storage | public key → `IServerKeyStore.StoreAsync` (keyed on subscriber × `KeyPurpose.Signature`) |
+| 6. State | `IMasterDataManager.TransitionSubscriberAsync(…, Initialized)` |
+| 7. Response | `ebicsKeyManagementResponse` with `000000`/`000000` (`EbicsResponseFactory.BuildKeyManagementResponse`) |
 
-Beispiel — INI-Order-Data (H004, `S001`, gekürzt), vor Kompression/Base64:
+Example — INI order data (H004, `S001`, abridged), before compression/base64:
 
 ```xml
 <SignaturePubKeyOrderData xmlns="http://www.ebics.org/S001" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
@@ -57,7 +56,7 @@ Beispiel — INI-Order-Data (H004, `S001`, gekürzt), vor Kompression/Base64:
 </SignaturePubKeyOrderData>
 ```
 
-Erfolgsantwort (H004, gekürzt):
+Success response (H004, abridged):
 
 ```xml
 <ebicsKeyManagementResponse xmlns="urn:org:ebics:H004" Version="H004">
@@ -69,69 +68,69 @@ Erfolgsantwort (H004, gekürzt):
 </ebicsKeyManagementResponse>
 ```
 
-## Schlüssel-Store
+## Key store
 
-Der Server hält empfangene öffentliche Schlüssel im neuen `IServerKeyStore`
-(Default `InMemoryServerKeyStore`, via `TryAddSingleton` überschreibbar). Er ist auf
-(`HostId`, `PartnerId`, `UserId`) × `KeyPurpose` gekeyt und speichert ausschließlich den
-**öffentlichen** Schlüssel plus die EBICS-Schlüsselversion (`StoredPublicKey`). INI legt
-den Signaturschlüssel (`A00x`) ab; HIA (#27) nutzt denselben Store für Authentifikations-
-(`X00x`) und Verschlüsselungsschlüssel (`E00x`). Das Domänen-Aggregat `Subscriber` bleibt
-bewusst schlüsselfrei (siehe [Stammdaten](master-data.md)).
+The server holds received public keys in the new `IServerKeyStore`
+(default `InMemoryServerKeyStore`, overridable via `TryAddSingleton`). It is keyed on
+(`HostId`, `PartnerId`, `UserId`) × `KeyPurpose` and stores exclusively the
+**public** key plus the EBICS key version (`StoredPublicKey`). INI stores
+the signature key (`A00x`); HIA (#27) uses the same store for authentication
+(`X00x`) and encryption keys (`E00x`). The domain aggregate `Subscriber` remains
+deliberately key-free (see [Master data](master-data.md)).
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-Wie beim gesamten `/ebics`-Endpoint werden Protokoll-/Businessfehler mit **HTTP 200** und
-einem Returncode im Envelope beantwortet (siehe [host.md](host.md)); der fachliche Code
-steht in `body/ReturnCode`.
+As across the entire `/ebics` endpoint, protocol/business errors are answered with **HTTP 200** and
+a return code in the envelope (see [host.md](host.md)); the business code
+sits in `body/ReturnCode`.
 
-| Situation | Returncode |
+| Situation | Return code |
 | --- | --- |
-| INI angenommen | `000000` EBICS_OK |
-| Teilnehmer unbekannt **oder** nicht mehr `New` (bereits initialisiert) | `091002` EBICS_INVALID_USER_OR_USER_STATE |
-| Order-Data nicht entpack-/deserialisierbar, unbrauchbares/unzulässiges Schlüsselmaterial oder falsche Signaturversion | `090004` EBICS_INVALID_ORDER_DATA_FORMAT |
+| INI accepted | `000000` EBICS_OK |
+| Subscriber unknown **or** no longer `New` (already initialised) | `091002` EBICS_INVALID_USER_OR_USER_STATE |
+| Order data cannot be decompressed/deserialised, unusable/impermissible key material or wrong signature version | `090004` EBICS_INVALID_ORDER_DATA_FORMAT |
 
-Re-INI wird also **strikt abgelehnt**, sobald der Teilnehmer nicht mehr `New` ist — das
-deckt sich mit den erlaubten Übergängen der Domäne (`New → Initialized`).
+Re-INI is therefore **strictly rejected** as soon as the subscriber is no longer `New` — this
+matches the domain's permitted transitions (`New → Initialized`).
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- Die konkreten Codes (`091002` für „bereits initialisiert", `090004` für Order-Data-Format)
-  sind gegen den offiziellen EBICS-Annex 1 zu verifizieren; der vollständige, zentrale
-  Returncode-Katalog kommt mit **#36 (M4)**.
-- Die Antwort ist **unsigniert** — die Antwort-Authentifikationssignatur (X002) ist **M4**;
-  strikte Clients könnten unsignierte Antworten ablehnen (konsistent mit `EbicsResponseFactory`).
-- **H005:** aus dem übermittelten Zertifikat wird nur der öffentliche Schlüssel entnommen und
-  gespeichert; eine Zertifikatsketten-/Selbstsignaturprüfung ist ein Conformance-Thema (**M8**).
-- `OrderAttribute`/`SecurityMedium` werden nicht erzwungen (unverifiziert, wie im Connector).
+- The concrete codes (`091002` for "already initialised", `090004` for order-data format)
+  are to be verified against the official EBICS Annex 1; the complete, central
+  return code catalogue arrives with **#36 (M4)**.
+- The response is **unsigned** — the response authentication signature (X002) is **M4**;
+  strict clients might reject unsigned responses (consistent with `EbicsResponseFactory`).
+- **H005:** only the public key is extracted from the transmitted certificate and
+  stored; a certificate-chain/self-signature check is a conformance topic (**M8**).
+- `OrderAttribute`/`SecurityMedium` are not enforced (unverified, as in the connector).
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-| Version | Order-Data | Schlüsseltransport | OrderType-Feld |
+| Version | Order data | Key transport | OrderType field |
 | --- | --- | --- | --- |
 | H003 / H004 | `S001.SignaturePubKeyOrderData` | `RSAKeyValue` (Modulus/Exponent) | `OrderType` |
-| H005 | `S002.SignaturePubKeyOrderData` | `X509Data` (Zertifikat) | `AdminOrderType` |
+| H005 | `S002.SignaturePubKeyOrderData` | `X509Data` (certificate) | `AdminOrderType` |
 
-Erlaubte Signaturversionen (via `KeyVersions`): **A004** (nur H003/H004), **A005** (alle),
-**A006** (nur H005). Eine für die Protokollversion unzulässige Version (z. B. A006 auf H004)
-wird mit `090004` abgelehnt.
+Permitted signature versions (via `KeyVersions`): **A004** (H003/H004 only), **A005** (all),
+**A006** (H005 only). A version impermissible for the protocol version (e.g. A006 on H004)
+is rejected with `090004`.
 
 ## Tests
 
-`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; Request-XML aus committeten
-Core-Bindings, keine proprietären Fixtures):
+`tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; request XML from committed
+Core bindings, no proprietary fixtures):
 
-- `IniOrderHandlerTests` — End-to-End über `EbicsRequestPipeline`, `[Theory]` über H003/H004/H005:
-  Happy Path (Antwort `ebicsKeyManagementResponse` `000000`, Teilnehmer `New→Initialized`,
-  Schlüssel im `IServerKeyStore` mit passendem Modulus/Version) plus Negativfälle: bereits
-  initialisiert und unbekannter Teilnehmer (`091002`), undekodierbare Order-Data (`090004`),
-  für die Protokollversion unzulässige (A006/H004) bzw. zweckfremde (X002) Signaturversion (`090004`).
-- `InMemoryServerKeyStoreTests` — Store/Get/Contains, Purpose-Isolation, Overwrite, Teilnehmer-Isolation.
+- `IniOrderHandlerTests` — end-to-end via `EbicsRequestPipeline`, `[Theory]` over H003/H004/H005:
+  happy path (response `ebicsKeyManagementResponse` `000000`, subscriber `New→Initialized`,
+  key in the `IServerKeyStore` with matching modulus/version) plus negative cases: already
+  initialised and unknown subscriber (`091002`), undecodable order data (`090004`),
+  a version impermissible for the protocol version (A006/H004) or purpose-alien (X002) signature version (`090004`).
+- `InMemoryServerKeyStoreTests` — Store/Get/Contains, purpose isolation, overwrite, subscriber isolation.
 
-## Verwandte Doku
+## Related documentation
 
-- [Hostable Server-Grundgerüst](host.md) — Host, Pipeline, Returncodes, Response-Factory
-- [Stammdatenverwaltung](master-data.md) — Teilnehmer-Lebenszyklus, `IMasterDataManager`, Store
-- [Onboarding-Flows INI / HIA / HPB](../connector/onboarding.md) — der Client-Gegenpart
-- [Schlüsselpaare & -repräsentation (A/E/X)](../protocol/key-representation.md) — Schlüsselversionen, RSAKeyValue/X.509-Import
-- [Public-Key-Fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md) — INI-Brief-Abgleich
+- [Hostable server skeleton](host.md) — host, pipeline, return codes, response factory
+- [Master data management](master-data.md) — subscriber lifecycle, `IMasterDataManager`, store
+- [Onboarding flows INI / HIA / HPB](../connector/onboarding.md) — the client counterpart
+- [Key pairs & representation (A/E/X)](../protocol/key-representation.md) — key versions, RSAKeyValue/X.509 import
+- [Public key fingerprints (HPB/INI/HIA)](../protocol/public-key-fingerprint.md) — INI letter reconciliation

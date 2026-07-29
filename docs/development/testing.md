@@ -1,31 +1,31 @@
-# Test-Harness & Fixtures
+# Test harness & fixtures
 
-Beschreibt das Test-Setup von EBICO. Gehört zu Issue **#8 — Test-Harness &
-Fixtures** (Milestone M0).
+Describes EBICO's test setup. Belongs to issue **#8 — Test harness &
+fixtures** (Milestone M0).
 
 ## Framework: xUnit v3 + AwesomeAssertions
 
 - **xUnit v3** (`xunit.v3` + `xunit.runner.visualstudio` + `Microsoft.NET.Test.Sdk`)
-  ist das Testframework. Das Testprojekt `tests/EBICO.Tests` ist ausführbar
-  (`OutputType=Exe`, von xUnit v3 verlangt) und referenziert `EBICO.Core`,
-  `EBICO.Connector` und `EBICO.Server`.
-- **AwesomeAssertions** liefert die fluente Assertion-API (`value.Should()…`).
+  is the test framework. The test project `tests/EBICO.Tests` is executable
+  (`OutputType=Exe`, required by xUnit v3) and references `EBICO.Core`,
+  `EBICO.Connector` and `EBICO.Server`.
+- **AwesomeAssertions** provides the fluent assertion API (`value.Should()…`).
 
-> **Warum AwesomeAssertions statt FluentAssertions?** FluentAssertions ist seit
-> v8 (Januar 2025) kommerziell lizenziert (Xceed) und damit für ein öffentliches
-> OSS-Repo ungeeignet. [AwesomeAssertions](https://github.com/AwesomeAssertions/AwesomeAssertions)
-> ist ein MIT-lizenzierter Fork der FluentAssertions-v7-API — gleiche `Should()`-
-> Syntax. Hinweis: Der Root-Namespace ist `AwesomeAssertions` (nicht
+> **Why AwesomeAssertions instead of FluentAssertions?** FluentAssertions has been
+> commercially licensed (Xceed) since v8 (January 2025) and is thus unsuitable for a public
+> OSS repo. [AwesomeAssertions](https://github.com/AwesomeAssertions/AwesomeAssertions)
+> is an MIT-licensed fork of the FluentAssertions v7 API — same `Should()`
+> syntax. Note: the root namespace is `AwesomeAssertions` (not
 > `FluentAssertions`).
 
-Ausführen:
+Running:
 
 ```bash
 dotnet test                 # alle Tests
 dotnet test --collect:"XPlat Code Coverage"   # mit Coverage (wie in der CI)
 ```
 
-## Verzeichnis-Layout
+## Directory layout
 
 ```
 tests/EBICO.Tests/
@@ -42,73 +42,73 @@ tests/EBICO.Tests/
     └── Keys/                        # Schlüssel-Fixtures (in-process generiert)
 ```
 
-Die übrigen Ordner folgen dem **Prüfgegenstand** (`Connector/`, `Server/`, `Suite/`, `Schema/`, …).
-`E2E/` fällt bewusst in keine dieser Schichten: Prüfgegenstand ist dort die *Nahtstelle zwischen zwei*
-von ihnen — ein Fehler auf beiden Seiten lässt diese Tests rotlaufen. **`Conformance/`** (Issue #59)
-prüft EBICO gegen **echte, fremde Clients**: committete **Vendor-Captures** unter
-`Conformance/Vendor/<client>/<version>/request/` (Output eines OSS-Clients, committbar — nicht
-`.gitignore`d, anders als `Fixtures/Xml/`), plus Parser-/Wire-Shape-Toleranz (`XmlShape`),
-C14N-Adaptivität und Known-Gap-Negativfälle. Siehe
-[Konformität gegen reale Clients](conformance-real-clients.md).
+The remaining folders follow the **subject under test** (`Connector/`, `Server/`, `Suite/`, `Schema/`, …).
+`E2E/` deliberately falls into none of these layers: the subject under test there is the *seam between two*
+of them — an error on both sides makes these tests run red. **`Conformance/`** (issue #59)
+tests EBICO against **real, third-party clients**: committed **vendor captures** under
+`Conformance/Vendor/<client>/<version>/request/` (output of an OSS client, committable — not
+`.gitignore`d, unlike `Fixtures/Xml/`), plus parser/wire-shape tolerance (`XmlShape`),
+C14N adaptivity and known-gap negative cases. See
+[Conformance against real clients](conformance-real-clients.md).
 
-Der Ordner `Fixtures/**` wird in den Build-Output kopiert
-(`CopyToOutputDirectory`), damit die Helfer die Dateien zur Laufzeit relativ zum
-Test-Assembly finden.
+The folder `Fixtures/**` is copied into the build output
+(`CopyToOutputDirectory`), so that the helpers find the files at runtime relative to
+the test assembly.
 
-## Helfer
+## Helpers
 
-### `CanonicalXmlComparer` — kanonisierter XML-Vergleich
+### `CanonicalXmlComparer` — canonicalized XML comparison
 
-Vergleicht XML nach **Canonical XML 1.0** (C14N) — die Kanonisierung, auf die
-EBICS-XML-Signaturen aufsetzen. Die Kanonform liefert seit #15 der **produktive**
-Canonicalizer (`EBICO.Core.Serialization.XmlCanonicalizer`, Modus `Inclusive`),
-an den dieser Test-Helfer delegiert; zusätzlich verwirft er belanglosen Whitespace,
-sodass reine Formatierungsunterschiede gleich verglichen werden. Unempfindlich gegen
-belanglose Whitespace/Einrückung, Attribut-Reihenfolge und Reihenfolge der
-Namespace-Deklarationen; empfindlich gegen Inhalt und Struktur.
+Compares XML by **Canonical XML 1.0** (C14N) — the canonicalization that
+EBICS XML signatures build on. The canonical form is delivered since #15 by the **production**
+canonicalizer (`EBICO.Core.Serialization.XmlCanonicalizer`, mode `Inclusive`),
+to which this test helper delegates; in addition it discards insignificant whitespace,
+so that pure formatting differences compare as equal. Insensitive to
+insignificant whitespace/indentation, attribute order and order of the
+namespace declarations; sensitive to content and structure.
 
 ```csharp
 CanonicalXmlComparer.AreEqual("<a><b/></a>", "<a>\n  <b></b>\n</a>");  // true
 ```
 
-Eigene Unit-Tests decken Happy Path (Whitespace, Attribut-Reihenfolge,
-leeres Element ↔ explizites Schließen) und Negativ-/Grenzfälle (abweichender
-Inhalt/Attributwert, `null`, nicht-wohlgeformtes XML) ab. Die produktive
-C14N-Implementierung (inkl./exkl.) liegt in
-[XML-Serialisierung & C14N](../protocol/serialization-c14n.md) (Issue #15).
+Its own unit tests cover the happy path (whitespace, attribute order,
+empty element ↔ explicit closing) and negative/edge cases (deviating
+content/attribute value, `null`, non-well-formed XML). The production
+C14N implementation (incl./excl.) is in
+[XML serialization & C14N](../protocol/serialization-c14n.md) (issue #15).
 
-### `TestCertificates` — Schlüssel- und Zertifikat-Fixtures
+### `TestCertificates` — key and certificate fixtures
 
-Erzeugt **in-process** self-signed X.509-Zertifikate und RSA-Schlüsselpaare für
-Krypto-/Onboarding-Tests (M2/M3). Es liegt **kein** echtes oder proprietäres
-Schlüsselmaterial im Repo. Details: [Fixtures/Keys/README](../../tests/EBICO.Tests/Fixtures/Keys/README.md).
+Creates **in-process** self-signed X.509 certificates and RSA key pairs for
+crypto/onboarding tests (M2/M3). There is **no** real or proprietary
+key material in the repo. Details: [Fixtures/Keys/README](../../tests/EBICO.Tests/Fixtures/Keys/README.md).
 
-### `SampleXml` — Loader für Beispiel-XML
+### `SampleXml` — loader for sample XML
 
-Lädt EBICS-Beispiele aus `Fixtures/Xml/<VERSION>/<direction>/`. Da die offiziellen
-Beispiele proprietär und **nicht eingecheckt** sind, liefert `TryLoad` bei
-fehlender Datei `false`; Tests überspringen sich dann via `Assert.Skip` — die
-Suite bleibt auch ohne Beispiele (z. B. in der CI) grün. Details:
+Loads EBICS examples from `Fixtures/Xml/<VERSION>/<direction>/`. Since the official
+examples are proprietary and **not checked in**, `TryLoad` returns `false` when a file is
+missing; tests then skip themselves via `Assert.Skip` — the
+suite stays green even without examples (e.g. in CI). Details:
 [Fixtures/Xml/README](../../tests/EBICO.Tests/Fixtures/Xml/README.md).
 
-## Gegenstelle: Fake vs. echt
+## Counterpart: fake vs. real
 
-Quer zur bekannten Tier-A/Tier-B-Achse (*ohne* vs. *mit* proprietären Beispiel-XML, siehe
-[XSD-Bindings](../protocol/xsd-bindings.md)) gibt es seit #57 eine zweite Unterscheidung: **womit
-spricht die getestete Seite?**
+Orthogonal to the familiar Tier-A/Tier-B axis (*without* vs. *with* proprietary sample XML, see
+[XSD bindings](../protocol/xsd-bindings.md)) there is, since #57, a second distinction: **what does
+the tested side talk to?**
 
-- **Fake-Gegenstelle** — der Regelfall. `OnboardingTestHarness`, `FakeUploadServer`,
-  `FakeDownloadServer` bauen die Bankantwort selbst; `ServerTestHelpers` baut umgekehrt das
-  Request-XML. Schnell und präzise steuerbar (Fehlerinjektion!), prüft aber jede Seite nur gegen ein
-  *Modell* der anderen.
-- **Echte Gegenstelle** — [`E2E/`](e2e-connector-server.md). Der echte Connector spricht gegen den
-  in-process gehosteten echten Server. Findet genau die Klasse von Fehlern, die Fakes bauartbedingt
-  verstecken: Annahmen, die beide Seiten konsistent, aber falsch teilen.
+- **Fake counterpart** — the regular case. `OnboardingTestHarness`, `FakeUploadServer`,
+  `FakeDownloadServer` build the bank response themselves; `ServerTestHelpers` conversely builds the
+  request XML. Fast and precisely controllable (error injection!), but checks each side only against a
+  *model* of the other.
+- **Real counterpart** — [`E2E/`](e2e-connector-server.md). The real connector talks against the
+  in-process hosted real server. Finds exactly the class of errors that fakes hide by
+  construction: assumptions that both sides share consistently, but wrongly.
 
-Beides ist **Tier A** — es geht hier nicht um Lizenz/CI-Tauglichkeit, sondern um die Aussagekraft.
+Both are **Tier A** — the point here is not license/CI suitability, but expressiveness.
 
-## Lizenz-Hinweis
+## License note
 
-Wie die Schemas sind die **EBICS-Beispiel-XML proprietär (EBICS SC)** und werden
-nicht committet (`.gitignore`: `tests/**/Fixtures/Xml/**/*.xml`). Siehe
-[../protocol/schema-sources.md](../protocol/schema-sources.md) und Lizenz-Issue #5.
+Like the schemas, the **EBICS sample XML is proprietary (EBICS SC)** and is
+not committed (`.gitignore`: `tests/**/Fixtures/Xml/**/*.xml`). See
+[../protocol/schema-sources.md](../protocol/schema-sources.md) and license issue #5.

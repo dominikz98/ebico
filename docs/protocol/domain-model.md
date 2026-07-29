@@ -1,46 +1,46 @@
-# Domänenmodell: Bank / Partner / User / Subscriber (H003/H004/H005)
+# Domain model: Bank / Partner / User / Subscriber (H003/H004/H005)
 
-Die ersten handgeschriebenen Domänen-Primitives in `EBICO.Core`: typsichere
-Identifikatoren, der Subscriber-Lebenszyklus und die Berechtigungs-/Signaturklassen.
-Bis hierher existierten `HostID`/`PartnerID`/`UserID`/`SystemID` nur als rohe
-`string`-Felder auf den [generierten Bindings](xsd-bindings.md) (z. B.
+The first hand-written domain primitives in `EBICO.Core`: type-safe
+identifiers, the subscriber lifecycle and the authorisation/signature classes.
+Until now, `HostID`/`PartnerID`/`UserID`/`SystemID` existed only as raw
+`string` fields on the [generated bindings](xsd-bindings.md) (e.g.
 `StaticHeaderType.HostId`). Issue **#16** (Milestone M1),
-Konvention: [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md).
+convention: [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md).
 
-> **Abgrenzung:** Bewusst nur Identität, Zustand und Berechtigungen. Persistenz,
-> Krypto und Key-Management gehören nicht hierher — sie folgen in M2 (Krypto) und M3
-> (Server/Stammdaten, u. a. #30). Auftrags-/BTF-Typen sind hier noch freie Strings;
-> das typisierte Modell kommt in M5.
+> **Scope:** Deliberately only identity, state and authorisations. Persistence,
+> crypto and key management do not belong here — they follow in M2 (crypto) and M3
+> (server/master data, among others #30). Order/BTF types are still free strings here;
+> the typed model comes in M5.
 
-## Bausteine
+## Building blocks
 
-Alle unter `src/EBICO.Core/Domain/` (Namespace `EBICO.Core.Domain`):
+All under `src/EBICO.Core/Domain/` (namespace `EBICO.Core.Domain`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `HostId`, `PartnerId`, `UserId`, `SystemId` | `Identifiers.cs` | typsichere ID-Value-Objects (`readonly record struct`) |
-| `EbicsIdentifier` | `EbicsIdentifier.cs` | gemeinsame Validierung gegen das Schema-Pattern (intern) |
-| `SubscriberState` (Enum) | `SubscriberState.cs` | Lebenszyklus: `New`/`Initialized`/`Ready`/`Suspended` |
-| `SignatureClass` (Enum) + `SignatureClassExtensions` | `SignatureClass.cs` | Signaturklasse `E`/`A`/`B`/`T` + Transport-vs-Bank-Klassifikation |
-| `SubscriberPermission` | `SubscriberPermission.cs` | Berechtigung: Auftragstyp × Signaturklasse |
-| `Address`, `BankAccount` | `Address.cs`, `BankAccount.cs` | Kunden-Adresse / -Konto (von HTD/HKD ausgeliefert, #41) |
-| `Bank`, `Partner`, `Subscriber` | `Bank.cs`, `Partner.cs`, `Subscriber.cs` | schlanke, unveränderliche Aggregate |
-| `EbicsDomainException` (+ abgeleitete) | `DomainExceptions.cs` | Validierungsfehler des Domänenmodells |
+| `HostId`, `PartnerId`, `UserId`, `SystemId` | `Identifiers.cs` | type-safe ID value objects (`readonly record struct`) |
+| `EbicsIdentifier` | `EbicsIdentifier.cs` | shared validation against the schema pattern (internal) |
+| `SubscriberState` (enum) | `SubscriberState.cs` | lifecycle: `New`/`Initialized`/`Ready`/`Suspended` |
+| `SignatureClass` (enum) + `SignatureClassExtensions` | `SignatureClass.cs` | signature class `E`/`A`/`B`/`T` + transport-vs-bank classification |
+| `SubscriberPermission` | `SubscriberPermission.cs` | authorisation: order type × signature class |
+| `Address`, `BankAccount` | `Address.cs`, `BankAccount.cs` | customer address / account (delivered by HTD/HKD, #41) |
+| `Bank`, `Partner`, `Subscriber` | `Bank.cs`, `Partner.cs`, `Subscriber.cs` | lean, immutable aggregates |
+| `EbicsDomainException` (+ derived) | `DomainExceptions.cs` | validation errors of the domain model |
 
-## Identifikatoren
+## Identifiers
 
-Alle vier IDs teilen dieselbe Schema-Restriktion — **1–35 Zeichen aus
-`[a-zA-Z0-9,=]`** — und werden deshalb über einen gemeinsamen, internen Validator
-(`EbicsIdentifier`, Quellgenerator-Regex) geprüft. Als Value-Objects sind es vier
-**distinkte** Typen: eine `UserId` lässt sich nicht versehentlich dort übergeben, wo
-eine `PartnerId` erwartet wird.
+All four IDs share the same schema restriction — **1–35 characters from
+`[a-zA-Z0-9,=]`** — and are therefore checked via a shared, internal validator
+(`EbicsIdentifier`, source-generator regex). As value objects they are four
+**distinct** types: a `UserId` cannot accidentally be passed where a
+`PartnerId` is expected.
 
-| ID | Bedeutung | Pflicht | Constraint |
+| ID | Meaning | Mandatory | Constraint |
 |---|---|---|---|
-| `HostId` | Bank-/Server-Endpunkt (`HostID`) | ja | `[a-zA-Z0-9,=]{1,35}` |
-| `PartnerId` | Kunde (`PartnerID`) | ja | `[a-zA-Z0-9,=]{1,35}` |
-| `UserId` | Teilnehmer (`UserID`) | ja | `[a-zA-Z0-9,=]{1,35}` |
-| `SystemId` | technisches System (`SystemID`) | optional (Multi-User) | `[a-zA-Z0-9,=]{1,35}` |
+| `HostId` | bank/server endpoint (`HostID`) | yes | `[a-zA-Z0-9,=]{1,35}` |
+| `PartnerId` | customer (`PartnerID`) | yes | `[a-zA-Z0-9,=]{1,35}` |
+| `UserId` | subscriber (`UserID`) | yes | `[a-zA-Z0-9,=]{1,35}` |
+| `SystemId` | technical system (`SystemID`) | optional (multi-user) | `[a-zA-Z0-9,=]{1,35}` |
 
 ```csharp
 var host = HostId.Create("BANKDE01");          // wirft InvalidEbicsIdentifierException bei ungültig
@@ -55,23 +55,23 @@ HostId.Create("AB CD");                          // InvalidEbicsIdentifierExcept
 HostId.Create(new string('X', 36));              // InvalidEbicsIdentifierException (zu lang)
 ```
 
-> **Caveat (struct-bedingt):** `default(HostId)` / `new HostId()` umgeht die Factory und
-> trägt `Value == null`. Gültige Instanzen entstehen ausschließlich über
-> `Create`/`TryCreate`. Werte-Gleichheit gilt typweise: zwei `HostId` mit gleichem
-> `Value` sind gleich.
+> **Caveat (struct-related):** `default(HostId)` / `new HostId()` bypasses the factory and
+> carries `Value == null`. Valid instances arise exclusively via
+> `Create`/`TryCreate`. Value equality holds per type: two `HostId` with the same
+> `Value` are equal.
 
-## Berechtigungen — Transport- vs. Bankunterschrift
+## Authorisations — transport vs. bank signature
 
-`SignatureClass` ist das versionsunabhängige Domänen-Pendant zum generierten
-`AuthorisationLevelType` (in H003/H004/H005 identisch). Die zentrale Unterscheidung
-ist **Transport (`T`)** gegen **bankfachlich/autorisierend (`E`/`A`/`B`)**:
+`SignatureClass` is the version-independent domain counterpart to the generated
+`AuthorisationLevelType` (identical across H003/H004/H005). The central distinction
+is **transport (`T`)** versus **bank-technical/authorising (`E`/`A`/`B`)**:
 
-| Klasse | Bedeutung | Autorisierend? |
+| Class | Meaning | Authorising? |
 |---|---|---|
-| `E` | Einzelunterschrift | ja (`IsBankTechnical`) |
-| `A` | Erstunterschrift | ja (`IsBankTechnical`) |
-| `B` | Zweitunterschrift | ja (`IsBankTechnical`) |
-| `T` | Transportunterschrift (nur Einreichung, keine Autorisierung) | nein (`IsTransportOnly`) |
+| `E` | single signature | yes (`IsBankTechnical`) |
+| `A` | first signature | yes (`IsBankTechnical`) |
+| `B` | second signature | yes (`IsBankTechnical`) |
+| `T` | transport signature (submission only, no authorisation) | no (`IsTransportOnly`) |
 
 ```csharp
 SignatureClass.T.IsTransportOnly();    // true
@@ -81,33 +81,33 @@ var perm = new SubscriberPermission("CCT", SignatureClass.T);  // CCT nur einrei
 perm.IsTransportOnly;                                          // true
 ```
 
-Ein `Subscriber` bündelt seine Berechtigungen und beantwortet daraus:
-`CanAuthorize(orderType)` (hält eine bankfachliche Berechtigung) bzw.
-`IsTransportOnlyFor(orderType)` (nur Transport für diesen Auftragstyp).
+A `Subscriber` bundles its authorisations and answers from them:
+`CanAuthorize(orderType)` (holds a bank-technical authorisation) or
+`IsTransportOnlyFor(orderType)` (transport only for this order type).
 
-## Subscriber-Zustände
+## Subscriber states
 
-Der Lebenszyklus eines Teilnehmers. Übergänge sind in
-`Subscriber.Transition(SubscriberState)` gekapselt; unerlaubte Übergänge werfen
-`InvalidSubscriberStateTransitionException`. Da das Aggregat unveränderlich ist,
-liefert `Transition` eine **neue** Instanz.
+The lifecycle of a subscriber. Transitions are encapsulated in
+`Subscriber.Transition(SubscriberState)`; disallowed transitions throw
+`InvalidSubscriberStateTransitionException`. Since the aggregate is immutable,
+`Transition` yields a **new** instance.
 
-| Zustand | Bedeutung |
+| State | Meaning |
 |---|---|
-| `New` | angelegt, noch keine Schlüssel gesendet (kein INI/HIA) |
-| `Initialized` | Signaturschlüssel via INI gesendet, noch nicht einsatzbereit |
-| `Ready` | vollständig onboarded und aktiviert |
-| `Suspended` | gesperrt, bis zur Reaktivierung |
+| `New` | created, no keys sent yet (no INI/HIA) |
+| `Initialized` | signature key sent via INI, not yet operational |
+| `Ready` | fully onboarded and activated |
+| `Suspended` | locked, until reactivation |
 
-Erlaubte Übergänge:
+Permitted transitions:
 
-| von → nach | erlaubt |
+| from → to | permitted |
 |---|---|
 | `New` → `Initialized` | ✅ |
 | `Initialized` → `Ready` | ✅ |
 | `New`/`Initialized`/`Ready` → `Suspended` | ✅ |
-| `Suspended` → `Ready` (Reaktivierung) | ✅ |
-| alles andere (inkl. Selbstübergang, Überspringen) | ❌ → Exception |
+| `Suspended` → `Ready` (reactivation) | ✅ |
+| everything else (incl. self-transition, skipping) | ❌ → exception |
 
 ```csharp
 var subscriber = new Subscriber(host, partner, user);   // State = New
@@ -116,47 +116,47 @@ subscriber = subscriber.Transition(SubscriberState.Initialized)
 subscriber.Transition(SubscriberState.New);             // InvalidSubscriberStateTransitionException
 ```
 
-## Aggregate
+## Aggregates
 
-Schlank und unveränderlich (`sealed class`, Get-only-Properties), analog zu
+Lean and immutable (`sealed class`, get-only properties), analogous to
 `EbicsVersionInfo`:
 
-- `Bank` — Identität `HostId`, optionaler `Name` (HPD-`Institute`), unterstützte `EbicsVersion`s
-  (Default: alle) und optionaler `Url` (HPD-Zugangs-URL, #41).
-- `Partner` — Identität (`HostId`, `PartnerId`), optionaler `Name`; gehört zu **genau einer**
-  Bank und gruppiert deren Subscriber. Das Scoping pro Bank ermöglicht die
-  Mehr-Mandanten-Fähigkeit (derselbe `PartnerId`-String bezeichnet an verschiedenen Banken
-  verschiedene Kunden) und wurde im Server-Layer (#30) ergänzt. Trägt zusätzlich eine optionale
-  `Address` und `BankAccount`s (von HTD/HKD ausgeliefert, #41).
-- `Subscriber` — Identität über das Tripel (`HostId`, `PartnerId`, `UserId`), optionale
-  `SystemId` (technischer Teilnehmer → `IsTechnicalSubscriber`), optionaler `Name` (von HTD/HKD
-  ausgeliefert, #41), `SubscriberState` und `SubscriberPermission`s. Berechtigungen werden
-  unveränderlich fortgeschrieben: `WithPermission` / `WithoutPermissionsFor` / `WithPermissions`
-  liefern (wie `Transition`) jeweils eine neue Instanz (der `Name` bleibt dabei erhalten).
+- `Bank` — identity `HostId`, optional `Name` (HPD `Institute`), supported `EbicsVersion`s
+  (default: all) and optional `Url` (HPD access URL, #41).
+- `Partner` — identity (`HostId`, `PartnerId`), optional `Name`; belongs to **exactly one**
+  bank and groups its subscribers. The scoping per bank enables
+  multi-tenancy (the same `PartnerId` string denotes different customers at different banks)
+  and was added in the server layer (#30). It additionally carries an optional
+  `Address` and `BankAccount`s (delivered by HTD/HKD, #41).
+- `Subscriber` — identity via the triple (`HostId`, `PartnerId`, `UserId`), optional
+  `SystemId` (technical subscriber → `IsTechnicalSubscriber`), optional `Name` (delivered by
+  HTD/HKD, #41), `SubscriberState` and `SubscriberPermission`s. Authorisations are updated
+  immutably: `WithPermission` / `WithoutPermissionsFor` / `WithPermissions`
+  each yield (like `Transition`) a new instance (the `Name` is preserved in the process).
 
-Die serverseitige CRUD-Verwaltung dieser Aggregate (inkl. referentieller Integrität und
-kaskadierendem Löschen) beschreibt die [Stammdatenverwaltung](../server/master-data.md) (#30).
+The server-side CRUD management of these aggregates (incl. referential integrity and
+cascading deletion) is described by the [master-data management](../server/master-data.md) (#30).
 
-## EBICS-Versionsbezug
+## EBICS version relation
 
-IDs (Pattern/Länge) und Signaturklassen (`E`/`A`/`B`/`T`) sind über **H003, H004 und
-H005 identisch**; das Domänenmodell ist daher versionsunabhängig. Nur die
-XML-Namespaces der Schemas unterscheiden sich — das betrifft die
-[Bindings](xsd-bindings.md), nicht dieses Modell.
+IDs (pattern/length) and signature classes (`E`/`A`/`B`/`T`) are identical across **H003, H004 and
+H005**; the domain model is therefore version-independent. Only the
+XML namespaces of the schemas differ — that concerns the
+[bindings](xsd-bindings.md), not this model.
 
 ## Tests
 
-`tests/EBICO.Tests/Domain/` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Domain/` (Tier A, CI-safe, without proprietary samples):
 
-- `IdentifierTests` — gültige Werte & Grenzlängen (1/35), ungültige (leer, zu lang,
-  illegale Zeichen, `null`), `TryCreate`, Werte-Gleichheit, `default`-Caveat, alle vier Typen.
-- `SignatureClassTests` — `IsTransportOnly`/`IsBankTechnical`, Partition über alle Werte.
-- `SubscriberTests` — erlaubte/unerlaubte Zustandsübergänge, Identitäts-/Permission-Erhalt,
-  `SystemId`/technischer Teilnehmer, `CanAuthorize`/`IsTransportOnlyFor`.
-- `BankPartnerTests` — Konstruktion, Default-Versionen, Identität.
+- `IdentifierTests` — valid values & boundary lengths (1/35), invalid ones (empty, too long,
+  illegal characters, `null`), `TryCreate`, value equality, `default` caveat, all four types.
+- `SignatureClassTests` — `IsTransportOnly`/`IsBankTechnical`, partition over all values.
+- `SubscriberTests` — permitted/disallowed state transitions, identity/permission preservation,
+  `SystemId`/technical subscriber, `CanAuthorize`/`IsTransportOnlyFor`.
+- `BankPartnerTests` — construction, default versions, identity.
 
-## Verwandtes
+## Related
 
-- [ADR-0007 — Domänen-Value-Objects als `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md)
-- [Versions-Dispatch](version-dispatch.md) — die `EbicsVersion`-Abstraktion, auf die `Bank` aufsetzt
-- [XSD-Bindings](xsd-bindings.md) — die generierten Typen mit den rohen ID-Feldern und `AuthorisationLevelType`
+- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md)
+- [Version dispatch](version-dispatch.md) — the `EbicsVersion` abstraction that `Bank` builds on
+- [XSD bindings](xsd-bindings.md) — the generated types with the raw ID fields and `AuthorisationLevelType`

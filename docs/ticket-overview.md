@@ -1,152 +1,152 @@
-# EBICO — Ticket-Übersicht
+# EBICO — Ticket overview
 
-Schnellreferenz über alle Milestones und Issues, die `create-ebico-plan.sh`
-anlegt. Stand: Planungsphase.
+Quick reference over all milestones and issues that `create-ebico-plan.sh`
+creates. Status: planning phase.
 
-**Gesamt:** 10 Milestones · 64 Issues (davon 12 Epics) · 16 Labels
+**Total:** 10 milestones · 64 issues (of which 12 epics) · 16 labels
 
-Jedes Feature-Issue trägt automatisch eine projektweite *Definition of Done*
-(Markdown-Doku unter `docs/` **und** Unit-Tests). Epics tragen sie nicht.
+Every feature issue automatically carries a project-wide *Definition of Done*
+(Markdown doc under `docs/` **and** unit tests). Epics do not carry it.
 
 ---
 
-## Projektstruktur (Zielbild)
+## Project structure (target picture)
 
-5 Projekte: `EBICO.Core` (geteilte Primitives), `EBICO.Connector` (NuGet-Client),
-`EBICO.Server` (Emulator), `EBICO.Suite` (Blazor-UI), `EBICO.Tests`.
+5 projects: `EBICO.Core` (shared primitives), `EBICO.Connector` (NuGet client),
+`EBICO.Server` (emulator), `EBICO.Suite` (Blazor UI), `EBICO.Tests`.
 
-Unterstützte Versionen: **H003 / H004 / H005**. Order-Abdeckung: möglichst
-vollständige BTF/Order-Palette.
+Supported versions: **H003 / H004 / H005**. Order coverage: as complete a
+BTF/order palette as possible.
 
 ---
 
 ## M0 — Foundation & Tooling
 
-Fundament, Querschnittsanforderungen, Beschaffung & Recht.
+Foundation, cross-cutting requirements, procurement & law.
 
 - **EPIC:** Foundation & Tooling
-- **EPIC:** Dokumentationsstrategie (Markdown / `docs/`)
-- **EPIC:** Teststrategie (Unit-Tests pro Feature)
-- Schemas & Specs beschaffen (Beschaffungsskript)
-- Lizenz-/Terms-of-Use-Klärung (EBICS-Schemas/Specs)
-- Solution & Projektgerüst anlegen
-- CI-Pipeline (GitHub Actions)
-- Test-Harness & Fixtures
-- Architektur-Entscheidungen dokumentieren (ADRs)
+- **EPIC:** Documentation strategy (Markdown / `docs/`)
+- **EPIC:** Test strategy (unit tests per feature)
+- Obtain schemas & specs (procurement script)
+- License/Terms-of-Use clarification (EBICS schemas/specs)
+- Create solution & project skeleton
+- CI pipeline (GitHub Actions)
+- Test harness & fixtures
+- Document architecture decisions (ADRs)
 
 ## M1 — Core & Protocol Primitives
 
-Geteilte Protokoll-Grundlagen in `EBICO.Core`.
+Shared protocol foundations in `EBICO.Core`.
 
 - **EPIC:** Core & Protocol Primitives
-- XSD-Bindings generieren — H005 (EBICS 3.0)
-- XSD-Bindings generieren — H004 (EBICS 2.5)
-- XSD-Bindings generieren — H003 (EBICS 2.4)
-- Versionsabstraktion / Protokoll-Dispatch
-- XML-Serialisierung & Canonicalization (C14N)
-- Domänenmodell: Bank / Partner / User / Subscriber
+- Generate XSD bindings — H005 (EBICS 3.0)
+- Generate XSD bindings — H004 (EBICS 2.5)
+- Generate XSD bindings — H003 (EBICS 2.4)
+- Version abstraction / protocol dispatch
+- XML serialisation & canonicalization (C14N)
+- Domain model: bank / partner / user / subscriber
 
 ## M2 — Cryptography & Certificates
 
-Signatur, Verschlüsselung, Hashing, Zertifikate.
+Signature, encryption, hashing, certificates.
 
 - **EPIC:** Cryptography & Certificates
-- Schlüsselpaare & -repräsentation (A/E/X)
-- Banktechnische Signatur A005/A006 (sign + verify)
-- Authentifikationssignatur X002
-- Verschlüsselung E002 (RSA + AES)
-- Hashing & Public-Key-Fingerprints (HPB/INI/HIA)
-- Zertifikatsverifizierung (X.509)
+- Key pairs & representation (A/E/X)
+- Bank-technical signature A005/A006 (sign + verify)
+- Authentication signature X002
+- Encryption E002 (RSA + AES)
+- Hashing & public-key fingerprints (HPB/INI/HIA)
+- Certificate verification (X.509)
 
 ## M3 — Server: Key Management
 
-Subscriber-Onboarding im Emulator.
+Subscriber onboarding in the emulator.
 
 - **EPIC:** Server — Key Management & Onboarding
-- Hostable Server-Grundgerüst (ASP.NET Core)
-- INI — Senden der Signaturschlüssel (A00x)
-- HIA — Senden Auth- & Enc-Schlüssel (X002/E002)
-- HPB — Abruf der Bankschlüssel
-- HSA / SPR / HCA / HCS — Schlüsselwechsel & Sperrung
-- Subscriber-/Partner-/Bank-Verwaltung (Stammdaten)
+- Hostable server skeleton (ASP.NET Core)
+- INI — send the signature keys (A00x)
+- HIA — send auth & enc keys (X002/E002)
+- HPB — retrieve the bank keys
+- HSA / SPR / HCA / HCS — key change & suspension
+- Subscriber/partner/bank management (master data)
 
 ## M4 — Server: Transaction Engine
 
-Generische Upload/Download-Transaktionsmaschine.
+Generic upload/download transaction machine.
 
 - **EPIC:** Server — Transaction Engine
-- Upload-Transaktion (Initialisation + Transfer)
-- Download-Transaktion (Initialisation + Transfer + Receipt)
-- Segmentierung, Kompression & Base64-Pipeline
-- Transaktions-Recovery & Timeouts
-- EBICS-Returncode-Katalog
+- Upload transaction (Initialisation + Transfer)
+- Download transaction (Initialisation + Transfer + Receipt)
+- Segmentation, compression & Base64 pipeline
+- Transaction recovery & timeouts
+- EBICS return-code catalogue
 
 ## M5 — Server: Orders & BTF
 
-Order-Typen / Business Transaction Formats.
+Order types / Business Transaction Formats.
 
 - **EPIC:** Orders & Business Transaction Formats
-- BTF-Framework (H005)
-- Upload-Orders: Zahlungsverkehr (CCT/CDD/CDB/CIP/…)
-- Download-Orders: Kontoauszüge & Reports (STA/C53/C52/C54/Z53…)
-- Status- & Protokoll-Orders (HAC/HAA/HTD/HKD/HPD/PTK)
-- Verteilte elektronische Unterschrift (HVE/HVD/HVU/HVZ/HVS/HVT)
-- Order-/BTF-Abdeckungsmatrix pflegen
+- BTF framework (H005)
+- Upload orders: payments (CCT/CDD/CDB/CIP/…)
+- Download orders: statements & reports (STA/C53/C52/C54/Z53…)
+- Status & protocol orders (HAC/HAA/HTD/HKD/HPD/PTK)
+- Distributed electronic signature (HVE/HVD/HVU/HVZ/HVS/HVT)
+- Maintain the order/BTF coverage matrix
 
 ## M6 — Connector (NuGet)
 
-Client-Bibliothek (Mediator-Muster). Architektur: `docs/connector/architecture.md`.
+Client library (mediator pattern). Architecture: `docs/connector/architecture.md`.
 
-- **EPIC:** EBICO.Connector (NuGet Client) — enthält die volle Architektur
-- Architektur-Dokumentation EBICO.Connector
-- Client-Kern & Konfiguration
-- Onboarding-Flows: INI / HIA / HPB
-- Upload-API (CCT/CDD …)
-- Download-API (STA/C53 …)
-- NuGet-Packaging & Beispiele
+- **EPIC:** EBICO.Connector (NuGet Client) — contains the full architecture
+- Architecture documentation EBICO.Connector
+- Client core & configuration
+- Onboarding flows: INI / HIA / HPB
+- Upload API (CCT/CDD …)
+- Download API (STA/C53 …)
+- NuGet packaging & samples
 
 ## M7 — Suite (Blazor UI)
 
-Admin-/Inspektor-UI für den Emulator.
+Admin/inspector UI for the emulator.
 
 - **EPIC:** EBICO.Suite (Blazor UI)
-- UI-Grundgerüst & Navigation
-- Stammdaten-Verwaltung (Banks/Partner/User)
-- Transaktions-Inspektor
-- Schlüssel-/Zertifikats-Ansicht
+- UI skeleton & navigation
+- Master-data management (banks/partner/user)
+- Transaction inspector
+- Key/certificate view
 
 ## M8 — Validation & Conformance
 
-End-to-End, Negativfälle, reale Clients.
+End-to-end, negative cases, real clients.
 
 - **EPIC:** Validation & Conformance
-- E2E: Connector ↔ Server Happy Paths
-- Negativ-/Sicherheitsfälle
-- Konformität gegen reale Clients
+- E2E: Connector ↔ Server happy paths
+- Negative/security cases
+- Conformance against real clients
 
 ## M9 — Packaging & Docs
 
-Veröffentlichung und Doku.
+Publication and documentation.
 
 - **EPIC:** Packaging & Documentation
-- Container-Image für EBICO.Server
-- NuGet-Publish-Pipeline
-- Quickstart & Beispiele
+- Container image for EBICO.Server
+- NuGet publish pipeline
+- Quickstart & samples
 
 ---
 
-## Empfohlene Reihenfolge
+## Recommended order
 
-Die Milestones sind als Abhängigkeitskette gedacht:
+The milestones are intended as a dependency chain:
 
 ```
 M0 → M1 → M2 → M3 → M4 → M5 → M6 → M7 → M8 → M9
 ```
 
-In der Praxis lohnt sich nach M0/M1/M2 (Fundament + Protokoll + Krypto) eine
-Aufteilung: **Server-Strang** (M3 → M4 → M5) und **Connector-Strang** (M6)
-können teils parallel laufen, weil beide auf `EBICO.Core` aufsetzen. M7 (UI)
-braucht einen funktionierenden Server; M8/M9 kommen zum Schluss.
+In practice, after M0/M1/M2 (foundation + protocol + crypto) a
+split is worthwhile: the **server strand** (M3 → M4 → M5) and the **connector strand** (M6)
+can partly run in parallel, because both build on `EBICO.Core`. M7 (UI)
+needs a working server; M8/M9 come at the end.
 
-> Wichtig: Vor M1 die Lizenzfrage aus M0 klären (dürfen XSDs/Bindings ins Repo?)
-> und die Schemas via `scripts/fetch-schemas.sh` beziehen.
+> Important: before M1, clarify the licensing question from M0 (may XSDs/bindings go into the repo?)
+> and obtain the schemas via `scripts/fetch-schemas.sh`.

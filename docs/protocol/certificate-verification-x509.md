@@ -1,66 +1,66 @@
-# Zertifikatsverifizierung (X.509) (H005)
+# Certificate verification (X.509) (H005)
 
-Die **X.509-Zertifikatsverifizierung** in `EBICO.Core` (`Crypto/`): sie prüft ein Teilnehmer- oder
-Bankzertifikat gegen einen **konfigurierbaren Vertrauensanker** (Kette/Test-CA), kontrolliert
-**Gültigkeit** (Zeitraum) und **Verwendungszweck** (KeyUsage passend zur EBICS-Schlüsselrolle) und
-bindet das Zertifikat optional an einen bekannten Subscriber-Schlüssel. EBICS **3.0 / H005 ist
-zertifikatsbasiert** — der öffentliche RSA-Schlüssel wird dort aus einem X.509-Zertifikat
-(`PubKeyInfoType/X509Data`) gelesen; **H003/H004 nutzen reine RSA-Schlüssel** (Trust über den
-INI-Brief-Fingerprint, [#22](public-key-fingerprint.md)). Baut auf der Schlüssel-Schicht aus
-[#18](key-representation.md) auf. Issue **#23** (Milestone M2), Krypto-Bibliothek:
+The **X.509 certificate verification** in `EBICO.Core` (`Crypto/`): it checks a subscriber or
+bank certificate against a **configurable trust anchor** (chain/test CA), controls
+**validity** (time range) and **usage purpose** (KeyUsage matching the EBICS key role) and
+optionally binds the certificate to a known subscriber key. EBICS **3.0 / H005 is
+certificate-based** — there the public RSA key is read from an X.509 certificate
+(`PubKeyInfoType/X509Data`); **H003/H004 use pure RSA keys** (trust via the
+INI-letter fingerprint, [#22](public-key-fingerprint.md)). Builds on the key layer from
+[#18](key-representation.md). Issue **#23** (Milestone M2), crypto library:
 [ADR-0008](../adr/0008-krypto-bibliothek.md) (`System.Security.Cryptography.X509Certificates`,
-kein BouncyCastle) — `X509Chain`/`X509ChainPolicy` kommen nativ aus der BCL.
+no BouncyCastle) — `X509Chain`/`X509ChainPolicy` come natively from the BCL.
 
-> **Abgrenzung:** Diese Primitive prüft ein **einzelnes, fertig geladenes** `X509Certificate2`
-> gegen Optionen. Das **XML-Auslesen** des Zertifikats aus `X509Data`, die Zuordnung
-> Zertifikat↔Subscriber und die Frage, **welcher** Vertrauensanker pro Bank gilt, gehören in die
-> Dispatch-/Onboarding-Schicht (M3) bzw. Suite (M7) — nicht hierher. Die Entscheidung, **ob**
-> überhaupt ein Zertifikat verlangt wird, ist eine Versions-/Onboarding-Eigenschaft und über
-> `CertificateRequirement` / `CertificateRequirements.For(version)` modelliert.
+> **Scope:** This primitive checks a **single, fully loaded** `X509Certificate2`
+> against options. The **XML extraction** of the certificate from `X509Data`, the mapping
+> certificate↔subscriber and the question of **which** trust anchor applies per bank belong in the
+> dispatch/onboarding layer (M3) or the Suite (M7) — not here. The decision **whether**
+> a certificate is required at all is a version/onboarding property and is modelled via
+> `CertificateRequirement` / `CertificateRequirements.For(version)`.
 
-## Bausteine
+## Building blocks
 
-Unter `src/EBICO.Core/Crypto/` (Namespace `EBICO.Core.Crypto`):
+Under `src/EBICO.Core/Crypto/` (namespace `EBICO.Core.Crypto`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `X509CertificateVerifier` (static) | `X509CertificateVerifier.cs` | `Verify(cert, options)` (+ Komfort-Overload): Kette bauen/prüfen, Gültigkeit, Key-Usage, optionales Key-Binding; gekapseltes `ExpectedKeyUsage`-Mapping |
-| `CertificateVerificationOptions` | `CertificateVerificationOptions.cs` | konfigurierbar: `TrustAnchors`, `ExtraStore`, `TrustMode`, `RevocationMode`/`Flag`, `VerificationFlags`, `VerificationTime`, `ExpectedPurpose`, `ExpectedPublicKey` |
-| `CertificateVerificationResult` | `CertificateVerificationResult.cs` | Ergebnis: `IsValid`, `Errors` (`[Flags]`), roher `ChainStatus`, `Diagnostics` |
-| `CertificateVerificationError` (`[Flags]`) | `CertificateVerificationResult.cs` | Ablehnungsgründe, gemeinsam berichtbar |
-| `CertificateRequirement` / `CertificateRequirements` | `CertificateRequirement.cs` | Policy „Zertifikat nötig?" je EBICS-Version (H003/H004 → `NotUsed`, H005 → `Required`) |
+| `X509CertificateVerifier` (static) | `X509CertificateVerifier.cs` | `Verify(cert, options)` (+ convenience overload): build/check chain, validity, key usage, optional key binding; encapsulated `ExpectedKeyUsage` mapping |
+| `CertificateVerificationOptions` | `CertificateVerificationOptions.cs` | configurable: `TrustAnchors`, `ExtraStore`, `TrustMode`, `RevocationMode`/`Flag`, `VerificationFlags`, `VerificationTime`, `ExpectedPurpose`, `ExpectedPublicKey` |
+| `CertificateVerificationResult` | `CertificateVerificationResult.cs` | result: `IsValid`, `Errors` (`[Flags]`), raw `ChainStatus`, `Diagnostics` |
+| `CertificateVerificationError` (`[Flags]`) | `CertificateVerificationResult.cs` | rejection reasons, reportable together |
+| `CertificateRequirement` / `CertificateRequirements` | `CertificateRequirement.cs` | policy "certificate needed?" per EBICS version (H003/H004 → `NotUsed`, H005 → `Required`) |
 
-Wiederverwendet aus [#18](key-representation.md): `RsaKeyMaterial` (kanonischer Modulus/Exponent für
-das Key-Binding), `RsaKeyImportExport.ImportPublicKeyFromCertificate`. Die `Verify`-Konvention
-(sauberes Ergebnis statt Exception) folgt [#19](bank-signature.md)/[#22](public-key-fingerprint.md).
+Reused from [#18](key-representation.md): `RsaKeyMaterial` (canonical modulus/exponent for
+the key binding), `RsaKeyImportExport.ImportPublicKeyFromCertificate`. The `Verify` convention
+(clean result instead of exception) follows [#19](bank-signature.md)/[#22](public-key-fingerprint.md).
 
-## Verfahren
+## Procedure
 
-`Verify` baut die Kette per `X509Chain` und leitet den Gesamtbefund aus den **gemappten** Gründen
-ab — nicht aus dem `Build()`-Bool. So schlägt z. B. bei `RevocationMode.NoCheck` eine fehlende
-Sperrauskunft die Prüfung **nicht** fehl.
+`Verify` builds the chain via `X509Chain` and derives the overall verdict from the **mapped**
+reasons — not from the `Build()` bool. So, for example, with `RevocationMode.NoCheck` a missing
+revocation response does **not** fail the check.
 
-| Schritt | Ein-/Ausgabe | BCL |
+| Step | Input/output | BCL |
 |---|---|---|
-| Trust/Kette | Anker aus `TrustAnchors` (→ `CustomRootTrust`), Intermediates aus `ExtraStore` | `X509ChainPolicy.CustomTrustStore` / `.ExtraStore` |
-| Zeitpunkt | `VerificationTime` (UTC-gepinnt), sonst „jetzt" | `X509ChainPolicy.VerificationTime` |
-| Offline | keine AIA/CRL/OCSP-Netzcalls | `DisableCertificateDownloads = true`, `RevocationMode.NoCheck` |
-| Gültigkeit | Leaf-`NotBefore`/`NotAfter` gegen Zeitpunkt (in UTC) | `X509Certificate2.NotBefore/NotAfter` |
-| Key-Usage | `ExpectedPurpose` → erwartete `X509KeyUsageFlags` | `X509KeyUsageExtension.KeyUsages` |
-| Key-Binding | `ExpectedPublicKey` vs. Cert-RSA (kanonisch) | `GetRSAPublicKey()` + `RsaKeyMaterial` |
+| Trust/chain | anchors from `TrustAnchors` (→ `CustomRootTrust`), intermediates from `ExtraStore` | `X509ChainPolicy.CustomTrustStore` / `.ExtraStore` |
+| Point in time | `VerificationTime` (UTC-pinned), otherwise "now" | `X509ChainPolicy.VerificationTime` |
+| Offline | no AIA/CRL/OCSP network calls | `DisableCertificateDownloads = true`, `RevocationMode.NoCheck` |
+| Validity | leaf `NotBefore`/`NotAfter` against the point in time (in UTC) | `X509Certificate2.NotBefore/NotAfter` |
+| Key usage | `ExpectedPurpose` → expected `X509KeyUsageFlags` | `X509KeyUsageExtension.KeyUsages` |
+| Key binding | `ExpectedPublicKey` vs. cert RSA (canonical) | `GetRSAPublicKey()` + `RsaKeyMaterial` |
 
-**Kette/Trust:** `X509ChainStatusFlags` werden aggregiert und gemappt:
+**Chain/trust:** `X509ChainStatusFlags` are aggregated and mapped:
 `UntrustedRoot`/`PartialChain` → `UntrustedRoot`; `NotTimeValid` → `NotTimeValid`;
 `Revoked` → `Revoked`; `RevocationStatusUnknown`/`OfflineRevocation` → `RevocationStatusUnknown`;
-`NotSignatureValid` → `InvalidSignature`; `InvalidBasicConstraints` → dito;
-`NotValidForUsage`/`HasNotSupportedCriticalExtension` → `InvalidKeyUsage`; alles Übrige → `Other`.
+`NotSignatureValid` → `InvalidSignature`; `InvalidBasicConstraints` → likewise;
+`NotValidForUsage`/`HasNotSupportedCriticalExtension` → `InvalidKeyUsage`; everything else → `Other`.
 
-**Gültigkeit:** Zusätzlich zur Ketten-Zeitprüfung verfeinert der Verifier am **Leaf** in `Expired`
-(Zeitpunkt nach `NotAfter`) bzw. `NotYetValid` (Zeitpunkt vor `NotBefore`) — beide setzen auch
+**Validity:** In addition to the chain time check, the verifier refines at the **leaf** into `Expired`
+(point in time after `NotAfter`) or `NotYetValid` (point in time before `NotBefore`) — both also set
 `NotTimeValid`.
 
-**Verwendungszweck:** Ist `ExpectedPurpose` gesetzt, wird die KeyUsage-Extension geprüft. Fehlt die
-Extension, gilt das als `InvalidKeyUsage` (strikt).
+**Usage purpose:** If `ExpectedPurpose` is set, the KeyUsage extension is checked. If the extension is
+missing, this counts as `InvalidKeyUsage` (strict).
 
 ```csharp
 using var ca = /* Vertrauensanker / Bank-CA */;
@@ -73,69 +73,69 @@ if (!result.IsValid)
 }
 ```
 
-### Key-Usage-Mapping
+### Key-usage mapping
 
-| `KeyPurpose` | erforderlich (AllOf) | eins von (AnyOf) |
+| `KeyPurpose` | required (AllOf) | one of (AnyOf) |
 |---|---|---|
-| `Signature` | `DigitalSignature` | — (`NonRepudiation` erlaubt, nicht erzwungen) |
+| `Signature` | `DigitalSignature` | — (`NonRepudiation` allowed, not enforced) |
 | `Authentication` | `DigitalSignature` | — |
 | `Encryption` | — | `KeyEncipherment` \| `DataEncipherment` |
 
-> **⚠️ Spec-Vorbehalt:** Das **EBICS-Zertifikatsprofil** (KeyUsage je Schlüsselrolle), die
-> **strikte** Behandlung fehlender KeyUsage-Extensions, der **Revocation-Default** (`NoCheck`) und
-> die **Versions-Anforderung** (`CertificateRequirements.For`) sind noch **nicht gegen die
-> offiziellen EBICS-Schemas/Annexe verifiziert** (vgl. CLAUDE.md). Sie sind auf je **eine Stelle**
-> gekapselt — `X509CertificateVerifier.ExpectedKeyUsage` bzw. `CertificateRequirements.For` — und
-> werden dort nachgezogen, sobald die Spec vorliegt. **Extended Key Usage (EKU)** wird bewusst
-> **nicht** geprüft (EBICS definiert keine Standard-EKU-OIDs für A/E/X-Schlüssel); das bleibt ein
-> dokumentierter Opt-in-Erweiterungspunkt über `ChainPolicy.ApplicationPolicy`.
+> **⚠️ Spec caveat:** The **EBICS certificate profile** (KeyUsage per key role), the
+> **strict** handling of missing KeyUsage extensions, the **revocation default** (`NoCheck`) and
+> the **version requirement** (`CertificateRequirements.For`) are not yet verified against the
+> **official EBICS schemas/annexes** (cf. CLAUDE.md). They are encapsulated in **one place** each
+> — `X509CertificateVerifier.ExpectedKeyUsage` and `CertificateRequirements.For` respectively — and
+> are caught up there as soon as the spec is available. **Extended Key Usage (EKU)** is deliberately
+> **not** checked (EBICS defines no standard EKU OIDs for A/E/X keys); this remains a
+> documented opt-in extension point via `ChainPolicy.ApplicationPolicy`.
 
-## Fehlerverhalten
+## Error behaviour
 
-| Bedingung | Verhalten |
+| Condition | Behaviour |
 |---|---|
 | `certificate == null` / `options == null` / `trustAnchors == null` | `ArgumentNullException` |
-| wohlgeformtes, aber ungültiges Zertifikat (untrusted/abgelaufen/falsche Usage/…) | `IsValid == false`, passende `Errors`-Bits, **kein** Throw |
-| non-RSA-Zertifikat (z. B. ECDSA) | `Errors` enthält `NotRsa` (saubere Ablehnung, kein Throw) |
-| mehrere Mängel gleichzeitig | alle Gründe zusammen in `Errors` (`[Flags]`) |
+| well-formed but invalid certificate (untrusted/expired/wrong usage/…) | `IsValid == false`, matching `Errors` bits, **no** throw |
+| non-RSA certificate (e.g. ECDSA) | `Errors` contains `NotRsa` (clean rejection, no throw) |
+| several defects at once | all reasons together in `Errors` (`[Flags]`) |
 
-> **Ergebnis statt Werfen:** wie `BankSignature.Verify` liefert ein schlechtes Zertifikat eine
-> saubere Ablehnung mit strukturierter Begründung; nur `null`-Argumente werfen. Aufrufer, die
-> Throw-Semantik wünschen, prüfen `if (!result.IsValid) throw …` auf ihrer Ebene.
+> **Result instead of throwing:** like `BankSignature.Verify`, a bad certificate yields a
+> clean rejection with a structured reason; only `null` arguments throw. Callers who want
+> throw semantics check `if (!result.IsValid) throw …` at their level.
 
-## EBICS-Versionsbezug
+## EBICS version relation
 
-| Version | Schlüsselaustausch | X.509-Prüfung |
+| Version | Key exchange | X.509 check |
 |---|---|---|
-| H003 / H004 | reine RSA-Schlüssel (`RSAKeyValue`), Trust via INI-Fingerprint [#22](public-key-fingerprint.md) | **nicht anwendbar** (`CertificateRequirement.NotUsed`) — Verifier wird nicht aufgerufen |
-| H005 | Zertifikat (`X509Data`) | **erforderlich** (`CertificateRequirement.Required`) — volle Ketten-/Gültigkeits-/Usage-Prüfung |
+| H003 / H004 | pure RSA keys (`RSAKeyValue`), trust via INI fingerprint [#22](public-key-fingerprint.md) | **not applicable** (`CertificateRequirement.NotUsed`) — the verifier is not called |
+| H005 | certificate (`X509Data`) | **required** (`CertificateRequirement.Required`) — full chain/validity/usage check |
 
-Das „Verfahren ohne Zertifikate" ist damit als Policy modelliert: Die Onboarding-Schicht fragt
-`CertificateRequirements.For(version)` und ruft den Verifier nur im `Required`-Fall auf. Der Verifier
-selbst behält so eine einzige Aufgabe (Zertifikate prüfen) und bekommt nie ein Zertifikat, das er
-nicht prüfen sollte.
+The "procedure without certificates" is thus modelled as policy: the onboarding layer queries
+`CertificateRequirements.For(version)` and calls the verifier only in the `Required` case. The verifier
+itself thus keeps a single responsibility (checking certificates) and never receives a certificate it
+should not check.
 
 ## Tests
 
-`tests/EBICO.Tests/Crypto/X509CertificateVerifierTests.cs` und die erweiterten
-`tests/EBICO.Tests/Infrastructure/TestCertificates(Tests).cs` (Tier A, CI-sicher, In-Process-CA über
-`TestCertificates.CreateCertificateAuthority`/`IssueCertificate`; deterministisch via
+`tests/EBICO.Tests/Crypto/X509CertificateVerifierTests.cs` and the extended
+`tests/EBICO.Tests/Infrastructure/TestCertificates(Tests).cs` (Tier A, CI-safe, in-process CA via
+`TestCertificates.CreateCertificateAuthority`/`IssueCertificate`; deterministic via
 `VerificationTime` + `NoCheck`):
 
-- **Happy Path:** Leaf kettet zu vertrauenswürdiger Test-CA; self-signed im Trust-Store;
-  Root→Intermediate→Leaf (Intermediate im `ExtraStore`); korrekte KeyUsage je `KeyPurpose`;
-  `VerificationTime` im Fenster; passendes `ExpectedPublicKey`.
-- **Negativfälle (je spezifisches `Errors`-Bit):** untrusted Root; abgelaufen (`Expired`);
-  noch nicht gültig (`NotYetValid`); falsche KeyUsage; fehlende KeyUsage-Extension; self-signed nicht
-  vertraut; `KeyMismatch`; non-RSA (ECDSA) → `NotRsa`; Mehrfachfehler (abgelaufen + untrusted).
-- **Revocation:** `NoCheck` meldet kein `Revoked`/`RevocationStatusUnknown` (echter Revoked-Test
-  braucht CRL/OCSP → integration-only, kein Unit-Test).
-- **Null-Args:** `Verify(null, …)` / `Verify(cert, null)` / `Verify(cert, null-anchors, …)` → Throw.
-- **Pure-key:** `CertificateRequirements.For` mappt H003/H004→`NotUsed`, H005→`Required`, unbekannt→Throw.
+- **Happy path:** leaf chains to a trusted test CA; self-signed in the trust store;
+  Root→Intermediate→Leaf (intermediate in `ExtraStore`); correct KeyUsage per `KeyPurpose`;
+  `VerificationTime` within the window; matching `ExpectedPublicKey`.
+- **Negative cases (each a specific `Errors` bit):** untrusted root; expired (`Expired`);
+  not yet valid (`NotYetValid`); wrong KeyUsage; missing KeyUsage extension; self-signed not
+  trusted; `KeyMismatch`; non-RSA (ECDSA) → `NotRsa`; multiple errors (expired + untrusted).
+- **Revocation:** `NoCheck` reports no `Revoked`/`RevocationStatusUnknown` (a real revoked test
+  needs CRL/OCSP → integration-only, not a unit test).
+- **Null args:** `Verify(null, …)` / `Verify(cert, null)` / `Verify(cert, null-anchors, …)` → throw.
+- **Pure-key:** `CertificateRequirements.For` maps H003/H004→`NotUsed`, H005→`Required`, unknown→throw.
 
-## Verwandtes
+## Related
 
-- [Schlüsselpaare & -repräsentation (A/E/X)](key-representation.md) — zugrunde liegende Schlüssel-Schicht (#18)
-- [Public-Key-Fingerprints (HPB/INI/HIA)](public-key-fingerprint.md) — Trust im reinen-Schlüssel-Verfahren (#22)
-- [Banktechnische Signatur A005/A006](bank-signature.md) — teilt die `Verify`-Konvention (#19)
-- [ADR-0008 — Krypto-Bibliothek](../adr/0008-krypto-bibliothek.md)
+- [Key pairs & representation (A/E/X)](key-representation.md) — underlying key layer (#18)
+- [Public-key fingerprints (HPB/INI/HIA)](public-key-fingerprint.md) — trust in the pure-key procedure (#22)
+- [Bank-technical signature A005/A006](bank-signature.md) — shares the `Verify` convention (#19)
+- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)

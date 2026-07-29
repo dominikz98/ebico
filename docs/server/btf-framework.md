@@ -1,95 +1,94 @@
-# Server: BTF-Framework (H005)
+# Server: BTF Framework (H005)
 
-> Umsetzung von **Issue #38** (Milestone M5 — Server: Orders & BTF). Diese Seite beschreibt das
-> **Fundament** für die konkreten Order-Implementierungen (#39–#42) und die Abdeckungsmatrix (#43):
-> das typisierte **Business-Transaction-Format**-Modell (H005), das **Mapping BTF ↔ klassische
-> OrderTypes** (H004) und die **Berechtigungsprüfung pro BTF** in den Transaction-Engines.
+> Implementation of **Issue #38** (Milestone M5 — Server: Orders & BTF). This page describes the
+> **foundation** for the concrete order implementations (#39–#42) and the coverage matrix (#43):
+> the typed **Business Transaction Format** model (H005), the **mapping BTF ↔ classic
+> OrderTypes** (H004) and the **per-BTF authorisation check** in the transaction engines.
 >
-> Bewusst **enthalten**: das Wert-Objekt `BusinessTransactionFormat` (`EBICO.Core.Btf`) als
-> hand­geschriebene Projektion des generierten `ServiceType`-Bindings; der statische
-> `BtfOrderTypeCatalog` mit einem repräsentativen Best-Effort-Seed; die Extraktion des BTF-Service aus
-> `BTUOrderParams`/`BTDOrderParams` in der Pipeline; die **strikte** Autorisierung im Upload-/Download-Init
-> (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`, 090003) über die vorhandenen `SubscriberPermission`s.
-> Bewusst **noch nicht**: die konkreten Upload-/Download-Orders (CCT/CDD/STA/C5x, [#39](../ticket-overview.md)/#40),
-> Status-/Protokoll-Orders (HAC/HTD/…, #41), die verteilte Unterschrift (HVx, #42); die vollständige
-> External Code List; die Auswertung von `SignatureFlag` (ES-Pflicht je BTF) und von
-> `FULOrderParams`/`FDLOrderParams`-`FileFormat` (H004) → BTF.
+> Deliberately **included**: the value object `BusinessTransactionFormat` (`EBICO.Core.Btf`) as a
+> hand-written projection of the generated `ServiceType` binding; the static
+> `BtfOrderTypeCatalog` with a representative best-effort seed; the extraction of the BTF service from
+> `BTUOrderParams`/`BTDOrderParams` in the pipeline; the **strict** authorisation in the upload/download init
+> (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`, 090003) via the existing `SubscriberPermission`s.
+> Deliberately **not yet**: the concrete upload/download orders (CCT/CDD/STA/C5x, [#39](../ticket-overview.md)/#40),
+> status/protocol orders (HAC/HTD/…, #41), the distributed signature (HVx, #42); the complete
+> External Code List; the evaluation of `SignatureFlag` (per-BTF ES requirement) and of
+> `FULOrderParams`/`FDLOrderParams` `FileFormat` (H004) → BTF.
 
-## Zweck
+## Purpose
 
-In **EBICS 3.0 (H005)** wird die klassische, dreistellige Auftragsart (H003/H004, z. B. `CCT`, `STA`)
-durch die generischen Admin-Auftragsarten **`BTU`** (Upload) und **`BTD`** (Download) plus ein
-**Business-Transaction-Format (BTF)** ersetzt. Das BTF beschreibt fachlich, *was* übertragen wird, und
-steckt im `BTUOrderParams`/`BTDOrderParams`-Element (`Service`). Bis #38 behandelte der Server den
-Auftragstyp durchgängig als **freien String** und wertete bei H005 nur den `AdminOrderType`
-(`"BTU"`/`"BTD"`) aus — der eigentliche BTF-Service blieb unbeachtet, und Berechtigungen wurden nie
-erzwungen. Dieses Framework schließt die Lücke.
+In **EBICS 3.0 (H005)** the classic three-letter order type (H003/H004, e.g. `CCT`, `STA`)
+is replaced by the generic admin order types **`BTU`** (upload) and **`BTD`** (download) plus a
+**Business Transaction Format (BTF)**. The BTF describes functionally *what* is transferred, and
+lives in the `BTUOrderParams`/`BTDOrderParams` element (`Service`). Up to #38 the server treated the
+order type throughout as a **free string** and, for H005, evaluated only the `AdminOrderType`
+(`"BTU"`/`"BTD"`) — the actual BTF service was ignored, and authorisations were never
+enforced. This framework closes the gap.
 
-## BTF-Parameter-Modell
+## BTF parameter model
 
-`EBICO.Core.Btf.BusinessTransactionFormat` (ein `readonly record struct`, [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md))
-bildet die BTF-Parameter typisiert ab:
+`EBICO.Core.Btf.BusinessTransactionFormat` (a `readonly record struct`, [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md))
+maps the BTF parameters in typed form:
 
-| Property | Herkunft (`ServiceType`) | Bedeutung |
+| Property | Origin (`ServiceType`) | Meaning |
 | --- | --- | --- |
-| `Service` (Pflicht) | `ServiceName` | Service-Code (z. B. `SCT`, `SDD`, `EOP`) |
-| `Option` | `ServiceOption` | Zusatzoption (z. B. `COR`, `B2B`) |
-| `Scope` | `Scope` | Geltungsbereich (ISO-Land/Issuer) |
-| `Container` | `Container` (Flag) | Container-Kennung `SVC`/`XML`/`ZIP` |
-| `MessageName` | `MsgName` (Value) | Meldungsname (z. B. `pain.001`, `camt.053`, `mt940`) |
-| `MessageVariant` | `MsgName@variant` | ISO-20022-Variante |
-| `MessageVersion` | `MsgName@version` | ISO-20022-Version |
-| `MessageFormat` | `MsgName@format` | Kodierung (z. B. `XML`) |
+| `Service` (mandatory) | `ServiceName` | Service code (e.g. `SCT`, `SDD`, `EOP`) |
+| `Option` | `ServiceOption` | Additional option (e.g. `COR`, `B2B`) |
+| `Scope` | `Scope` | Scope (ISO country/issuer) |
+| `Container` | `Container` (flag) | Container identifier `SVC`/`XML`/`ZIP` |
+| `MessageName` | `MsgName` (Value) | Message name (e.g. `pain.001`, `camt.053`, `mt940`) |
+| `MessageVariant` | `MsgName@variant` | ISO 20022 variant |
+| `MessageVersion` | `MsgName@version` | ISO 20022 version |
+| `MessageFormat` | `MsgName@format` | Encoding (e.g. `XML`) |
 
-Konvertierung zwischen Modell und generiertem Binding: `FromSchema(ServiceType)`,
-`TryFromBtfParams(BtfParamsTyp)`, `ToServiceType()`/`ToRestrictedServiceType()`. `CanonicalKey` liefert
-einen deterministischen Schlüssel (z. B. `"SCT:pain.001:COR"`) für Logging und als Fallback-Auth-Key.
+Conversion between model and generated binding: `FromSchema(ServiceType)`,
+`TryFromBtfParams(BtfParamsTyp)`, `ToServiceType()`/`ToRestrictedServiceType()`. `CanonicalKey` yields
+a deterministic key (e.g. `"SCT:pain.001:COR"`) for logging and as a fallback authorisation key.
 
-## BTF ↔ OrderType-Mapping
+## BTF ↔ OrderType mapping
 
-`EBICO.Core.Btf.BtfOrderTypeCatalog` ist die statische Äquivalenztabelle klassischer OrderType ↔ BTF.
-Sie trägt einen **repräsentativen Best-Effort-Seed** der gängigen Zahlungs- und Kontoauszugs-Orders; die
-konkreten Orders (#39–#42) erweitern sie, #43 dokumentiert das Ergebnis als
-[Order-/BTF-Abdeckungsmatrix](order-coverage-matrix.md).
+`EBICO.Core.Btf.BtfOrderTypeCatalog` is the static equivalence table classic OrderType ↔ BTF.
+It carries a **representative best-effort seed** of the common payment and account-statement orders; the
+concrete orders (#39–#42) extend it, #43 documents the result as the
+[order/BTF coverage matrix](order-coverage-matrix.md).
 
-| OrderType | Richtung | Service | Option | Container | MsgName | Beschreibung |
+| OrderType | Direction | Service | Option | Container | MsgName | Description |
 | --- | --- | --- | --- | --- | --- | --- |
 | `CCT` | Upload | `SCT` | – | – | `pain.001` | SEPA Credit Transfer |
 | `CIP` | Upload | `SCT` | `INST` | – | `pain.001` | SEPA Instant Credit Transfer |
 | `CDD` | Upload | `SDD` | `COR` | – | `pain.008` | SEPA Direct Debit (CORE) |
 | `CDB` | Upload | `SDD` | `B2B` | – | `pain.008` | SEPA Direct Debit (B2B) |
-| `STA` | Download | `EOP` | – | `ZIP` | `mt940` | Kontoauszug (SWIFT MT940) |
+| `STA` | Download | `EOP` | – | `ZIP` | `mt940` | Account statement (SWIFT MT940) |
 | `C53` | Download | `EOP` | – | `ZIP` | `camt.053` | Bank-to-Customer Statement |
 | `C52` | Download | `STM` | – | `ZIP` | `camt.052` | Bank-to-Customer Account Report |
 | `C54` | Download | `EOP` | – | `ZIP` | `camt.054` | Debit/Credit Notification |
 
-- `TryGetBtf(orderType)` — klassischer Code → BTF.
-- `TryGetOrderType(btf)` — BTF → Code (Match auf `Service` + `Option` + `MessageName`-Familie; eine
-  gesäte `camt.053` matcht auch ein eingehendes `camt.053.001.08`).
-- `ResolveOrderType(adminOrderType, btf)` — **effektiver Auth-Schlüssel**: BTF vorhanden → gemappter
-  Code (sonst `CanonicalKey`); kein BTF → `adminOrderType` (H003/H004: `FUL`/`FDL`; H005 ohne BTF: `BTU`/`BTD`).
+- `TryGetBtf(orderType)` — classic code → BTF.
+- `TryGetOrderType(btf)` — BTF → code (match on `Service` + `Option` + `MessageName` family; a
+  seeded `camt.053` also matches an incoming `camt.053.001.08`).
+- `ResolveOrderType(adminOrderType, btf)` — **effective authorisation key**: BTF present → mapped
+  code (otherwise `CanonicalKey`); no BTF → `adminOrderType` (H003/H004: `FUL`/`FDL`; H005 without BTF: `BTU`/`BTD`).
 
-## Berechtigungsprüfung pro BTF
+## Per-BTF authorisation check
 
-Die Prüfung setzt auf dem bestehenden Berechtigungsmodell auf ([Stammdaten](master-data.md),
-[Domänenmodell](../protocol/domain-model.md)): `Subscriber` bündelt `SubscriberPermission`s (OrderType ×
-`SignatureClass`). Neu ist die Gate-Methode `Subscriber.HasPermissionFor(orderType)` (hält *irgendeine*
-Berechtigung für den Auftragstyp — im Gegensatz zu `CanAuthorize`, das eine bankfachliche E/A/B-Klasse
-verlangt).
+The check builds on the existing authorisation model ([master data](master-data.md),
+[domain model](../protocol/domain-model.md)): `Subscriber` bundles `SubscriberPermission`s (OrderType ×
+`SignatureClass`). New is the gate method `Subscriber.HasPermissionFor(orderType)` (holds *any*
+authorisation for the order type — in contrast to `CanAuthorize`, which requires a bank-technical E/A/B class).
 
-Ablauf im Upload-/Download-Init (`UploadTransactionEngine.BeginUploadAsync` /
-`DownloadTransactionEngine.BeginDownloadAsync`), **nach** dem `Ready`-Check und — beim Download —
-**vor** dem Entnehmen der Daten:
+Flow in the upload/download init (`UploadTransactionEngine.BeginUploadAsync` /
+`DownloadTransactionEngine.BeginDownloadAsync`), **after** the `Ready` check and — for the download —
+**before** dequeuing the data:
 
-1. Pipeline extrahiert den BTF (`BTUOrderParams`/`BTDOrderParams` → `Service`) in `EbicsRequestContext.Btf`.
+1. Pipeline extracts the BTF (`BTUOrderParams`/`BTDOrderParams` → `Service`) into `EbicsRequestContext.Btf`.
 2. `effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf)`.
-3. `subscriber.HasPermissionFor(effectiveOrderType)` → sonst **`090003`**.
+3. `subscriber.HasPermissionFor(effectiveOrderType)` → otherwise **`090003`**.
 
-**Enforcement ist strikt** (siehe [ADR-0016](../adr/0016-btf-framework-und-berechtigung.md)): eine
-`Ready`-Teilnehmerin **muss** eine passende Berechtigung halten; ohne Berechtigung wird der Auftrag mit
-`090003` abgewiesen (kein „leere Menge = alles erlaubt").
+**Enforcement is strict** (see [ADR-0016](../adr/0016-btf-framework-und-berechtigung.md)): a
+`Ready` subscriber **must** hold a matching authorisation; without an authorisation the order is rejected with
+`090003` (no "empty set = everything allowed").
 
-### Beispiel: H005-BTU mit BTF (`BTUOrderParams`)
+### Example: H005 BTU with BTF (`BTUOrderParams`)
 
 ```xml
 <OrderDetails>
@@ -103,72 +102,71 @@ Ablauf im Upload-/Download-Init (`UploadTransactionEngine.BeginUploadAsync` /
 </OrderDetails>
 ```
 
-Dieser BTF (`SCT`/`pain.001`) wird auf den klassischen OrderType **`CCT`** gemappt; die Teilnehmerin
-benötigt eine `CCT`-Berechtigung.
+This BTF (`SCT`/`pain.001`) is mapped to the classic OrderType **`CCT`**; the subscriber
+needs a `CCT` authorisation.
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-| Situation | Returncode | Ablage |
+| Situation | Return code | Placement |
 | --- | --- | --- |
-| Autorisiert (Berechtigung vorhanden) | (Init läuft weiter, i. d. R. `000000`) | – |
-| Keine passende Berechtigung für den (aufgelösten) Auftragstyp | `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED | Body |
+| Authorised (authorisation present) | (init continues, usually `000000`) | – |
+| No matching authorisation for the (resolved) order type | `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED | Body |
 
-Der Code `090003` existierte bereits im [Returncode-Katalog](../protocol/return-codes.md), wurde vor #38
-aber nie ausgelöst. Alle Fälle werden mit **HTTP 200** und dem Returncode im `ebicsResponse`
-beantwortet.
+The code `090003` already existed in the [return-code catalog](../protocol/return-codes.md), but before #38
+was never triggered. All cases are answered with **HTTP 200** and the return code in the `ebicsResponse`.
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **Best-Effort-Mapping.** Die maßgebliche EBICS *BTF-Mapping / External Code List* ist proprietär
-  (EBICS SC) und wird **nicht** ins Repo committet ([Lizenz](../legal/ebics-licensing.md)). Der
-  Seed folgt der öffentlichen Liste nach bestem Wissen; die exakten Service-/Option-/MsgName-Codes
-  werden mit den konkreten Orders (#39–#43) gegen die offizielle Liste verifiziert.
-- **Container-Wert nicht round-trip-fähig.** Der SVC/XML/ZIP-Wert liegt im generierten Binding auf
-  einem untypisierten Attribut des `Container`-Flags; das Modell liest ihn best-effort, `ToServiceType`
-  schreibt nur das Vorhandensein des Flags (nicht den Wert). Nachziehen, sobald das Attribut gegen den
-  Annex verifiziert ist.
-- **Admin-/technische OrderTypes bleiben Admin-OrderTypes.** `HAC`/`HAA`/`HTD`/`HKD`/`HPD`/`PTK` werden
-  bewusst **nicht** als BTF-Service modelliert (in H005 weiterhin `AdminOrderType`); sie sind Thema von #41.
-- **`FUL`-`FileFormat` → OrderType (Upload, umgesetzt in #39).** Bei H003/H004 steckt die fachliche
-  Auftragsart im `FULOrderParams/FileFormat`; `BtfOrderTypeCatalog.TryGetOrderTypeByFileFormat` /
-  `ResolveUploadOrderType` bilden die MsgName-Familie (z. B. `pain.001.001.09` → `CCT`) für die
-  Upload-Autorisierung/-Verarbeitung ab (siehe [Zahlungsverkehr-Orders](payment-orders.md)). Die
-  **Download**-Seite (`FDL`-`FileFormat`) bleibt **[#40](download-transaction.md)** vorbehalten; die
-  Option (CORE/B2B) ist aus dem FileFormat allein nicht ableitbar (CDD-Default).
-- **`SignatureFlag` (ES-Pflicht je BTF).** Ob ein BTU-Auftrag eine ES fordert, steuert spec-seitig
-  `BTUOrderParams/SignatureFlag`; das ist von der reinen OrderType-Berechtigung getrennt und offen
-  (vgl. [Upload-Transaktion](upload-transaction.md)).
+- **Best-effort mapping.** The authoritative EBICS *BTF mapping / External Code List* is proprietary
+  (EBICS SC) and is **not** committed to the repo ([license](../legal/ebics-licensing.md)). The
+  seed follows the public list to the best of our knowledge; the exact Service/Option/MsgName codes
+  are verified against the official list with the concrete orders (#39–#43).
+- **Container value not round-trip capable.** The SVC/XML/ZIP value lives in the generated binding on
+  an untyped attribute of the `Container` flag; the model reads it best-effort, `ToServiceType`
+  writes only the presence of the flag (not the value). To be revisited once the attribute is verified against
+  the annex.
+- **Admin/technical OrderTypes remain admin OrderTypes.** `HAC`/`HAA`/`HTD`/`HKD`/`HPD`/`PTK` are
+  deliberately **not** modelled as a BTF service (in H005 they remain `AdminOrderType`); they are the subject of #41.
+- **`FUL` `FileFormat` → OrderType (upload, implemented in #39).** In H003/H004 the functional
+  order type lives in `FULOrderParams/FileFormat`; `BtfOrderTypeCatalog.TryGetOrderTypeByFileFormat` /
+  `ResolveUploadOrderType` map the MsgName family (e.g. `pain.001.001.09` → `CCT`) for the
+  upload authorisation/processing (see [payment orders](payment-orders.md)). The
+  **download** side (`FDL` `FileFormat`) remains reserved for **[#40](download-transaction.md)**; the
+  option (CORE/B2B) is not derivable from the FileFormat alone (CDD default).
+- **`SignatureFlag` (per-BTF ES requirement).** Whether a BTU order requires an ES is controlled per the spec by
+  `BTUOrderParams/SignatureFlag`; this is separate from the plain OrderType authorisation and open
+  (cf. [upload transaction](upload-transaction.md)).
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-| Aspekt | H003 / H004 | H005 |
+| Aspect | H003 / H004 | H005 |
 | --- | --- | --- |
-| Auftragstyp | `OrderDetails/OrderType` (z. B. `FUL`/`FDL`, klassischer Code) | `OrderDetails/AdminOrderType` (`BTU`/`BTD`) |
-| Fachliche Identität | im OrderType bzw. `FileFormat` | im **BTF** (`BTUOrderParams`/`BTDOrderParams` → `Service`) |
-| Autorisierungs-Schlüssel | OrderType-String direkt | BTF → klassischer Code (Katalog), sonst Fallback |
+| Order type | `OrderDetails/OrderType` (e.g. `FUL`/`FDL`, classic code) | `OrderDetails/AdminOrderType` (`BTU`/`BTD`) |
+| Functional identity | in the OrderType or `FileFormat` | in the **BTF** (`BTUOrderParams`/`BTDOrderParams` → `Service`) |
+| Authorisation key | OrderType string directly | BTF → classic code (catalog), otherwise fallback |
 
-BTF ist rein **H005**; H003/H004 tragen keinen BTF-Service.
+BTF is purely **H005**; H003/H004 carry no BTF service.
 
 ## Tests
 
-`tests/EBICO.Tests/Core/Btf/` und `tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; Request-XML
-aus committeten Core-Bindings, keine proprietären Fixtures):
+`tests/EBICO.Tests/Core/Btf/` and `tests/EBICO.Tests/Server/` (xUnit v3 + AwesomeAssertions; request XML
+from committed Core bindings, no proprietary fixtures):
 
-- `BusinessTransactionFormatTests` — Konstruktion/Validierung, `FromSchema`↔`ToServiceType`-Roundtrip,
-  `CanonicalKey`, `TryFromBtfParams`, Wert-Gleichheit.
-- `BtfOrderTypeCatalogTests` — Roundtrips je Seed-Eintrag, `TryGetOrderType`-Matching (inkl. MsgName-
-  Familie), `ResolveOrderType` (H004-OrderType, H005-mit/ohne-BTF, Unmapped-Fallback).
-- `SubscriberTests` — `HasPermissionFor` (jede Signaturklasse zählt).
-- `BtfAuthorizationTests` — End-to-end über die Pipeline: H005-BTU mit gemapptem BTF → `Ok` (mit
-  passender Berechtigung) bzw. **`090003`** (ohne); H004-`FUL` ohne Berechtigung → `090003`; H005 ohne
-  BTF → Fallback auf `BTU`-Berechtigung; Download-BTD analog (`C53`).
+- `BusinessTransactionFormatTests` — construction/validation, `FromSchema`↔`ToServiceType` round-trip,
+  `CanonicalKey`, `TryFromBtfParams`, value equality.
+- `BtfOrderTypeCatalogTests` — round-trips per seed entry, `TryGetOrderType` matching (incl. MsgName
+  family), `ResolveOrderType` (H004 OrderType, H005 with/without BTF, unmapped fallback).
+- `SubscriberTests` — `HasPermissionFor` (every signature class counts).
+- `BtfAuthorizationTests` — end-to-end via the pipeline: H005 BTU with mapped BTF → `Ok` (with
+  matching authorisation) or **`090003`** (without); H004 `FUL` without authorisation → `090003`; H005 without
+  BTF → fallback to `BTU` authorisation; download BTD analogously (`C53`).
 
-## Verwandte Doku
+## Related documentation
 
-- [Order-/BTF-Abdeckungsmatrix](order-coverage-matrix.md) — konsolidierte Übersicht aller Auftragsarten × Version × Status (#43)
-- [Upload-Transaktion](upload-transaction.md) / [Download-Transaktion](download-transaction.md) — die Engines, in denen die Prüfung andockt
-- [Stammdatenverwaltung](master-data.md) — `SubscriberPermission`, Grant/Revoke, Admin-API
-- [Domänenmodell](../protocol/domain-model.md) — Subscriber-Aggregat, Signaturklassen
-- [EBICS-Returncode-Katalog](../protocol/return-codes.md) — `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED
-- [ADR-0016 (BTF-Framework & Berechtigung)](../adr/0016-btf-framework-und-berechtigung.md) — Entscheidungen *strikt* & *Bridge über OrderType-Code*
-- [Lizenz & Repo-Policy](../legal/ebics-licensing.md) — proprietäre Schemas/External Code List
+- [Order/BTF coverage matrix](order-coverage-matrix.md) — consolidated overview of all order types × version × status (#43)
+- [Upload transaction](upload-transaction.md) / [Download transaction](download-transaction.md) — the engines where the check plugs in
+- [Master data management](master-data.md) — `SubscriberPermission`, grant/revoke, admin API
+- [Domain model](../protocol/domain-model.md) — subscriber aggregate, signature classes
+- [EBICS return-code catalog](../protocol/return-codes.md) — `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED
+- [ADR-0016 (BTF framework & authorisation)](../adr/0016-btf-framework-und-berechtigung.md) — decisions *strict* & *bridge via OrderType code*
+- [License & repo policy](../legal/ebics-licensing.md) — proprietary schemas/External Code List

@@ -1,31 +1,31 @@
-# Server: Hostable Grundgerüst (ASP.NET Core)
+# Server: Hostable skeleton (ASP.NET Core)
 
-> Umsetzung von **Issue #25** (Milestone M3 — Server). Diese Seite beschreibt das
-> *Grundgerüst* des EBICS-Emulator-Hosts (`EBICO.Server`): den HTTP-Endpoint, die
-> Request-Pipeline mit **Verify/Handle als Erweiterungspunkten** (No-Op-Defaults),
-> die zentrale Fehlerabbildung auf EBICS-Returncodes und den pluggbaren
-> In-Memory-Zustandsspeicher. Die eigentlichen Auftragsverarbeitungen (INI/HIA/HPB
-> und die Transaktions-Engine) folgen in **#26 ff. / M4**. Der Returncode-Katalog ist
-> bewusst vorläufig (voller Katalog → **#36 / M4**), die Vereinigung mit dem
-> Suite-Read-Model (`IEmulatorStateProvider`) ist **M4**.
+> Implementation of **Issue #25** (Milestone M3 — Server). This page describes the
+> *skeleton* of the EBICS emulator host (`EBICO.Server`): the HTTP endpoint, the
+> request pipeline with **Verify/Handle as extension points** (No-Op defaults),
+> the central error mapping onto EBICS return codes, and the pluggable
+> in-memory state store. The actual order processing (INI/HIA/HPB
+> and the transaction engine) follows in **#26 ff. / M4**. The return code catalogue is
+> deliberately provisional (full catalogue → **#36 / M4**), the union with the
+> Suite read model (`IEmulatorStateProvider`) is **M4**.
 
-## Zweck
+## Purpose
 
-`EBICO.Server` ist der EBICS-Server-Emulator — konzeptionell wie *Azurite* für Azure
-Storage, aber für EBICS. #25 liefert das *Skelett*: einen hostbaren ASP.NET-Core-Host,
-der EBICS-Requests über HTTP annimmt, sie durch eine testbare Pipeline schickt und
-wohlgeformte EBICS-Antworten zurückgibt. Fachliche Auftragslogik kommt in den
-Folge-Issues; hier steht die tragende Struktur und ihre Erweiterungspunkte.
+`EBICO.Server` is the EBICS server emulator — conceptually like *Azurite* for Azure
+Storage, but for EBICS. #25 delivers the *skeleton*: a hostable ASP.NET Core host
+that accepts EBICS requests over HTTP, sends them through a testable pipeline and
+returns well-formed EBICS responses. Business order logic comes in the
+follow-up issues; here stand the load-bearing structure and its extension points.
 
-Bewusst **im Skelett enthalten**: HTTP-Endpoint, Parsing, Versions-Dispatch,
-Fehlerabbildung, Antwort-Serialisierung, DI-Verdrahtung, State-Store-Abstraktion.
-Bewusst **noch nicht**: Order-Handler (INI/HIA/HPB), Signatur-/Verschlüsselungsprüfung,
-Antwort-Signatur (X002), Persistenz, Segmentierung.
+Deliberately **included in the skeleton**: HTTP endpoint, parsing, version dispatch,
+error mapping, response serialisation, DI wiring, state-store abstraction.
+Deliberately **not yet**: order handlers (INI/HIA/HPB), signature/encryption checking,
+response signature (X002), persistence, segmentation.
 
 ## Host & `Program.cs`
 
-Der Host wird über eine einzige DI-Extension verdrahtet und mappt den EBICS-Endpoint
-auf einen konfigurierbaren Pfad (Default `/ebics`):
+The host is wired via a single DI extension and maps the EBICS endpoint
+onto a configurable path (default `/ebics`):
 
 ```csharp
 // Program.cs
@@ -36,118 +36,118 @@ var options = app.Services.GetRequiredService<IOptions<EbicoServerOptions>>().Va
 app.MapEbicsEndpoint(options.EndpointPath);   // POST, text/xml
 app.Run();
 
-public partial class Program;   // damit Integrationstests WebApplicationFactory<Program> nutzen können
+public partial class Program;   // so integration tests can use WebApplicationFactory<Program>
 ```
 
-`AddEbicoServer(Action<EbicoServerOptions>?)` registriert die Pipeline, die
-Erweiterungspunkte mit ihren Skelett-Defaults, den Error-Mapper, die Response-Factory
-und den In-Memory-State-Store. Alle konkreten Services werden mit `TryAdd*` registriert,
-sodass Aufrufer jeden Baustein vorab überschreiben können (Muster wie `AddEbicoConnector`).
+`AddEbicoServer(Action<EbicoServerOptions>?)` registers the pipeline, the
+extension points with their skeleton defaults, the error mapper, the response factory
+and the in-memory state store. All concrete services are registered with `TryAdd*`,
+so callers can override every building block beforehand (pattern like `AddEbicoConnector`).
 
-`EbicoServerOptions` steuert Endpoint-Pfad, Fallback-Antwortversion (wenn die
-Request-Version nicht erkennbar ist), maximale Body-Größe und die akzeptierten
-Content-Types. Seit **M4** zusätzlich die Transaction-Engine-Parameter: Segmentgröße
-(`SegmentSizeBytes`), die Segment-Obergrenzen (`MaxUploadSegments`/`MaxDownloadSegments`)
-und — mit [#35](transaction-recovery.md) — der Transaktions-Idle-Timeout
-(`TransactionTimeout`), das Sweep-Intervall des Cleanup-Dienstes
-(`TransactionCleanupInterval`) und die obere Schranke paralleler Transaktionen
+`EbicoServerOptions` controls the endpoint path, fallback response version (when the
+request version is not recognisable), maximum body size and the accepted
+content types. Since **M4** additionally the transaction engine parameters: segment size
+(`SegmentSizeBytes`), the segment upper bounds (`MaxUploadSegments`/`MaxDownloadSegments`)
+and — with [#35](transaction-recovery.md) — the transaction idle timeout
+(`TransactionTimeout`), the sweep interval of the cleanup service
+(`TransactionCleanupInterval`) and the upper bound on concurrent transactions
 (`MaxConcurrentTransactions`).
 
-## Request-Pipeline
+## Request pipeline
 
-Der Endpoint-Handler bleibt dünn: Er liest den Body transport-sicher und delegiert an
-`IEbicsRequestPipeline.ProcessAsync(string) → EbicsPipelineResult`. Die Pipeline ist
-**HTTP-frei** (String rein, Bytes raus) und daher ohne Web-Host unit-testbar.
+The endpoint handler stays thin: it reads the body transport-safely and delegates to
+`IEbicsRequestPipeline.ProcessAsync(string) → EbicsPipelineResult`. The pipeline is
+**HTTP-free** (string in, bytes out) and therefore unit-testable without a web host.
 
-| Stufe | Umsetzung | Fehlerpfad → Returncode |
+| Stage | Implementation | Error path → return code |
 | --- | --- | --- |
-| **Parse** | `EbicsXmlSerializer.DeserializeEnvelope(xml)` (Core) | malformed/leer **oder wohlgeformt-aber-nicht-abbildbar** (#117) → `091010` |
-| **Version-Dispatch** | Root-Namespace → Version, Root-Element → Envelope-Typ; Cast auf `IEbicsRequestEnvelope` | nicht unterstützte Version / kein Request-Envelope → `061002` |
-| **Verify** | `IEbicsRequestVerifier.VerifyAsync` (Default: No-Op → Erfolg) | Fehlschlag → `061001` |
-| **Handle** | `IEbicsOrderHandlerResolver.Resolve(version, orderType)` (Skelett: kein Handler) | kein Handler → `091006`; leerer/unbek. Order-Typ → `091005` |
+| **Parse** | `EbicsXmlSerializer.DeserializeEnvelope(xml)` (Core) | malformed/empty **or well-formed-but-not-mappable** (#117) → `091010` |
+| **Version dispatch** | root namespace → version, root element → envelope type; cast to `IEbicsRequestEnvelope` | unsupported version / no request envelope → `061002` |
+| **Verify** | `IEbicsRequestVerifier.VerifyAsync` (default: No-Op → success) | failure → `061001` |
+| **Handle** | `IEbicsOrderHandlerResolver.Resolve(version, orderType)` (skeleton: no handler) | no handler → `091006`; empty/unknown order type → `091005` |
 | **Respond** | `EbicsResponseFactory.BuildErrorResponse(version, code)` → `SerializeToUtf8Bytes` | — |
 
-Parsing und Versions-Dispatch werden aus `EBICO.Core` wiederverwendet
-([Versions-Dispatch](../protocol/version-dispatch.md)); das Parsing ist gegen DTD/XXE
-gehärtet (`DtdProcessing.Prohibit`, `XmlResolver = null`), da der Server unvertrautes
-XML annimmt.
+Parsing and version dispatch are reused from `EBICO.Core`
+([Version dispatch](../protocol/version-dispatch.md)); the parsing is hardened against
+DTD/XXE (`DtdProcessing.Prohibit`, `XmlResolver = null`), since the server accepts
+untrusted XML.
 
-### Erweiterungspunkte
+### Extension points
 
-Die Stufen **Verify** und **Handle** sind Interfaces mit Skelett-Defaults, an denen die
-M3/M4-Features andocken:
+The stages **Verify** and **Handle** are interfaces with skeleton defaults, onto which the
+M3/M4 features dock:
 
-| Typ | Rolle | Skelett-Default |
+| Type | Role | Skeleton default |
 | --- | --- | --- |
-| `IEbicsRequestVerifier` | Signatur-/Zustandsprüfung (X002, HostID/User, Subscriber-State) | seit #58 `X002EbicsRequestVerifier` (prüft die X002-Signatur signierter `ebicsRequest`, [Details](../development/negative-security-cases.md)); das ursprüngliche Skelett war `NoOpEbicsRequestVerifier` |
-| `IEbicsOrderHandler` | Verarbeitung genau eines Order-Typs einer Version | *keine Registrierung* |
-| `IEbicsOrderHandlerResolver` | Auflösung `(Version, OrderType) → Handler` | `EbicsOrderHandlerResolver` über `IEnumerable<IEbicsOrderHandler>` (leer) |
+| `IEbicsRequestVerifier` | signature/state checking (X002, HostID/User, subscriber state) | since #58 `X002EbicsRequestVerifier` (checks the X002 signature of signed `ebicsRequest`, [details](../development/negative-security-cases.md)); the original skeleton was `NoOpEbicsRequestVerifier` |
+| `IEbicsOrderHandler` | processing exactly one order type of one version | *no registration* |
+| `IEbicsOrderHandlerResolver` | resolution `(Version, OrderType) → Handler` | `EbicsOrderHandlerResolver` over `IEnumerable<IEbicsOrderHandler>` (empty) |
 
-Da kein Handler registriert ist, beantwortet das Skelett jeden erkannten Request mit
-`EBICS_UNSUPPORTED_ORDER_TYPE` (`091006`) — genug, um die Pipeline end-to-end zu zeigen.
+Since no handler is registered, the skeleton answers every recognised request with
+`EBICS_UNSUPPORTED_ORDER_TYPE` (`091006`) — enough to demonstrate the pipeline end-to-end.
 
-### Body-Lesen (transport-sicher)
+### Body reading (transport-safe)
 
-`EbicsRequestReader` prüft den Content-Type (Default `text/xml`/`application/xml`),
-erzwingt die maximale Body-Größe und dekodiert mit dem deklarierten Charset (Default
-UTF-8). Es parst **kein** XML — die (gehärtete) XML-Verarbeitung liegt ausschließlich in
+`EbicsRequestReader` checks the content type (default `text/xml`/`application/xml`),
+enforces the maximum body size and decodes with the declared charset (default
+UTF-8). It parses **no** XML — the (hardened) XML processing lives exclusively in
 `EBICO.Core`.
 
-## Fehlerabbildung & HTTP-Semantik
+## Error mapping & HTTP semantics
 
-Die zentrale Exception→Returncode-Abbildung liegt in `EbicsErrorMapper`
-(`IEbicsErrorMapper`, pluggbar). Pipeline-interne Fälle (kein Handler, Verify-Fehlschlag)
-werden direkt im Orchestrator gesetzt.
+The central exception→return code mapping lives in `EbicsErrorMapper`
+(`IEbicsErrorMapper`, pluggable). Pipeline-internal cases (no handler, verify failure)
+are set directly in the orchestrator.
 
-| Situation | Returncode | HTTP-Status |
+| Situation | Return code | HTTP status |
 | --- | --- | --- |
-| Wohlgeformter Request, kein Handler | `091006` EBICS_UNSUPPORTED_ORDER_TYPE | **200** |
-| Leerer/unbekannter Order-Typ | `091005` EBICS_INVALID_ORDER_TYPE | **200** |
-| Ungültiges/leeres XML | `091010` EBICS_INVALID_XML | **200** |
-| Nicht unterstützte Version / kein Request-Envelope | `061002` EBICS_INVALID_REQUEST | **200** |
-| Verify fehlgeschlagen | `061001` EBICS_AUTHENTICATION_FAILED | **200** |
-| Unerwarteter interner Fehler | `061099` EBICS_INTERNAL_ERROR | **200** |
-| Falscher Content-Type | — | **415** |
-| Body zu groß | — | **413** |
+| Well-formed request, no handler | `091006` EBICS_UNSUPPORTED_ORDER_TYPE | **200** |
+| Empty/unknown order type | `091005` EBICS_INVALID_ORDER_TYPE | **200** |
+| Invalid/empty XML | `091010` EBICS_INVALID_XML | **200** |
+| Unsupported version / no request envelope | `061002` EBICS_INVALID_REQUEST | **200** |
+| Verify failed | `061001` EBICS_AUTHENTICATION_FAILED | **200** |
+| Unexpected internal error | `061099` EBICS_INTERNAL_ERROR | **200** |
+| Wrong content type | — | **415** |
+| Body too large | — | **413** |
 
-**Grundregel:** EBICS ist ein Anwendungsprotokoll *über* HTTP. Protokoll- und
-Businessfehler werden mit **HTTP 200** und dem Returncode im `ebicsResponse`
-beantwortet — der Client wertet den Returncode aus, nicht den HTTP-Status. Nur echte
-Transportfehler (Content-Type, Größe), bei denen der Server nicht sinnvoll ins Envelope
-antworten kann, führen zu HTTP 4xx.
+**Basic rule:** EBICS is an application protocol *over* HTTP. Protocol and
+business errors are answered with **HTTP 200** and the return code in the `ebicsResponse`
+— the client evaluates the return code, not the HTTP status. Only genuine
+transport errors (content type, size), where the server cannot sensibly answer into the envelope,
+lead to HTTP 4xx.
 
-## Returncode-Katalog (zentral in `EBICO.Core`)
+## Return code catalogue (central in `EBICO.Core`)
 
-`EbicsReturnCode` bündelt Code, symbolischen Namen und die Ablage (`Kind`): ein
-**technischer** Code landet im `header/mutable/ReturnCode`, ein **business** Code im
-`body/ReturnCode`; die jeweils andere Stelle bekommt `000000`. `EbicsResponseFactory`
-baut daraus je Version (H003/H004/H005) den typisierten Response-Graphen aus den
-committeten Schema-Bindings.
+`EbicsReturnCode` bundles code, symbolic name and the placement (`Kind`): a
+**technical** code lands in `header/mutable/ReturnCode`, a **business** code in
+`body/ReturnCode`; the respective other place gets `000000`. `EbicsResponseFactory`
+builds from it, per version (H003/H004/H005), the typed response graph from the
+committed schema bindings.
 
-Der Katalog und die Registry (`EbicsReturnCodes`) liegen seit **Issue #36 (M4)** zentral in
-`EBICO.Core.ReturnCodes` und werden von Server **und** Connector genutzt; das
-Exception→Returncode-Mapping (`IEbicsErrorMapper`/`EbicsErrorMapper`) bleibt server-seitig.
-Details, vollständige Code-Tabellen und das Fehlerverhalten:
-[Returncode-Katalog](../protocol/return-codes.md) und [ADR-0012](../adr/0012-returncode-katalog.md).
+The catalogue and the registry (`EbicsReturnCodes`) have, since **Issue #36 (M4)**, lived centrally in
+`EBICO.Core.ReturnCodes` and are used by server **and** connector; the
+exception→return code mapping (`IEbicsErrorMapper`/`EbicsErrorMapper`) stays server-side.
+Details, complete code tables and the error behaviour:
+[Return code catalogue](../protocol/return-codes.md) and [ADR-0012](../adr/0012-returncode-katalog.md).
 
-### ⚠️ Spec-Vorbehalte (gegen die offiziellen EBICS-Annexe zu verifizieren)
+### ⚠️ Spec caveats (to be verified against the official EBICS annexes)
 
-- **Header- vs. Body-Platzierung** der Codes und mögliche Doppelbelegung (besonders
-  `091010` EBICS_INVALID_XML) sind gegen Annex 1 zu prüfen.
-- **„Nicht unterstützte Version"** hat im `ebicsResponse` keinen dedizierten Code
-  (spec-konform ist die Versionsaushandlung per HEV); das Skelett bildet pragmatisch auf
-  `061002` in der Fallback-Version ab.
-- Die **Antwort-Signatur (X002)** fehlt im Skelett bewusst (= M4); strikte Clients
-  könnten unsignierte Antworten ablehnen.
-- `TransactionPhaseType` serialisiert mangels `*Specified`-Flag immer `Initialisation` —
-  für eine transaktionsfreie Fehlerantwort gegen Schema/Spec zu prüfen.
+- **Header- vs. body placement** of the codes and possible dual assignment (especially
+  `091010` EBICS_INVALID_XML) are to be checked against Annex 1.
+- **"Unsupported version"** has no dedicated code in the `ebicsResponse`
+  (spec-conformant is version negotiation via HEV); the skeleton maps pragmatically onto
+  `061002` in the fallback version.
+- The **response signature (X002)** is deliberately absent in the skeleton (= M4); strict clients
+  might reject unsigned responses.
+- `TransactionPhaseType` serialises, lacking a `*Specified` flag, always `Initialisation` —
+  to be checked against schema/spec for a transaction-free error response.
 
-## Zustandsspeicher (pluggable, In-Memory)
+## State store (pluggable, in-memory)
 
-`IEbicsStateStore` ist der autoritative serverseitige Zustand (Banken/Partner/Teilnehmer,
-lesend **und** schreibend) auf Basis der `EBICO.Core.Domain`-Aggregate. Default-Registrierung
-ist der thread-sichere `InMemoryEbicsStateStore` (Vorbild `InMemoryKeyStore` im Connector),
-pluggbar via `TryAddSingleton`.
+`IEbicsStateStore` is the authoritative server-side state (banks/partners/subscribers,
+read **and** write) based on the `EBICO.Core.Domain` aggregates. The default registration
+is the thread-safe `InMemoryEbicsStateStore` (modelled on `InMemoryKeyStore` in the connector),
+pluggable via `TryAddSingleton`.
 
 ```csharp
 public interface IEbicsStateStore
@@ -155,59 +155,59 @@ public interface IEbicsStateStore
     Task<IReadOnlyList<Bank>> GetBanksAsync(CancellationToken ct = default);
     Task<Bank?> GetBankAsync(HostId hostId, CancellationToken ct = default);
     Task RegisterBankAsync(Bank bank, CancellationToken ct = default);
-    // … Partner- und Subscriber-Pendants (Subscriber per (HostId, PartnerId, UserId)-Tripel)
+    // … partner and subscriber counterparts (subscriber by (HostId, PartnerId, UserId) triple)
 }
 ```
 
-Er ist das **read/write-Gegenstück** zum read-only `IEmulatorStateProvider` der Suite
-(siehe [UI-Grundgerüst](../suite/ui-shell.md)). Beide arbeiten auf denselben
-Domänen-Aggregaten; die Zusammenführung (In-Process oder HTTP-API, siehe
-[ADR-0009](../adr/0009-blazor-render-mode.md)) erfolgt in **M4** — das Suite-Read-Model
-bleibt bis dahin am `SampleEmulatorStateProvider`.
+It is the **read/write counterpart** to the read-only `IEmulatorStateProvider` of the Suite
+(see [UI skeleton](../suite/ui-shell.md)). Both work on the same
+domain aggregates; the merge (in-process or HTTP API, see
+[ADR-0009](../adr/0009-blazor-render-mode.md)) happens in **M4** — the Suite read model
+stays on the `SampleEmulatorStateProvider` until then.
 
-Auf diesem Store setzt in **#30** die vollständige **Stammdatenverwaltung** auf: der Store
-wurde um `Remove*` und bankscoped Abfragen erweitert (Partner nun per (`HostId`, `PartnerId`)),
-darüber liegt der `IMasterDataManager` (referentielle Integrität, kaskadierendes Löschen,
-Permission-/Lebenszyklus-Mutation) samt einer unauthentifizierten HTTP-Admin-API
-(`MapEbicoAdminApi`). Details: [Stammdatenverwaltung](master-data.md).
+On this store, **#30** builds the complete **master data management**: the store
+was extended with `Remove*` and bank-scoped queries (partner now by (`HostId`, `PartnerId`)),
+above it sits the `IMasterDataManager` (referential integrity, cascading deletion,
+permission/lifecycle mutation) together with an unauthenticated HTTP admin API
+(`MapEbicoAdminApi`). Details: [Master data management](master-data.md).
 
-### Roh-XML-Erfassung (`IMessageCaptureStore`, #54)
+### Raw-XML capture (`IMessageCaptureStore`, #54)
 
-Nach dem Serialisieren der Antwort schreibt die Pipeline die **Roh-XML** (Request und Response) einer
-Transaktionsnachricht in den `IMessageCaptureStore` — keyed nach Transaktions-ID, mit Phase und
-Returncode. Nur transaktionsbezogene Nachrichten werden erfasst (Key-Management ohne Transaktions-ID
-bleibt außen vor); der In-Memory-Default begrenzt Speicher per Ring-Puffer
-(`EbicoServerOptions.MaxMessageCaptureEntries`) und Kürzung je Dokument
-(`MaxCapturedMessageBytes`). Gelesen wird er ausschließlich vom
-[Suite-Transaktions-Inspektor](../suite/transaktions-inspektor.md) ([ADR-0021](../adr/0021-message-capture-store.md)).
+After serialising the response, the pipeline writes the **raw XML** (request and response) of a
+transaction message into the `IMessageCaptureStore` — keyed by transaction ID, with phase and
+return code. Only transaction-related messages are captured (key management without a transaction ID
+stays out); the in-memory default bounds memory via a ring buffer
+(`EbicoServerOptions.MaxMessageCaptureEntries`) and truncation per document
+(`MaxCapturedMessageBytes`). It is read exclusively by the
+[Suite transaction inspector](../suite/transaktions-inspektor.md) ([ADR-0021](../adr/0021-message-capture-store.md)).
 
 ## Tests
 
-`tests/EBICO.Tests/Server/` deckt ab (xUnit v3 + AwesomeAssertions; Request-XML wird aus
-den committeten Core-Bindings gebaut — **keine** proprietären Fixtures nötig):
+`tests/EBICO.Tests/Server/` covers (xUnit v3 + AwesomeAssertions; request XML is built from
+the committed Core bindings — **no** proprietary fixtures needed):
 
-- `EbicsErrorMapperTests` — Exception → Returncode (InvalidXml/InvalidRequest/InternalError, null-Guard).
-- `EbicsResponseFactoryTests` — je Version: Round-Trip via `DeserializeEnvelope`, Code-Platzierung
-  header vs. body, korrekter Versions-Namespace, `ReportText`.
-- `InMemoryEbicsStateStoreTests` — Round-Trip, unbekannte Lookups → `null`, Add-or-Replace, null-Guard.
-- `EbicoServerServiceCollectionExtensionsTests` — auflösbare Services, Skelett-Defaults
-  (No-Op-Verifier, keine Handler), Options-Defaults/Override, null-Guard.
-- `EbicsRequestPipelineTests` — Orchestrator direkt: malformed/leer → `091010`, fremder
-  Namespace → `061002`, wohlgeformter Request ohne Handler → `091006`, Response-Envelope
-  als Eingang → `061002`.
-- `EbicsEndpointIntegrationTests` — über `WebApplicationFactory<Program>`: Happy-Path
-  (HTTP 200 + `091006`), malformed/leer → 200 + `091010`, fremde Version → 200 in
-  Fallback-Version, falscher Content-Type → 415, Body zu groß → 413.
+- `EbicsErrorMapperTests` — exception → return code (InvalidXml/InvalidRequest/InternalError, null guard).
+- `EbicsResponseFactoryTests` — per version: round-trip via `DeserializeEnvelope`, code placement
+  header vs. body, correct version namespace, `ReportText`.
+- `InMemoryEbicsStateStoreTests` — round-trip, unknown lookups → `null`, add-or-replace, null guard.
+- `EbicoServerServiceCollectionExtensionsTests` — resolvable services, skeleton defaults
+  (No-Op verifier, no handlers), options defaults/override, null guard.
+- `EbicsRequestPipelineTests` — orchestrator directly: malformed/empty → `091010`, foreign
+  namespace → `061002`, well-formed request without handler → `091006`, response envelope
+  as input → `061002`.
+- `EbicsEndpointIntegrationTests` — via `WebApplicationFactory<Program>`: happy path
+  (HTTP 200 + `091006`), malformed/empty → 200 + `091010`, foreign version → 200 in
+  fallback version, wrong content type → 415, body too large → 413.
 
-Für die Integrationstests wurde `Microsoft.AspNetCore.Mvc.Testing` aufgenommen und im
-Testprojekt eine `FrameworkReference` auf `Microsoft.AspNetCore.App` gesetzt; der globale
-`Program`-Typ wird per `extern alias` gegen den der Suite disambiguiert.
+For the integration tests `Microsoft.AspNetCore.Mvc.Testing` was added and a
+`FrameworkReference` on `Microsoft.AspNetCore.App` was set in the test project; the global
+`Program` type is disambiguated against the Suite's via `extern alias`.
 
-## Verwandte Doku
+## Related documentation
 
-- [Versions-Dispatch](../protocol/version-dispatch.md) — die im Parse-/Dispatch-Schritt genutzte Erkennung
-- [XML-Serialisierung & C14N](../protocol/serialization-c14n.md) — deterministische Antwort-Serialisierung
-- [Domänenmodell](../protocol/domain-model.md) — die Aggregate hinter dem State-Store
-- [Client-Kern & Konfiguration](../connector/client-core.md) — Vorbild für DI/Options/Store und vorläufiges `EbicsResult`
-- [UI-Grundgerüst & Navigation](../suite/ui-shell.md) — das Suite-Gegenstück (`IEmulatorStateProvider`)
-- [ADR-0004 (Multi-Version)](../adr/0004-multi-version-strategie.md), [ADR-0009 (Suite-Render-Modus)](../adr/0009-blazor-render-mode.md)
+- [Version dispatch](../protocol/version-dispatch.md) — the detection used in the parse/dispatch step
+- [XML serialisation & C14N](../protocol/serialization-c14n.md) — deterministic response serialisation
+- [Domain model](../protocol/domain-model.md) — the aggregates behind the state store
+- [Client core & configuration](../connector/client-core.md) — model for DI/options/store and provisional `EbicsResult`
+- [UI skeleton & navigation](../suite/ui-shell.md) — the Suite counterpart (`IEmulatorStateProvider`)
+- [ADR-0004 (multi-version)](../adr/0004-multi-version-strategie.md), [ADR-0009 (Suite render mode)](../adr/0009-blazor-render-mode.md)

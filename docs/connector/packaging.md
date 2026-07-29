@@ -1,153 +1,153 @@
-# Connector: NuGet-Packaging & Beispiele
+# Connector: NuGet packaging & samples
 
-> Umsetzung von **Issue #50** (Milestone M6 — Connector, Abschluss). Diese Seite beschreibt, wie die
-> beiden veröffentlichten Bibliotheken **`EBICO.Core`** und **`EBICO.Connector`** als NuGet-Pakete
-> gebaut werden: die Paket-Metadaten, die **Symbols/SourceLink**-Einbindung, die Paket-READMEs, die
-> **CalVer**-Versionierung und der lauffähige **Quickstart-Sample**. Grundlage sind der
-> [Client-Kern](client-core.md) (#46) und die [Connector-Architektur](architecture.md). Der eigentliche
-> **Publish/Push** in einen Feed ist bewusst auf **M9 / #62** verschoben; #50 legt das Fundament und
-> validiert die Packbarkeit in der CI. Grundsatzentscheidung:
+> Implementation of **issue #50** (milestone M6 — Connector, completion). This page describes how the
+> two published libraries **`EBICO.Core`** and **`EBICO.Connector`** are built as NuGet packages:
+> the package metadata, the **symbols/SourceLink** integration, the package READMEs, the
+> **CalVer** versioning and the runnable **quickstart sample**. The basis is the
+> [client core](client-core.md) (#46) and the [Connector architecture](architecture.md). The actual
+> **publish/push** to a feed is deliberately deferred to **M9 / #62**; #50 lays the foundation and
+> validates the packability in the CI. Fundamental decision:
 > [ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md).
 
-## Zweck
+## Purpose
 
-`EBICO.Connector` ist als NuGet-Client gedacht (wie *Azurite* das Gegenstück auf der Server-Seite ist).
-Damit er auslieferbar ist, brauchen die Bibliotheken vollständige Paket-Metadaten, Debug-Symbole und
-eine reproduzierbare Versionierung. Da der Connector `EBICO.Core` per `ProjectReference` nutzt, muss
-Core **ebenfalls** ein Paket sein — sonst hätte das Connector-Paket eine unauflösbare Abhängigkeit.
+`EBICO.Connector` is intended as a NuGet client (just as *Azurite* is the counterpart on the server
+side). For it to be shippable, the libraries need complete package metadata, debug symbols and
+reproducible versioning. Since the connector uses `EBICO.Core` via `ProjectReference`, Core must
+**also** be a package — otherwise the connector package would have an unresolvable dependency.
 
-Zentraler Ort für die gemeinsamen Felder ist [`Directory.Build.props`](../../Directory.Build.props),
-konditioniert auf die beiden Bibliotheks-Projekte (gleiches Muster wie die bereits vorhandene
-`GenerateDocumentationFile`-Regel). Projekt-spezifische Felder (`Description`, `PackageTags`, die
-Paket-`README.md`) stehen in der jeweiligen `.csproj`.
+The central place for the shared fields is [`Directory.Build.props`](../../Directory.Build.props),
+conditioned on the two library projects (same pattern as the already-present
+`GenerateDocumentationFile` rule). Project-specific fields (`Description`, `PackageTags`, the
+package `README.md`) live in the respective `.csproj`.
 
-## Zwei Pakete (Core + Connector)
+## Two packages (Core + Connector)
 
-| Paket | Inhalt | Abhängigkeit |
+| Package | Content | Dependency |
 | --- | --- | --- |
-| `EBICO.Core` | Geteilte Primitives (Schema/Serialisierung, Krypto, BTF/Order-Modelle, Returncodes) | — |
-| `EBICO.Connector` | Client-Pipeline (Mediator-Muster), Onboarding/Upload/Download-API | `EBICO.Core` (gleiche Version) + `Microsoft.Extensions.*` |
+| `EBICO.Core` | Shared primitives (schema/serialization, crypto, BTF/order models, return codes) | — |
+| `EBICO.Connector` | Client pipeline (mediator pattern), onboarding/upload/download API | `EBICO.Core` (same version) + `Microsoft.Extensions.*` |
 
-Beim `dotnet pack` des Connectors wird `EBICO.Core` **nicht** eingebettet, sondern als
-Paket-Abhängigkeit in die `.nuspec` geschrieben (mit exakt gleicher Version). Ein Konsument zieht also
-beide Pakete. Die schlanke Fremd-Abhängigkeitsliste (nur `Microsoft.Extensions.*` und — für den
-INI-/HIA-Brief — QuestPDF) bleibt damit erhalten.
+On `dotnet pack` of the connector, `EBICO.Core` is **not** embedded but written into the `.nuspec`
+as a package dependency (with exactly the same version). A consumer therefore pulls both packages.
+The lean third-party dependency list (only `Microsoft.Extensions.*` and — for the INI/HIA letter —
+QuestPDF) is thereby preserved.
 
-## Paket-Metadaten
+## Package metadata
 
-Gesetzt in [`Directory.Build.props`](../../Directory.Build.props) (gemeinsam) bzw. in den `.csproj`
-(projekt-spezifisch):
+Set in [`Directory.Build.props`](../../Directory.Build.props) (shared) or in the `.csproj`
+(project-specific):
 
-| Feld | Wert |
+| Field | Value |
 | --- | --- |
-| `PackageId` | Projektname (`EBICO.Core`, `EBICO.Connector`) |
+| `PackageId` | project name (`EBICO.Core`, `EBICO.Connector`) |
 | `Authors` / `Company` | `Dominik Zettl` / `tecvia` |
-| `Description` / `PackageTags` | je Projekt in der `.csproj` |
-| `PackageLicenseExpression` | `MIT` (siehe [`LICENSE`](../../LICENSE)) |
+| `Description` / `PackageTags` | per project in the `.csproj` |
+| `PackageLicenseExpression` | `MIT` (see [`LICENSE`](../../LICENSE)) |
 | `PackageProjectUrl` / `RepositoryUrl` | `https://github.com/dominikz98/ebico` |
-| `PackageReadmeFile` | `README.md` (je Projekt, mit ins Paket gepackt) |
+| `PackageReadmeFile` | `README.md` (per project, packed into the package) |
 | `IncludeSymbols` / `SymbolPackageFormat` | `true` / `snupkg` |
 
-Die XML-Doku (`GenerateDocumentationFile`, bereits für Core+Connector aktiv) landet automatisch als
-`lib/net10.0/<Assembly>.xml` im Paket.
+The XML docs (`GenerateDocumentationFile`, already active for Core+Connector) automatically end up
+as `lib/net10.0/<Assembly>.xml` in the package.
 
-## Versionierung (CalVer)
+## Versioning (CalVer)
 
-Die Version folgt dem Schema **`{JAHR}.{MONAT}.{BUILD}`** (Kalenderversionierung, bewusst **statt**
-SemVer — siehe [ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)):
+The version follows the scheme **`{YEAR}.{MONTH}.{BUILD}`** (calendar versioning, deliberately
+**instead of** SemVer — see [ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)):
 
 ```
 VersionPrefix = <UTC-Jahr>.<UTC-Monat>.$(EbicoBuildNumber)
 ```
 
-- **BUILD** kommt in der CI aus `github.run_number` (`-p:EbicoBuildNumber=…`, monoton steigend), lokal
-  Default `0` (→ z. B. `2026.7.0`).
-- **Normalisierung:** NuGet/MSBuild behandeln Versionskomponenten als Integer — die führende Null im
-  Monat entfällt (`2026.07.1` → **`2026.7.1`**). Das ist erwartet und ändert die Ordnung nicht.
-- Über SourceLink trägt `AssemblyInformationalVersion` zusätzlich den Commit-SHA (`2026.7.1+<sha>`).
+- **BUILD** comes in the CI from `github.run_number` (`-p:EbicoBuildNumber=…`, monotonically
+  increasing), locally the default `0` (→ e.g. `2026.7.0`).
+- **Normalization:** NuGet/MSBuild treat version components as integers — the leading zero in the
+  month drops (`2026.07.1` → **`2026.7.1`**). This is expected and does not change the ordering.
+- Via SourceLink, `AssemblyInformationalVersion` additionally carries the commit SHA (`2026.7.1+<sha>`).
 
-CalVer kodiert **keine** API-Kompatibilität; Breaking Changes werden über Release-Notes/Changelog
-kommuniziert, nicht über die Versionsnummer (Trade-off in ADR-0024).
+CalVer encodes **no** API compatibility; breaking changes are communicated via release
+notes/changelog, not via the version number (trade-off in ADR-0024).
 
 ## Symbols & SourceLink
 
-`Microsoft.SourceLink.GitHub` (build-only, `PrivateAssets=all`) bettet die Repository-/Commit-Info ein;
-`IncludeSymbols=true` + `SymbolPackageFormat=snupkg` erzeugt neben jedem `.nupkg` ein `.snupkg` mit dem
-`.pdb`. Zusammen mit `PublishRepositoryUrl`/`EmbedUntrackedSources` erlaubt das Step-Debugging bis in die
-Quellen des jeweiligen Commits. `ContinuousIntegrationBuild` wird nur in der CI (`GITHUB_ACTIONS`) gesetzt
-(deterministische Pfade).
+`Microsoft.SourceLink.GitHub` (build-only, `PrivateAssets=all`) embeds the repository/commit info;
+`IncludeSymbols=true` + `SymbolPackageFormat=snupkg` produces a `.snupkg` with the `.pdb` alongside
+each `.nupkg`. Together with `PublishRepositoryUrl`/`EmbedUntrackedSources` this allows step-debugging
+right into the sources of the respective commit. `ContinuousIntegrationBuild` is only set in the CI
+(`GITHUB_ACTIONS`) (deterministic paths).
 
-## Paket-README
+## Package README
 
-Jedes Paket bringt eine eigene `README.md` mit (`src/EBICO.Core/README.md`,
-`src/EBICO.Connector/README.md`), die auf nuget.org als Paketbeschreibung gerendert wird. Sie verlinken
-mit **absoluten** GitHub-URLs (relative Repo-Links würden auf nuget.org nicht auflösen).
+Each package brings its own `README.md` (`src/EBICO.Core/README.md`,
+`src/EBICO.Connector/README.md`), which is rendered on nuget.org as the package description. They link
+with **absolute** GitHub URLs (relative repo links would not resolve on nuget.org).
 
-## Quickstart-Sample
+## Quickstart sample
 
-[`samples/EBICO.Connector.Quickstart`](../../samples/EBICO.Connector.Quickstart/README.md) ist eine
-**selbstständige Konsolenapp**: sie startet den `EBICO.Server`-Emulator **in-process** (Kestrel,
-ephemerer Loopback-Port), seedet die Stammdaten und fährt mit dem Connector den vollständigen Rundlauf.
-Kein externer Server, keine echte Bank:
+[`samples/EBICO.Connector.Quickstart`](../../samples/EBICO.Connector.Quickstart/README.md) is a
+**self-contained console app**: it starts the `EBICO.Server` emulator **in-process** (Kestrel,
+ephemeral loopback port), seeds the master data and drives the full round-trip with the connector.
+No external server, no real bank:
 
 ```bash
 dotnet run --project samples/EBICO.Connector.Quickstart
 ```
 
-Der Ablauf (in `QuickstartRunner.RunAsync`, auch aus Tests aufrufbar):
+The flow (in `QuickstartRunner.RunAsync`, also callable from tests):
 
-1. Teilnehmerschlüssel erzeugen (`ISubscriberKeyGenerator.GenerateAsync`, A00x/X002/E002),
-2. Onboarding **INI → HIA → HPB** (Bank-Fingerprints in-flow geprüft),
-3. Upload **CCT** (`pain.001`, selbst erzeugte, nicht-proprietäre Sample-Daten in `SamplePain`),
-4. Download **C53** (`camt.053`) mit Parse-Hook (ZIP-Einträge auslesen).
+1. generate subscriber keys (`ISubscriberKeyGenerator.GenerateAsync`, A00x/X002/E002),
+2. onboarding **INI → HIA → HPB** (bank fingerprints checked in-flow),
+3. upload **CCT** (`pain.001`, self-generated, non-proprietary sample data in `SamplePain`),
+4. download **C53** (`camt.053`) with parse hook (read out ZIP entries).
 
-Ein *echter* Einsatz zeigt statt des in-process-Servers auf die Bank-URL bzw. auf einen separat
-gestarteten `EBICO.Server`; DI-Setup und `IEbicsClient.Send` bleiben identisch.
+A *real* deployment points at the bank URL or at a separately started `EBICO.Server` instead of the
+in-process server; the DI setup and `IEbicsClient.Send` stay identical.
 
 ## Tests
 
-`tests/EBICO.Tests/Packaging/` sichert das Feature ab:
+`tests/EBICO.Tests/Packaging/` secures the feature:
 
-- **`PackageMetadataTests`** — prüft reflektiv für die `EBICO.Core`- und `EBICO.Connector`-Assemblies,
-  dass die `AssemblyInformationalVersion` dem CalVer-Muster entspricht und
-  `Description`/`Company`/`Copyright` gesetzt sind.
-- **`QuickstartSampleTests`** — Smoke-Test: führt `QuickstartRunner.RunAsync` aus und belegt den
-  vollständigen Rundlauf (INI/HIA/HPB `000000`, CCT `000000`, C53 **`011000`**).
+- **`PackageMetadataTests`** — checks reflectively for the `EBICO.Core` and `EBICO.Connector`
+  assemblies that the `AssemblyInformationalVersion` matches the CalVer pattern and that
+  `Description`/`Company`/`Copyright` are set.
+- **`QuickstartSampleTests`** — smoke test: runs `QuickstartRunner.RunAsync` and proves the full
+  round-trip (INI/HIA/HPB `000000`, CCT `000000`, C53 **`011000`**).
 
-Die tatsächlichen **Paketinhalte** (README, XML-Doc, Lizenz-Expression, Core-Dependency, `.snupkg`)
-werden vom CI-`pack`-Job validiert — ein fehlerhaftes README-Wiring bräche `dotnet pack` z. B. mit
+The actual **package contents** (README, XML doc, license expression, Core dependency, `.snupkg`)
+are validated by the CI `pack` job — a faulty README wiring would break `dotnet pack` e.g. with
 `NU5039`.
 
 ## CI / Publish
 
-Der [`pack`-Job](../development/ci.md) baut bei jedem Push/PR nach `build-test` beide Pakete
-(`*.nupkg` + `*.snupkg`) nach `./artifacts` und lädt sie als Artefakt hoch — **build-only, kein
-Registry-Push** (Regressionsschutz, analog zum `container-build`-Job).
+The [`pack` job](../development/ci.md) builds both packages on every push/PR after `build-test`
+(`*.nupkg` + `*.snupkg`) into `./artifacts` and uploads them as an artifact — **build-only, no
+registry push** (regression protection, analogous to the `container-build` job).
 
-Der authentifizierte **Push nach nuget.org** erfolgt seit **M9 / #62** in der tag-getriggerten
-[Release-Pipeline](../development/release.md) (`.github/workflows/release.yml`,
-[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)): Ein Tag `vJAHR.MONAT.N` leitet die
-Version ab, packt Core + Connector mit dieser Version und pusht sie (inkl. `.snupkg`-Symbole) nach
-nuget.org (Secret `NUGET_API_KEY`, `--skip-duplicate`); zusätzlich entsteht ein GitHub-Release mit
-auto-generierten Notes. Der bloße Merge publiziert nichts — der Push feuert nur beim Tag.
+The authenticated **push to nuget.org** has happened since **M9 / #62** in the tag-triggered
+[release pipeline](../development/release.md) (`.github/workflows/release.yml`,
+[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)): a tag `vJAHR.MONAT.N` derives the
+version, packs Core + Connector with that version and pushes them (incl. `.snupkg` symbols) to
+nuget.org (secret `NUGET_API_KEY`, `--skip-duplicate`); additionally a GitHub release with
+auto-generated notes is created. A mere merge publishes nothing — the push only fires on the tag.
 
-## Offene Punkte
+## Open points
 
-- `Authors`/`Company` sind Platzhalter; bei einem offiziellen Release ggf. auf die endgültige
-  Herausgeber-/Firmenbezeichnung anpassen.
+- `Authors`/`Company` are placeholders; for an official release adjust them if needed to the final
+  publisher/company designation.
 
-## Verwandte Doku
+## Related docs
 
-- [Connector-Architektur](architecture.md) — Gesamtentwurf, Send-Pipeline
-- [Client-Kern & Konfiguration](client-core.md) — #46: `AddEbicoConnector`, Options/DI
-- [Onboarding](onboarding.md) · [Upload](upload.md) · [Download](download.md) — die im Sample genutzten Flows
-- [CI-Pipeline](../development/ci.md) — der `pack`-Job (build-only)
-- [Release-Runbook](../development/release.md) — Tag setzen → nuget.org-/GHCR-Push (#62)
-- [ADR-0024 — NuGet-Packaging & Versionierung](../adr/0024-nuget-packaging-und-versionierung.md)
-- [ADR-0027 — NuGet-Publish- & Release-Pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
-- [Lizenz & Repo-Policy](../legal/ebics-licensing.md) — proprietäre EBICS-Schemas (nicht Teil der Pakete)
+- [Connector architecture](architecture.md) — overall design, send pipeline
+- [Client core & configuration](client-core.md) — #46: `AddEbicoConnector`, options/DI
+- [Onboarding](onboarding.md) · [Upload](upload.md) · [Download](download.md) — the flows used in the sample
+- [CI pipeline](../development/ci.md) — the `pack` job (build-only)
+- [Release runbook](../development/release.md) — set tag → nuget.org/GHCR push (#62)
+- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-und-versionierung.md)
+- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
+- [License & repo policy](../legal/ebics-licensing.md) — proprietary EBICS schemas (not part of the packages)
 
 ---
 
-> Diese Seite ist die gepflegte Referenz. Bei Änderungen am Packaging hier (und im
-> [Doku-Index](../index.md)) nachziehen.
+> This page is the maintained reference. On changes to the packaging, update it here (and in the
+> [doc index](../index.md)).

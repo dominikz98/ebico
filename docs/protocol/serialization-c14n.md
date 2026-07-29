@@ -1,34 +1,34 @@
-# XML-Serialisierung & Canonicalization (C14N)
+# XML serialization & canonicalization (C14N)
 
-Wie `EBICO.Core` EBICS-Envelopes **deterministisch** serialisiert und für Signaturen
-**kanonisiert** (C14N). Setzt auf die committeten [XSD-Bindings](xsd-bindings.md)
-(#11–#13) und den [Versions-Dispatch](version-dispatch.md) (#14) auf. Issue **#15**
+How `EBICO.Core` serializes EBICS envelopes **deterministically** and canonicalizes them for
+signatures (C14N). Builds on the committed [XSD bindings](xsd-bindings.md)
+(#11–#13) and the [version dispatch](version-dispatch.md) (#14). Issue **#15**
 (Milestone M1).
 
-## Bausteine
+## Building blocks
 
-Alle unter `src/EBICO.Core/Serialization/`:
+All under `src/EBICO.Core/Serialization/`:
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `EbicsXmlSerializer` | `Serialization/EbicsXmlSerializer.cs` | deterministisches Serialisieren + versions­erkennendes Deserialisieren von Envelopes |
-| `XmlCanonicalizer` | `Serialization/XmlCanonicalizer.cs` | Kanonform (C14N) als UTF-8-Oktette; inklusiv **und** exklusiv |
-| `C14nMode` / `C14nAlgorithms` | `Serialization/C14nAlgorithm.cs` | die vier C14N-Varianten + Mapping zur `ds:CanonicalizationMethod/@Algorithm`-URI |
+| `EbicsXmlSerializer` | `Serialization/EbicsXmlSerializer.cs` | deterministic serialization + version-detecting deserialization of envelopes |
+| `XmlCanonicalizer` | `Serialization/XmlCanonicalizer.cs` | canonical form (C14N) as UTF-8 octets; inclusive **and** exclusive |
+| `C14nMode` / `C14nAlgorithms` | `Serialization/C14nAlgorithm.cs` | the four C14N variants + mapping to the `ds:CanonicalizationMethod/@Algorithm` URI |
 
-## Deterministische Serialisierung
+## Deterministic serialization
 
-Damit dieselbe Objektstruktur stets dieselben Bytes ergibt (und über H003/H004/H005
-strukturgleich bleibt), legt `EbicsXmlSerializer` fest:
+So that the same object structure always produces the same bytes (and stays structurally equal
+across H003/H004/H005), `EbicsXmlSerializer` fixes:
 
-- **UTF-8 ohne BOM**, mit XML-Deklaration, ohne Einrückung
-  (`encoding="utf-8"` korrekt in der Deklaration — die Serialisierung läuft über einen
-  `MemoryStream`, nicht über einen `StringWriter`, der `utf-16` deklarieren würde).
-- **Stabile Prefix-Map** je Version via `XmlSerializerNamespaces`: der Protokoll-Namespace
-  als **Default** (Wurzel unpräfigiert), `ds` für XML-DSig. Das unterdrückt zugleich das
-  automatische `xmlns:xsi`/`xmlns:xsd`-Rauschen.
-- Die **Element-/Attribut-Reihenfolge** ist bereits durch die generierten Bindings fest;
-  der Serializer fügt nur Kodierung, Namespaces und Formatierung deterministisch hinzu.
-- `XmlSerializer`-Instanzen werden je Typ **gecacht** (Konstruktion ist teuer).
+- **UTF-8 without BOM**, with an XML declaration, without indentation
+  (`encoding="utf-8"` correct in the declaration — the serialization runs over a
+  `MemoryStream`, not over a `StringWriter`, which would declare `utf-16`).
+- **Stable prefix map** per version via `XmlSerializerNamespaces`: the protocol namespace
+  as the **default** (root unprefixed), `ds` for XML-DSig. This at the same time suppresses the
+  automatic `xmlns:xsi`/`xmlns:xsd` noise.
+- The **element/attribute order** is already fixed by the generated bindings;
+  the serializer only adds encoding, namespaces and formatting deterministically.
+- `XmlSerializer` instances are **cached** per type (construction is expensive).
 
 ```csharp
 var request = new EBICO.Core.Schema.H005.EbicsRequest { Version = "H005" };
@@ -39,9 +39,9 @@ string xml    = EbicsXmlSerializer.SerializeToString(request);
 //              <ebicsRequest xmlns="urn:org:ebics:H005" xmlns:ds="…" Version="H005" />
 ```
 
-Symmetrisch dazu **erkennt** `DeserializeEnvelope` die Version selbst: der Wurzel-Namespace
-wählt über den [`EbicsVersionDetector`](version-dispatch.md) die Version (inkl.
-H003-Legacy-Sonderfall), der Wurzel-**Elementname** eines der sechs Envelopes
+Symmetrically, `DeserializeEnvelope` **detects** the version itself: the root namespace
+selects the version via the [`EbicsVersionDetector`](version-dispatch.md) (incl.
+H003 legacy special case), the root **element name** one of the six envelopes
 (`ebicsRequest` → `RequestType`, `ebicsResponse` → `ResponseType`, …
 `ebicsKeyManagementResponse` → `KeyManagementResponseType`):
 
@@ -50,20 +50,20 @@ IEbicsEnvelope envelope = EbicsXmlSerializer.DeserializeEnvelope(rawXml);
 // envelope.ProtocolVersion → die erkannte Version; konkreter Typ je nach Wurzelelement
 ```
 
-Eingehendes XML wird **gegen DTD/XXE gehärtet** (`DtdProcessing.Prohibit`,
-`XmlResolver = null`) — ein `<!DOCTYPE …>` wird abgelehnt. Unbekannte Wurzelelemente in
-einem bekannten Namespace ergeben eine `EbicsEnvelopeFormatException`, ein unbekannter
-Namespace eine `EbicsVersionNotSupportedException`.
+Incoming XML is **hardened against DTD/XXE** (`DtdProcessing.Prohibit`,
+`XmlResolver = null`) — a `<!DOCTYPE …>` is rejected. Unknown root elements in
+a known namespace yield an `EbicsEnvelopeFormatException`, an unknown
+namespace an `EbicsVersionNotSupportedException`.
 
 ## Canonicalization (C14N)
 
-`XmlCanonicalizer` liefert die **Kanonform als UTF-8-`byte[]`** — genau die Bytes, über die
-eine EBICS-Authentifizierungssignatur ihren Digest bildet. Unterstützt werden beide
-Familien, gewählt über `C14nMode`:
+`XmlCanonicalizer` provides the **canonical form as a UTF-8 `byte[]`** — exactly the bytes over which
+an EBICS authentication signature forms its digest. Both families are supported,
+selected via `C14nMode`:
 
-| `C14nMode` | Algorithmus-URI |
+| `C14nMode` | Algorithm URI |
 |---|---|
-| `Inclusive` *(Default)* | `http://www.w3.org/TR/2001/REC-xml-c14n-20010315` |
+| `Inclusive` *(default)* | `http://www.w3.org/TR/2001/REC-xml-c14n-20010315` |
 | `InclusiveWithComments` | …`#WithComments` |
 | `Exclusive` | `http://www.w3.org/2001/10/xml-exc-c14n#` |
 | `ExclusiveWithComments` | …`#WithComments` |
@@ -73,52 +73,52 @@ byte[] c14n = XmlCanonicalizer.Canonicalize(xml);                       // inklu
 byte[] exc  = XmlCanonicalizer.Canonicalize(xml, C14nMode.Exclusive);   // exklusiv
 ```
 
-- **Whitespace-treu:** geladen wird mit `PreserveWhitespace = true` — anders als der
-  whitespace-tolerante Test-Helfer `CanonicalXmlComparer` (der für Vergleichszwecke
-  belanglose Formatierung verwirft), denn die Kanon-Oktette sind das **signierte Material**.
-- **Gleiche Härtung** wie oben (DTD/XXE).
-- `C14nAlgorithms.FromAlgorithmUri` / `ToAlgorithmUri` bilden die URI auf den Modus ab und
-  zurück — so kann der Signaturcode (M2) die Methode aus einem `SignedInfo` ableiten.
-- Der `inclusiveNamespacePrefixList`-Parameter wirkt nur in den exklusiven Modi
-  (`InclusiveNamespaces`-PrefixList).
+- **Whitespace-faithful:** loading happens with `PreserveWhitespace = true` — unlike the
+  whitespace-tolerant test helper `CanonicalXmlComparer` (which for comparison purposes
+  discards irrelevant formatting), because the canonical octets are the **signed material**.
+- **Same hardening** as above (DTD/XXE).
+- `C14nAlgorithms.FromAlgorithmUri` / `ToAlgorithmUri` map the URI onto the mode and
+  back — so the signature code (M2) can derive the method from a `SignedInfo`.
+- The `inclusiveNamespacePrefixList` parameter takes effect only in the exclusive modes
+  (`InclusiveNamespaces` prefix list).
 
-> **Inklusiv vs. exklusiv — Kernunterschied:** Eine auf einem Vorfahren deklarierte, im
-> Teilbaum **ungenutzte** Namespace-Deklaration behält die *inklusive* C14N bei, die
-> *exklusive* lässt sie weg. Genau das prüft der Differenzierer-Testvektor.
+> **Inclusive vs. exclusive — core difference:** A namespace declaration declared on an
+> ancestor and **unused** in the subtree is kept by *inclusive* C14N, whereas
+> *exclusive* leaves it out. This is exactly what the differentiator test vector checks.
 
-> ⚠️ **Spec-Vorbehalt (Default = inklusiv).** Der Issue-Text nennt „exklusive C14N", die
-> EBICS-Authentifizierungssignatur verwendet aber sehr wahrscheinlich **inklusive**
-> Canonical XML 1.0. Die offiziellen XSDs/Annexe liegen nicht im Repo (vgl.
-> [Schema-Quellen](schema-sources.md) und [ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md)),
-> daher ist die Primitive bewusst für **beide** Algorithmen ausgelegt und der Default auf
-> `Inclusive` gesetzt. Der exakte Algorithmus ist gegen den offiziellen EBICS-Annex zu
-> **verifizieren**, sobald die Schemas vorliegen; M2 (Krypto/Signaturen) wählt die Methode
-> dann über die `@Algorithm`-URI.
+> ⚠️ **Spec caveat (default = inclusive).** The issue text names "exclusive C14N", but the
+> EBICS authentication signature very probably uses **inclusive**
+> Canonical XML 1.0. The official XSDs/annexes are not in the repo (cf.
+> [Schema sources](schema-sources.md) and [ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md)),
+> so the primitive is deliberately designed for **both** algorithms and the default is set to
+> `Inclusive`. The exact algorithm is to be **verified** against the official EBICS annex,
+> as soon as the schemas are available; M2 (crypto/signatures) then selects the method
+> via the `@Algorithm` URI.
 
-## Verhältnis zu `CanonicalXmlComparer`
+## Relationship to `CanonicalXmlComparer`
 
-Der Test-Helfer [`CanonicalXmlComparer`](../development/testing.md#canonicalxmlcomparer--kanonisierter-xml-vergleich)
-delegiert seit #15 an `XmlCanonicalizer` (Modus `Inclusive`) — es gibt **eine**
-C14N-Implementierung. Der Helfer bleibt zusätzlich whitespace-tolerant, weil er
-Serializer-Determinismus vergleicht, nicht signierte Bytes erzeugt.
+The test helper [`CanonicalXmlComparer`](../development/testing.md#canonicalxmlcomparer--canonicalized-xml-comparison)
+has delegated since #15 to `XmlCanonicalizer` (mode `Inclusive`) — there is **one**
+C14N implementation. The helper additionally stays whitespace-tolerant, because it
+compares serializer determinism, not producing signed bytes.
 
 ## Tests
 
-`tests/EBICO.Tests/Serialization/` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Serialization/` (Tier A, CI-safe, without proprietary samples):
 
-- `XmlCanonicalizerTests` — bekannte C14N-Vektoren (angelehnt an W3C C14N 1.0 §3 / exc-c14n,
-  DTD-frei): Attribut-/Namespace-Sortierung, leeres Element ↔ explizites Schließen,
-  Zeichen-Escaping im Text, UTF-8-Oktette, Kommentar-Modi, **Inklusiv-vs-Exklusiv-Differenzierer**,
-  Determinismus, DOCTYPE-/`null`-/Malformed-Härtung; dazu `C14nAlgorithms`-Mapping.
-- `EbicsXmlSerializerTests` — deterministische, BOM-/xsi-/xsd-freie Ausgabe je
-  H003/H004/H005, strukturgleich über die Versionen, stabiler `ds`-Präfix bei
-  `AuthSignature`, Round-Trip über `DeserializeEnvelope` und XXE-Härtung.
+- `XmlCanonicalizerTests` — known C14N vectors (based on W3C C14N 1.0 §3 / exc-c14n,
+  DTD-free): attribute/namespace sorting, empty element ↔ explicit close,
+  character escaping in text, UTF-8 octets, comment modes, **inclusive-vs-exclusive differentiator**,
+  determinism, DOCTYPE/`null`/malformed hardening; plus `C14nAlgorithms` mapping.
+- `EbicsXmlSerializerTests` — deterministic, BOM-/xsi-/xsd-free output per
+  H003/H004/H005, structurally equal across the versions, stable `ds` prefix on
+  `AuthSignature`, round-trip via `DeserializeEnvelope` and XXE hardening.
 
-## Verwandtes
+## Related
 
-- [XSD-Bindings](xsd-bindings.md) — die generierten Klassen, die hier serialisiert werden
-- [Versions-Dispatch](version-dispatch.md) — `EbicsVersionDetector`/Registry, auf denen das
-  Deserialisieren aufsetzt
-- [Test-Harness](../development/testing.md) — `CanonicalXmlComparer` (delegiert hierher)
-- [ADR-0003 — proprietäre Schemas](../adr/0003-umgang-mit-proprietaeren-schemas.md) ·
-  [ADR-0006 — Bindings committen](../adr/0006-generierte-xsd-bindings-committen.md)
+- [XSD bindings](xsd-bindings.md) — the generated classes that are serialized here
+- [Version dispatch](version-dispatch.md) — `EbicsVersionDetector`/registry, on which the
+  deserialization builds
+- [Test harness](../development/testing.md) — `CanonicalXmlComparer` (delegates here)
+- [ADR-0003 — proprietary schemas](../adr/0003-umgang-mit-proprietaeren-schemas.md) ·
+  [ADR-0006 — commit bindings](../adr/0006-generierte-xsd-bindings-committen.md)

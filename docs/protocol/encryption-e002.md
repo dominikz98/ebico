@@ -1,49 +1,49 @@
-# Verschlüsselung E002 (RSA-OAEP + AES-128-CBC) (H003/H004/H005)
+# Encryption E002 (RSA-OAEP + AES-128-CBC) (H003/H004/H005)
 
-Die EBICS-Transportverschlüsselung in `EBICO.Core` (`Crypto/`): ein **hybrides** Verfahren —
-die Auftragsdaten werden symmetrisch mit einem Einmal-**Transaktionsschlüssel** (AES-128-CBC)
-verschlüsselt, und dieser Transaktionsschlüssel wird asymmetrisch mit dem öffentlichen
-Verschlüsselungsschlüssel (`E`) des Empfängers per **RSAES-OAEP über SHA-256** verschlüsselt.
-Baut auf der Schlüssel-Schicht aus [#18](key-representation.md) auf. Issue **#21** (Milestone M2),
-Krypto-Bibliothek: [ADR-0008](../adr/0008-krypto-bibliothek.md)
-(`System.Security.Cryptography`, kein BouncyCastle).
+The EBICS transport encryption in `EBICO.Core` (`Crypto/`): a **hybrid** procedure —
+the order data is encrypted symmetrically with a one-time **transaction key** (AES-128-CBC),
+and this transaction key is encrypted asymmetrically with the recipient's public
+encryption key (`E`) via **RSAES-OAEP over SHA-256**.
+Builds on the key layer from [#18](key-representation.md). Issue **#21** (Milestone M2),
+crypto library: [ADR-0008](../adr/0008-krypto-bibliothek.md)
+(`System.Security.Cryptography`, no BouncyCastle).
 
-> **Abgrenzung:** Bewusst nur die **Byte-Ebene** der hybriden Verschlüsselung — die beiden
-> Chiffrate (verschlüsselter Transaktionsschlüssel + verschlüsselte Auftragsdaten). Das
-> `DataEncryptionInfo`-/`EncryptionPubKeyDigest`-XML-Assembly (#22), die Segmentierung/der
-> `DataTransfer`-Envelope, die X002-Authentifikationssignatur (#20) und die banktechnische
-> Signatur, die die Integrität/Authentizität liefert (#19), gehören **nicht** hierher. Diese
-> Schicht liefert nur die Chiffrat-Bytes, die jene Schichten auf `DataEncryptionInfoType`
-> zusammensetzen.
+> **Scope:** Deliberately only the **byte level** of the hybrid encryption — the two
+> ciphertexts (encrypted transaction key + encrypted order data). The
+> `DataEncryptionInfo`/`EncryptionPubKeyDigest` XML assembly (#22), the segmentation/the
+> `DataTransfer` envelope, the X002 authentication signature (#20) and the bank-technical
+> signature that provides integrity/authenticity (#19) do **not** belong here. This
+> layer only provides the ciphertext bytes that those layers assemble onto
+> `DataEncryptionInfoType`.
 
-## Bausteine
+## Building blocks
 
-Unter `src/EBICO.Core/Crypto/` (Namespace `EBICO.Core.Crypto`):
+Under `src/EBICO.Core/Crypto/` (namespace `EBICO.Core.Crypto`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `EncryptionE002` (static) | `EncryptionE002.cs` | Transaktionsschlüssel erzeugen, RSA-OAEP über den Schlüssel, AES-128-CBC über die Daten, kombinierter Hybrid-Flow (zustandslose BCL-Wrapper) |
-| `EncryptedOrderData` (record struct) | `EncryptionE002.cs` | Ergebnis von `Encrypt`: verschlüsselter Transaktionsschlüssel + verschlüsselte Auftragsdaten |
+| `EncryptionE002` (static) | `EncryptionE002.cs` | generate transaction key, RSA-OAEP over the key, AES-128-CBC over the data, combined hybrid flow (stateless BCL wrappers) |
+| `EncryptedOrderData` (record struct) | `EncryptionE002.cs` | result of `Encrypt`: encrypted transaction key + encrypted order data |
 
-Wiederverwendet aus [#18](key-representation.md): `RsaKeyMaterial` (`CreateRsa()`,
-`HasPrivateKey`, `ToPublicOnly()`), die `KeyVersions`-Registry (`TryGet`, `PaddingIntent`),
-`KeyPurpose` sowie `KeyMaterialException`.
+Reused from [#18](key-representation.md): `RsaKeyMaterial` (`CreateRsa()`,
+`HasPrivateKey`, `ToPublicOnly()`), the `KeyVersions` registry (`TryGet`, `PaddingIntent`),
+`KeyPurpose` as well as `KeyMaterialException`.
 
-## E002 — Verfahren
+## E002 — procedure
 
-EBICS verschlüsselt die Auftragsdaten **symmetrisch** mit einem zufälligen Einmal-Schlüssel
-(AES-128) im CBC-Modus und verschlüsselt diesen Schlüssel **asymmetrisch** mit dem öffentlichen
-`E`-Schlüssel des Empfängers. Die RSA-Padding-Variante hängt an der Schlüsselversion und wird
-**registry-getrieben** aus `KeyVersionInfo.PaddingIntent` aufgelöst (nicht hartkodiert):
+EBICS encrypts the order data **symmetrically** with a random one-time key
+(AES-128) in CBC mode and encrypts this key **asymmetrically** with the recipient's public
+`E` key. The RSA padding variant depends on the key version and is resolved
+**registry-driven** from `KeyVersionInfo.PaddingIntent` (not hard-coded):
 
-| Schritt | Schema | BCL | Determinismus |
+| Step | Scheme | BCL | Determinism |
 |---|---|---|---|
-| Transaktionsschlüssel | AES-128 (16 Byte), zufällig | `RandomNumberGenerator.GetBytes(16)` | randomisiert |
-| Schlüssel-Verschlüsselung | RSAES-OAEP über SHA-256 | `RSAEncryptionPadding.OaepSHA256` | randomisiert |
-| Auftragsdaten | AES-128-CBC, PKCS7-Padding, Null-IV | `Aes.EncryptCbc(data, ivZero, PKCS7)` | deterministisch (gleicher Schlüssel/IV/Klartext → gleiches Chiffrat) |
+| Transaction key | AES-128 (16 bytes), random | `RandomNumberGenerator.GetBytes(16)` | randomised |
+| Key encryption | RSAES-OAEP over SHA-256 | `RSAEncryptionPadding.OaepSHA256` | randomised |
+| Order data | AES-128-CBC, PKCS7 padding, null IV | `Aes.EncryptCbc(data, ivZero, PKCS7)` | deterministic (same key/IV/plaintext → same ciphertext) |
 
-OAEP-SHA256 auf einem 2048-Bit-Schlüssel fasst bis zu 190 Byte Klartext — ein 16-Byte-AES-Schlüssel
-passt bequem. RSA-OAEP läuft über `RSA.Encrypt`/`RSA.Decrypt`, die AES-Schicht über
+OAEP-SHA256 on a 2048-bit key holds up to 190 bytes of plaintext — a 16-byte AES key
+fits comfortably. RSA-OAEP runs over `RSA.Encrypt`/`RSA.Decrypt`, the AES layer over
 `Aes.EncryptCbc`/`Aes.DecryptCbc`.
 
 ```csharp
@@ -59,71 +59,71 @@ var tkBack    = EncryptionE002.DecryptTransactionKey(encTk, recipientKey, KeyVer
 var dataBack  = EncryptionE002.DecryptOrderData(encData, tkBack);
 ```
 
-`GenerateTransactionKey` und die beiden Primitiv-Paare sind **öffentlich**, weil der Voll-Hybrid
-durch das randomisierte RSA-OAEP nicht byte-genau pinbar ist; nur die deterministische AES-Schicht
-lässt sich mit einem festen Schlüssel als Known-Answer-Vektor verankern.
+`GenerateTransactionKey` and the two primitive pairs are **public**, because the full hybrid
+is not byte-exactly pinnable due to the randomised RSA-OAEP; only the deterministic AES layer
+can be anchored with a fixed key as a known-answer vector.
 
-## IV & Padding — Spec-Vorbehalt
+## IV & padding — spec caveat
 
-> **⚠️ Spec-Vorbehalt (symmetrisch):** Der **Null-IV** (16 Null-Bytes) und das **PKCS7-Padding**
-> der Auftragsdaten-Verschlüsselung sind EBICS-Spec-Details, die **noch nicht gegen die offiziellen
-> Schemas/Annexe verifiziert** sind (vgl. CLAUDE.md). Sie sind auf eine einzige Stelle begrenzt
-> (`TransactionIv`, `SymmetricPadding`) und werden dort nachgezogen, sobald die Spec vorliegt. Da
-> **sowohl** `EncryptOrderData` als auch `DecryptOrderData` durch diese Stelle laufen, bleiben in
-> sich konsistente Encrypt-→-Decrypt-Round-Trips davon unberührt.
+> **⚠️ Spec caveat (symmetric):** The **null IV** (16 null bytes) and the **PKCS7 padding**
+> of the order-data encryption are EBICS spec details that are **not yet verified against the
+> official schemas/annexes** (cf. CLAUDE.md). They are confined to a single place
+> (`TransactionIv`, `SymmetricPadding`) and are caught up there as soon as the spec is available.
+> Since **both** `EncryptOrderData` and `DecryptOrderData` run through this place, internally
+> consistent encrypt-→-decrypt round-trips remain unaffected.
 
-> **⚠️ Spec-Vorbehalt (RSA-Padding):** Die EBICS-Version `E002` hat den Transaktionsschlüssel in
-> manchen historischen Spec-Revisionen mit **RSAES-PKCS1-v1_5** statt OAEP verschlüsselt. EBICO
-> folgt der Registry-Intention (**OAEP-SHA256**, wie in diesem Issue gefordert). Das Padding kommt
-> aus `KeyVersions` (`E002 → RsaPaddingScheme.Oaep`) und ist **nie** in der Primitive hartkodiert —
-> sollte echte Bank-Interop PKCS1-v1.5 erfordern, ist das eine **Ein-Zeilen-Änderung in
-> `KeyVersions.cs`**, kein Eingriff in `EncryptionE002`. ADR-0008 sieht diese Revision bereits vor.
+> **⚠️ Spec caveat (RSA padding):** The EBICS version `E002` encrypted the transaction key in
+> some historical spec revisions with **RSAES-PKCS1-v1_5** instead of OAEP. EBICO
+> follows the registry intention (**OAEP-SHA256**, as required in this issue). The padding comes
+> from `KeyVersions` (`E002 → RsaPaddingScheme.Oaep`) and is **never** hard-coded in the primitive —
+> should real bank interop require PKCS1-v1.5, that is a **one-line change in
+> `KeyVersions.cs`**, not an intervention in `EncryptionE002`. ADR-0008 already anticipates this revision.
 
-## Fehlerverhalten
+## Error behaviour
 
-| Bedingung | Verhalten |
+| Condition | Behaviour |
 |---|---|
 | `key == null` / `recipientKey == null` | `ArgumentNullException` |
-| Entschlüsseln (Transaktionsschlüssel) ohne privaten Schlüssel | `KeyMaterialException` |
-| `version` keine bekannte **Verschlüsselungs**-Version mit OAEP (`A005`, `X002`, `E001`, `A999`, `default`) | `InvalidOperationException` |
-| Transaktionsschlüssel-Länge ≠ 16 Byte | `ArgumentException` |
-| Entschlüsseln mit falschem Schlüssel / manipuliertes RSA-Chiffrat | `CryptographicException` (OAEP-Integritätsprüfung) |
-| Entschlüsseln eines manipulierten AES-Chiffrats (letzter Block) | `CryptographicException` (PKCS7-Padding ungültig) |
+| Decrypting (transaction key) without a private key | `KeyMaterialException` |
+| `version` not a known **encryption** version with OAEP (`A005`, `X002`, `E001`, `A999`, `default`) | `InvalidOperationException` |
+| Transaction-key length ≠ 16 bytes | `ArgumentException` |
+| Decrypting with the wrong key / tampered RSA ciphertext | `CryptographicException` (OAEP integrity check) |
+| Decrypting a tampered AES ciphertext (last block) | `CryptographicException` (PKCS7 padding invalid) |
 
-> **Kein `false`-statt-Werfen-Pfad:** Anders als `BankSignature.Verify` hat die Ver-/Entschlüsselung
-> kein boolesches Urteil — **jeder** Fehler wirft. CBC bietet **keine Integrität**: ein in einem
-> früheren Block manipuliertes AES-Chiffrat liefert verfälschten, aber „gültig gepaddeten" Klartext
-> ohne Exception. Integrität/Authentizität liefert die banktechnische Signatur (#19), nicht E002.
+> **No `false`-instead-of-throw path:** Unlike `BankSignature.Verify`, encryption/decryption has
+> no boolean verdict — **every** error throws. CBC provides **no integrity**: an AES ciphertext
+> tampered in an earlier block yields corrupted but "validly padded" plaintext
+> without an exception. Integrity/authenticity is provided by the bank-technical signature (#19), not E002.
 
-> **Keine Versions-Permission-Prüfung hier:** Ob E002 mit einer EBICS-Protokollversion erlaubt ist,
-> bleibt Aufgabe von `KeyVersions.EnsurePermitted` in der Dispatch-/Onboarding-Schicht. Diese
-> Primitive bleibt policy-frei und löst **kein** `KeyVersionNotPermittedException` aus.
+> **No version-permission check here:** Whether E002 is permitted with an EBICS protocol version
+> remains the task of `KeyVersions.EnsurePermitted` in the dispatch/onboarding layer. This
+> primitive stays policy-free and does **not** raise a `KeyVersionNotPermittedException`.
 
-## EBICS-Versionsbezug
+## EBICS version relation
 
-Das Verfahren (AES-128-CBC + RSA-OAEP-Transaktionsschlüssel) ist über H003/H004/H005 identisch;
-E002 ist in allen dreien zulässig (zentral in [`KeyVersions`](key-representation.md)). Die
-Legacy-Version E001 (RSAES-PKCS1-v1.5) ist **nicht** Ziel dieses Issues — sie wird von der
-`ResolveEncryptionPadding`-Stelle bewusst abgelehnt (`InvalidOperationException`).
+The procedure (AES-128-CBC + RSA-OAEP transaction key) is identical across H003/H004/H005;
+E002 is permitted in all three (centrally in [`KeyVersions`](key-representation.md)). The
+legacy version E001 (RSAES-PKCS1-v1.5) is **not** the target of this issue — it is deliberately
+rejected by the `ResolveEncryptionPadding` place (`InvalidOperationException`).
 
 ## Tests
 
-`tests/EBICO.Tests/Crypto/EncryptionE002Tests.cs` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Crypto/EncryptionE002Tests.cs` (Tier A, CI-safe, without proprietary samples):
 
-- Happy Path: Voll-Hybrid Encrypt → Decrypt, RSA-OAEP-Primitiv-Round-Trip, AES-Primitiv-Round-Trip.
-- Verschlüsseln mit `ToPublicOnly()` → Entschlüsseln mit Schlüsselpaar (privater Schlüssel beim
-  Verschlüsseln nicht nötig).
-- `Encrypt` liefert beide Chiffrate; verschlüsselter Transaktionsschlüssel == 256 Byte (2048-Bit-Modulus).
-- **Deterministischer AES-128-CBC-Known-Answer-Vektor**: fixer 16-Byte-Schlüssel + feste
-  Auftragsdaten → byte-gleiches Chiffrat (pinnt Null-IV und PKCS7), plus Decrypt-Richtung.
-- **RSA-OAEP-Nichtdeterminismus**: zweimal verschlüsseln → unterschiedliche Chiffrate, beide
-  entschlüsseln; OAEP-Round-Trip mit fixem PKCS#8-Schlüssel.
-- Negativfälle: Entschlüsseln ohne privaten Schlüssel, falscher Schlüssel, manipuliertes RSA- bzw.
-  AES-Chiffrat, falsche Schlüssellänge, `null`-Schlüssel, falsche/unbekannte Version
+- Happy path: full hybrid Encrypt → Decrypt, RSA-OAEP primitive round-trip, AES primitive round-trip.
+- Encrypting with `ToPublicOnly()` → decrypting with a key pair (private key not needed for
+  encryption).
+- `Encrypt` yields both ciphertexts; encrypted transaction key == 256 bytes (2048-bit modulus).
+- **Deterministic AES-128-CBC known-answer vector**: fixed 16-byte key + fixed
+  order data → byte-identical ciphertext (pins null IV and PKCS7), plus the decrypt direction.
+- **RSA-OAEP non-determinism**: encrypt twice → different ciphertexts, both
+  decrypt; OAEP round-trip with a fixed PKCS#8 key.
+- Negative cases: decrypting without a private key, wrong key, tampered RSA or
+  AES ciphertext, wrong key length, `null` key, wrong/unknown version
   (`A005`/`X002`/`E001`/`A999`/`default`).
 
-## Verwandtes
+## Related
 
-- [Schlüsselpaare & -repräsentation (A/E/X)](key-representation.md) — die zugrunde liegende Schlüssel-Schicht (#18)
-- [Banktechnische Signatur A005/A006](bank-signature.md) — die schwester-Krypto-Operation, liefert die Integrität (#19)
-- [ADR-0008 — Krypto-Bibliothek](../adr/0008-krypto-bibliothek.md)
+- [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
+- [Bank-technical signature A005/A006](bank-signature.md) — the sibling crypto operation, provides the integrity (#19)
+- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
