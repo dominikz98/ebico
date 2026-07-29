@@ -1,96 +1,96 @@
-# EBICO.Connector — Architektur
+# EBICO.Connector — Architecture
 
-`EBICO.Connector` ist die Client-Bibliothek für den Zugriff auf einen
-EBICS-Server (den Emulator `EBICO.Server` oder eine echte Bank). Sie ist
-fluent, testbar und DI-freundlich. Dieses Dokument beschreibt die tragende
-Architektur und die wichtigsten Designentscheidungen samt Trade-offs.
+`EBICO.Connector` is the client library for accessing an EBICS server (the
+`EBICO.Server` emulator or a real bank). It is fluent, testable and
+DI-friendly. This document describes the underlying architecture and the key
+design decisions along with their trade-offs.
 
-> **Status:** Der `EBICO.Connector` ist über die Issues #46–#50 implementiert
-> (Onboarding, Upload und Download für H003/H004/H005); mit der clientseitigen
-> Validierung (#44, Pipeline-Stufe 1) ist die Send-Pipeline vollständig verdrahtet.
-> Welche Bausteine wo liegen, zeigt der Abschnitt **„Bausteine: vorhanden vs.
-> geplant"** weiter unten. Ablaufdetails — etwa die Reihenfolge E002/A00x/X002 oder
-> die Segmentschleife je Version — sind weiterhin gegen die offiziellen
-> EBICS-XSDs/Annexe zu verifizieren, sobald die Schemas vorliegen (die jeweiligen
-> Spec-Vorbehalte stehen in den einzelnen Connector-Doku-Seiten).
+> **Status:** The `EBICO.Connector` is implemented across issues #46–#50
+> (onboarding, upload and download for H003/H004/H005); with the client-side
+> validation (#44, pipeline stage 1) the send pipeline is fully wired up.
+> Which building blocks live where is shown in the section **"Building blocks:
+> present vs. planned"** further below. Flow details — such as the order of
+> E002/A00x/X002 or the per-version segment loop — still need to be verified
+> against the official EBICS XSDs/annexes once the schemas are available (the
+> respective spec caveats are noted on the individual connector doc pages).
 
-## Leitidee: Mediator-Muster
+## Guiding idea: mediator pattern
 
-Der Aufrufer kennt nur **eine** Methode — `IEbicsClient.Send(request)`. Er
-übergibt ein Request-Objekt und bekommt ein typisiertes Ergebnis zurück. Die
-gesamte EBICS-Komplexität (Transaktions-Skelett, Kryptografie, XML-Serialisierung,
-Transport) liegt darunter und ist für den Aufrufer unsichtbar.
+The caller knows only **one** method — `IEbicsClient.Send(request)`. It passes
+a request object and gets back a typed result. The entire EBICS complexity
+(transaction skeleton, cryptography, XML serialization, transport) sits beneath
+it and is invisible to the caller.
 
 ```csharp
 var result = await client.Send(new CddUploadRequest { Pain008 = bytes });
 ```
 
-**Warum Mediator hier passt:** EBICS-Aufträge unterscheiden sich erstaunlich
-wenig. Nahezu jeder Auftrag ist entweder ein *Upload* (Initialisation →
-Transfer) oder ein *Download* (Initialisation → Transfer → Receipt) und
-unterscheidet sich nur in OrderType/BTF, Richtung und Payload-Behandlung. Ein
-generischer Handler pro Richtung deckt damit den Großteil ab; Sonderfälle
-(HPB, INI/HIA) bekommen eigene Handler. Das ist dasselbe Muster, das MediatR
-populär gemacht hat — hier aber bewusst ohne diese Library (siehe
-[Designentscheidungen](#designentscheidungen) und
+**Why mediator fits here:** EBICS orders differ surprisingly little. Almost
+every order is either an *upload* (Initialisation → Transfer) or a *download*
+(Initialisation → Transfer → Receipt) and differs only in OrderType/BTF,
+direction and payload handling. A generic handler per direction therefore
+covers the bulk of it; special cases (HPB, INI/HIA) get their own handlers.
+This is the same pattern that made MediatR popular — but here deliberately
+without that library (see [Design decisions](#design-decisions) and
 [ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)).
 
-## Schichtenmodell
+## Layer model
 
 ```mermaid
 flowchart TD
-    A["Aufrufende App<br/><small>DI, eigener HttpClient, Key-Store</small>"] -->|"Send(request)"| B["IEbicsClient (Mediator)<br/><small>Send&lt;TResult&gt;(IEbicsRequest), Pipeline</small>"]
-    B -->|wählt Handler| C1["Upload-Handler<br/><small>CCT, CDD, ...</small>"]
-    B -->|wählt Handler| C2["Download-Handler<br/><small>STA, C53, HPB, ...</small>"]
-    C1 --> D["Transaktionsmaschine<br/><small>Init – Transfer – Receipt, Segmente</small>"]
+    A["Calling app<br/><small>DI, own HttpClient, key store</small>"] -->|"Send(request)"| B["IEbicsClient (mediator)<br/><small>Send&lt;TResult&gt;(IEbicsRequest), pipeline</small>"]
+    B -->|selects handler| C1["Upload handler<br/><small>CCT, CDD, ...</small>"]
+    B -->|selects handler| C2["Download handler<br/><small>STA, C53, HPB, ...</small>"]
+    C1 --> D["Transaction engine<br/><small>Init – Transfer – Receipt, segments</small>"]
     C2 --> D
-    D --> E1["Krypto + Serialisierung<br/><small>A00x, E002, X002, XSD</small>"]
-    D --> E2["ITransport (HttpClient)<br/><small>injiziert von außen</small>"]
-    E2 --> F["EBICS-Server"]
+    D --> E1["Crypto + serialisation<br/><small>A00x, E002, X002, XSD</small>"]
+    D --> E2["ITransport (HttpClient)<br/><small>injected from outside</small>"]
+    E2 --> F["EBICS server"]
 ```
 
-Von außen nach innen:
+From the outside in:
 
-1. **Aufrufende App** — bringt Dependency Injection, einen eigenen
-   `HttpClient` und einen Key-Store mit.
-2. **`IEbicsClient` (Mediator)** — die einzige öffentliche Einstiegsmethode;
-   schlägt anhand des Request-Typs den passenden Handler nach.
-3. **Upload-/Download-Handler** — ein generischer Handler je Richtung plus
-   Sonderfall-Handler (HPB, INI/HIA).
-4. **Transaktionsmaschine** — kapselt das gemeinsame Init/Transfer/Receipt-
-   Skelett samt Segmentierung.
-5. **Krypto + Serialisierung** und **Transport** — die Querschnitts-Bausteine.
-6. **EBICS-Server** — Gegenstelle (Emulator oder echt).
+1. **Calling app** — brings its own dependency injection, its own
+   `HttpClient` and a key store.
+2. **`IEbicsClient` (mediator)** — the single public entry method; looks up the
+   appropriate handler based on the request type.
+3. **Upload/download handlers** — one generic handler per direction plus
+   special-case handlers (HPB, INI/HIA).
+4. **Transaction machine** — encapsulates the shared Init/Transfer/Receipt
+   skeleton including segmentation.
+5. **Crypto + serialization** and **transport** — the cross-cutting building
+   blocks.
+6. **EBICS server** — the counterpart (emulator or real).
 
-## Send-Pipeline
+## Send pipeline
 
-Jeder `Send`-Aufruf durchläuft eine Pipeline klar getrennter Stufen. Beispiel
-für einen Upload; Schritte 9/10 sind die Download-Segmentschleife.
+Every `Send` call runs through a pipeline of clearly separated stages. Example
+for an upload; steps 9/10 are the download segment loop.
 
 ```mermaid
 flowchart TD
-    R[Anfrage] --> S1[1. Validierung – Berechtigung, BTF]
-    S1 --> S2[2. Payload → XML serialisieren]
-    S2 --> S3[3. Komprimieren, E002, A00x]
-    S3 --> S4[4. X002 Authentifikationssignatur]
+    R[Request] --> S1[1. Validation – authorisation, BTF]
+    S1 --> S2[2. Serialise payload → XML]
+    S2 --> S3[3. Compress, E002, A00x]
+    S3 --> S4[4. X002 authentication signature]
     S4 --> S5[5. HttpClient.Send]
-    S5 --> S6[6. HTTP-Antwort]
-    S6 --> S7[7. Verify + entschlüsseln]
-    S7 --> S8[8. Returncode prüfen]
-    S8 --> S9[9. ggf. weitere Segmente]
-    S9 --> S10[10. Deserialisieren → TResult]
+    S5 --> S6[6. HTTP response]
+    S6 --> S7[7. Verify + decrypt]
+    S7 --> S8[8. Check return code]
+    S8 --> S9[9. further segments if needed]
+    S9 --> S10[10. Deserialise → TResult]
     S10 --> Res["EbicsResult&lt;T&gt;"]
 ```
 
-Jede Stufe ist eine eigene, isoliert unit-testbare Komponente. Die
-Segmentschleife (9) ruft intern weiter, bis alle Segmente eines Downloads
-vorliegen, und gibt erst dann das vollständige `TResult` zurück. Die konkrete
-Ausprägung der Krypto-Stufen ist in eigenen Doku-Seiten beschrieben:
-[XML-Serialisierung & C14N](../protocol/serialization-c14n.md),
-[Verschlüsselung E002](../protocol/encryption-e002.md) und
-[Banktechnische Signatur A005/A006](../protocol/bank-signature.md).
+Each stage is its own component that can be unit-tested in isolation. The
+segment loop (9) keeps calling internally until all segments of a download are
+present, and only then returns the complete `TResult`. The concrete shape of
+the crypto stages is described on their own doc pages:
+[XML serialization & C14N](../protocol/serialization-c14n.md),
+[Encryption E002](../protocol/encryption-e002.md) and
+[Bank-technical signature A005/A006](../protocol/bank-signature.md).
 
-## Kern-Abstraktionen
+## Core abstractions
 
 ```csharp
 // Marker + Ergebnistyp-Bindung: Der Request "weiß", was er zurückgibt.
@@ -119,56 +119,56 @@ public interface IEbicsRequestHandler<TRequest, TResult>
 }
 ```
 
-Der Aufruf in der App bleibt dadurch trivial:
+The call in the app therefore stays trivial:
 
 ```csharp
 var result = await client.Send(new CddUploadRequest { Pain008 = bytes });
 ```
 
-> **Abgrenzung zu Core:** `IEbicsRequest<TResult>` ist die *app-seitige* Request-
-> Abstraktion des Connectors. Sie ist bewusst von den protokollnahen
-> Envelope-Schnittstellen in `EBICO.Core`
-> (`IEbicsRequestEnvelope`/`IEbicsResponseEnvelope`, siehe
-> [Versions-Dispatch](../protocol/version-dispatch.md)) getrennt — beide leben
-> auf unterschiedlichen Schichten.
+> **Distinction from Core:** `IEbicsRequest<TResult>` is the *app-side* request
+> abstraction of the connector. It is deliberately kept separate from the
+> protocol-level envelope interfaces in `EBICO.Core`
+> (`IEbicsRequestEnvelope`/`IEbicsResponseEnvelope`, see
+> [Version dispatch](../protocol/version-dispatch.md)) — both live on
+> different layers.
 
-## Onboarding-Flows: INI / HIA / HPB
+## Onboarding flows: INI / HIA / HPB
 
-Bevor ein Teilnehmer fachliche Aufträge senden kann, muss der Schlüsselaustausch
-abgeschlossen sein. Der Connector kapselt das in drei Sonderfall-Handlern; die
-Schlüssel selbst kommen aus dem [`IKeyStore`](#key-store-als-abstraktion-ikeystore).
+Before a subscriber can send business orders, the key exchange must be
+complete. The connector encapsulates this in three special-case handlers; the
+keys themselves come from the [`IKeyStore`](#key-store-as-an-abstraction-ikeystore).
 
 ```mermaid
 sequenceDiagram
-    participant C as Teilnehmer (Connector)
-    participant S as EBICS-Server (Bank)
-    C->>S: INI — öffentlicher A00x-Signaturschlüssel
-    S-->>C: Returncode
-    C->>S: HIA — öffentliche X002- und E002-Schlüssel
-    S-->>C: Returncode
-    Note over C,S: INI-/HIA-Brief mit Schlüssel-Hashes wird manuell zur Bank<br/>übermittelt. Die Bank aktiviert daraufhin den Teilnehmer.
-    C->>S: HPB — Abruf der Bankschlüssel
-    S-->>C: X002-/E002-Schlüssel der Bank (verschlüsselt)
-    Note over C: Bank-Schlüssel-Hashes gegen den Bankbrief verifizieren,<br/>dann im IKeyStore ablegen.
+    participant C as Subscriber (connector)
+    participant S as EBICS server (bank)
+    C->>S: INI — public A00x signature key
+    S-->>C: return code
+    C->>S: HIA — public X002 and E002 keys
+    S-->>C: return code
+    Note over C,S: INI/HIA letter with key hashes is sent to the bank<br/>manually. The bank then activates the subscriber.
+    C->>S: HPB — fetch the bank keys
+    S-->>C: bank's X002/E002 keys (encrypted)
+    Note over C: verify the bank key hashes against the bank letter,<br/>then store them in the IKeyStore.
 ```
 
-- **INI** überträgt den öffentlichen **A00x**-Signaturschlüssel des Teilnehmers
-  (banktechnische Signatur, siehe [A005/A006](../protocol/bank-signature.md)).
-- **HIA** überträgt den öffentlichen **X002**-Authentifikations- und den
-  **E002**-Verschlüsselungsschlüssel des Teilnehmers.
-- **HPB** ist ein *Download*: Der Teilnehmer holt die öffentlichen Bankschlüssel
-  (X002/E002) und verifiziert deren Hash gegen den Bankbrief.
+- **INI** transmits the subscriber's public **A00x** signature key
+  (bank-technical signature, see [A005/A006](../protocol/bank-signature.md)).
+- **HIA** transmits the subscriber's public **X002** authentication and
+  **E002** encryption keys.
+- **HPB** is a *download*: the subscriber fetches the bank's public keys
+  (X002/E002) and verifies their hash against the bank letter.
 
-Erst nach INI + HIA + HPB und der Aktivierung durch die Bank sind Uploads (z. B.
-CCT/CDD) und Downloads (z. B. STA/C53) möglich — das entspricht dem
-Akzeptanzkriterium des Connector-Epics. Zu Schlüsselversionen und
--repräsentation siehe [Schlüsselpaare & -repräsentation](../protocol/key-representation.md).
+Only after INI + HIA + HPB and activation by the bank are uploads (e.g.
+CCT/CDD) and downloads (e.g. STA/C53) possible — this matches the acceptance
+criterion of the connector epic. For key versions and representation see
+[Key pairs & representation](../protocol/key-representation.md).
 
-## Transaktions-Skelett: Upload und Download
+## Transaction skeleton: upload and download
 
-Alle fachlichen Aufträge teilen sich ein gemeinsames Transaktions-Skelett, das
-die Transaktionsmaschine kapselt. Genau diese Gemeinsamkeit macht je einen
-generischen Handler pro Richtung möglich.
+All business orders share a common transaction skeleton that the transaction
+machine encapsulates. It is exactly this commonality that makes one generic
+handler per direction possible.
 
 ### Upload (Initialisation → Transfer)
 
@@ -176,12 +176,12 @@ generischen Handler pro Richtung möglich.
 sequenceDiagram
     participant C as Connector
     participant S as EBICS-Server
-    Note over C: Payload komprimieren, E002-verschlüsseln,<br/>A00x-signieren, X002-Authentifikationssignatur
-    C->>S: ebicsRequest — Initialisation (Auftragsdaten, Signaturen)
-    S-->>C: Transaction-ID + Returncode
-    loop je weiterem Segment
-        C->>S: ebicsRequest — Transfer (Segment n)
-        S-->>C: Returncode
+    Note over C: compress payload, E002-encrypt,<br/>A00x-sign, X002 authentication signature
+    C->>S: ebicsRequest — Initialisation (order data, signatures)
+    S-->>C: transaction ID + return code
+    loop each further segment
+        C->>S: ebicsRequest — Transfer (segment n)
+        S-->>C: return code
     end
 ```
 
@@ -191,69 +191,67 @@ sequenceDiagram
 sequenceDiagram
     participant C as Connector
     participant S as EBICS-Server
-    C->>S: ebicsRequest — Initialisation (Download-BTF)
-    S-->>C: Anzahl Segmente + Segment 1 (verschlüsselt) + Transaction-ID
-    loop restliche Segmente
-        C->>S: ebicsRequest — Transfer (Segment n anfordern)
-        S-->>C: Segment n
+    C->>S: ebicsRequest — Initialisation (download BTF)
+    S-->>C: number of segments + segment 1 (encrypted) + transaction ID
+    loop remaining segments
+        C->>S: ebicsRequest — Transfer (request segment n)
+        S-->>C: segment n
     end
-    C->>S: ebicsRequest — Receipt (Empfang quittieren)
-    S-->>C: Abschluss-Returncode
+    C->>S: ebicsRequest — Receipt (acknowledge receipt)
+    S-->>C: final return code
 ```
 
-Der Upload endet nach der Transfer-Phase; der Download quittiert zusätzlich mit
-einer **Receipt**-Phase, ob die Daten vollständig und verwertbar empfangen
-wurden. Die Download-Segmentschleife entspricht Stufe 9 der
-[Send-Pipeline](#send-pipeline).
+The upload ends after the transfer phase; the download additionally
+acknowledges, via a **Receipt** phase, whether the data was received completely
+and usably. The download segment loop corresponds to stage 9 of the
+[send pipeline](#send-pipeline).
 
-## Designentscheidungen
+## Design decisions
 
-### Eigener Dispatch statt MediatR-Library
+### Own dispatch instead of the MediatR library
 
-Die Pipeline-Reihenfolge (Krypto vor Transport, Segment-Schleife) und die
-Versionsabhängigkeit (H003/H004/H005) sind sehr EBICS-spezifisch. Ein eigener
-Dispatch gibt volle Kontrolle und vermeidet eine Fremd-Dependency im
-NuGet-Paket — eine schlanke Abhängigkeitsliste ist bei einem öffentlichen
-Connector ein echtes Verkaufsargument.
+The pipeline order (crypto before transport, segment loop) and the version
+dependency (H003/H004/H005) are very EBICS-specific. An own dispatch gives full
+control and avoids a third-party dependency in the NuGet package — a lean
+dependency list is a genuine selling point for a public connector.
 
-*Trade-off:* MediatR würde Dispatch-Boilerplate sparen, bringt aber Kopplung
-an die Library und weniger Kontrolle über die Pipeline. Ausführliche Begründung:
+*Trade-off:* MediatR would save dispatch boilerplate but brings coupling to the
+library and less control over the pipeline. Detailed rationale:
 [ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md).
 
-### `EbicsResult<T>` statt Exceptions für fachliche Returncodes
+### `EbicsResult<T>` instead of exceptions for business return codes
 
-EBICS liefert viele *fachliche* Returncodes (z. B. „noch keine Daten
-vorhanden"), die keine Programmfehler sind. Diese als Result-Typ
-zurückzugeben ist sauberer und zwingt den Aufrufer nicht in `try/catch` für
-Normalfälle. Echte Transport- oder Krypto-Fehler dürfen weiterhin Exceptions
-werfen. Die Form des Result-Typs beschreibt der Abschnitt
-[Ergebnis- und Returncode-Modell](#ebicsresultt--ergebnis--und-returncode-modell).
+EBICS returns many *business* return codes (e.g. "no data available yet") that
+are not program errors. Returning these as a result type is cleaner and does
+not force the caller into `try/catch` for the normal case. Genuine transport or
+crypto errors may still throw exceptions. The shape of the result type is
+described in the section
+[Result and return code model](#ebicsresultt--result-and-return-code-model).
 
-### HttpClient hinter schmalem `ITransport`
+### HttpClient behind a narrow `ITransport`
 
-Der von außen injizierte `HttpClient` wird nicht direkt durchgereicht, sondern
-intern von einem `ITransport` genutzt. So integriert der Connector sauber in
-`IHttpClientFactory` / `AddHttpClient` (Polly-Resilienz, Named Clients,
-Logging-Handler) — ohne dass die EBICS-Logik vom konkreten `HttpClient`
-abhängt. Das hält die Kernlogik transport-agnostisch und testbar.
+The externally injected `HttpClient` is not passed through directly but used
+internally by an `ITransport`. This lets the connector integrate cleanly with
+`IHttpClientFactory` / `AddHttpClient` (Polly resilience, named clients,
+logging handlers) — without the EBICS logic depending on the concrete
+`HttpClient`. This keeps the core logic transport-agnostic and testable.
 
-### Key-Store als Abstraktion (`IKeyStore`)
+### Key store as an abstraction (`IKeyStore`)
 
-Der Schlüsselspeicher ist nicht fest auf Dateien verdrahtet: im Test
-In-Memory-Schlüssel, in Produktion Datei, HSM oder ein eigener Store. Das
-hält die Krypto-Schicht isoliert testbar. Der `IKeyStore` liefert die im
-[Onboarding](#onboarding-flows-ini--hia--hpb) ausgetauschten Teilnehmer- und
-Bankschlüssel; zur Schlüsselrepräsentation siehe
-[Schlüsselpaare & -repräsentation](../protocol/key-representation.md). Die
-Abstraktion `IKeyStore` sowie ein `InMemoryKeyStore` und ein einfacher
-`FileKeyStore` sind mit **#46** umgesetzt (siehe
-[Client-Kern & Konfiguration](client-core.md)).
+The key store is not hard-wired to files: in-memory keys in tests, a file, an
+HSM or a custom store in production. This keeps the crypto layer isolated and
+testable. The `IKeyStore` provides the subscriber and bank keys exchanged
+during [onboarding](#onboarding-flows-ini--hia--hpb); for key representation see
+[Key pairs & representation](../protocol/key-representation.md). The
+`IKeyStore` abstraction as well as an `InMemoryKeyStore` and a simple
+`FileKeyStore` are implemented with **#46** (see
+[Client core & configuration](client-core.md)).
 
-## `EbicsResult<T>` — Ergebnis- und Returncode-Modell
+## `EbicsResult<T>` — Result and return code model
 
-`EbicsResult<T>` trennt drei Fälle sauber: technischer Erfolg mit Wert,
-fachlicher Returncode (kein Fehler) und — davon abgegrenzt — echte technische
-Fehler, die als Exception geworfen werden.
+`EbicsResult<T>` cleanly separates three cases: technical success with a value,
+a business return code (no error) and — distinct from that — genuine technical
+errors that are thrown as an exception.
 
 ```csharp
 // Skizze; die endgültige Form inkl. Returncode-Katalog folgt in #36 (M4).
@@ -266,46 +264,46 @@ public readonly record struct EbicsResult<T>
 }
 ```
 
-Fachliche Beispiel-Codes: `000000` (OK), `011000` (Download-Nachbearbeitung
-erledigt) oder ein „keine Daten vorhanden"-Code — sie führen zu einem
-`EbicsResult`, **nicht** zu einer Exception. Eine **vorläufige** Form dieses Typs
-liegt seit **#46** in `EBICO.Connector` (mit `Success`/`Failure`-Factories); der
-vollständige, gepflegte Returncode-Katalog und die zugehörige ADR werden separat
-in **#36 (Returncode-Modellierung, M4)** erarbeitet und dann abgeglichen.
+Example business codes: `000000` (OK), `011000` (download post-processing done)
+or a "no data available" code — they lead to an `EbicsResult`, **not** to an
+exception. A **preliminary** form of this type has existed since **#46** in
+`EBICO.Connector` (with `Success`/`Failure` factories); the complete, maintained
+return code catalog and the associated ADR will be worked out separately in
+**#36 (return code modelling, M4)** and reconciled then.
 
-## Fehlerbehandlung, Abbruch und Resilienz
+## Error handling, cancellation and resilience
 
-- **Grenze fachlich ↔ technisch:** Fachliche Returncodes → `EbicsResult<T>`
-  (kein Wurf). Technische Fehler (Netzwerk-/HTTP-Fehler, fehlgeschlagene
-  Signatur-Verifikation, nicht deserialisierbares XML) → Exception. So bleibt
-  der Normalpfad `try/catch`-frei.
-- **Abbruch:** Der `CancellationToken` aus `Send(...)` wird durch alle
-  async-Stufen bis in den `ITransport`/`HttpClient` durchgereicht.
-- **Resilienz gehört an den HttpClient, nicht in den Kern:** Timeouts, Retries
-  und Circuit-Breaker werden über `IHttpClientFactory`/Polly am injizierten
-  `HttpClient` konfiguriert (Named Client). Der Connector-Kern bleibt frei von
-  Retry-Logik.
-- **Idempotenz-Hinweis:** EBICS-Transaktionen sind zustandsbehaftet
-  (Transaction-ID über mehrere Segmente). Ein blindes Wiederholen einzelner
-  Transfer-Segmente ist heikel; Retries zielen auf die Verbindungs-/
-  Initialisierungs­ebene, nicht auf halb abgeschlossene Transaktionen.
+- **Boundary business ↔ technical:** Business return codes → `EbicsResult<T>`
+  (no throw). Technical errors (network/HTTP errors, failed signature
+  verification, non-deserializable XML) → exception. This keeps the normal path
+  `try/catch`-free.
+- **Cancellation:** The `CancellationToken` from `Send(...)` is passed through
+  all async stages down into the `ITransport`/`HttpClient`.
+- **Resilience belongs on the HttpClient, not in the core:** Timeouts, retries
+  and circuit breakers are configured via `IHttpClientFactory`/Polly on the
+  injected `HttpClient` (named client). The connector core stays free of retry
+  logic.
+- **Idempotency note:** EBICS transactions are stateful (transaction ID across
+  multiple segments). Blindly retrying individual transfer segments is delicate;
+  retries target the connection/initialization level, not half-completed
+  transactions.
 
-## Versionsabhängigkeit (H003/H004/H005)
+## Version dependency (H003/H004/H005)
 
-Der Connector arbeitet mehrversionsfähig. Die Zielversion kommt aus der
-Konfiguration (`o.Version`, siehe [DI-Registrierung](#di-registrierung))
-und beeinflusst Envelope-Namespaces, Header-Aufbau und teils Krypto-Defaults.
-Die Auswahl und Erkennung der Version stützt sich auf die Core-Bausteine
-(`EbicsVersion`-Registry, `EbicsVersionDetector`, Envelope-Bindings). Hintergrund
-und Strategie: [Versions-Dispatch](../protocol/version-dispatch.md) und
-[ADR-0004 (Multi-Version-Strategie)](../adr/0004-multi-version-strategie.md).
+The connector is multi-version capable. The target version comes from the
+configuration (`o.Version`, see [DI registration](#di-registration)) and
+affects envelope namespaces, header structure and partly crypto defaults. The
+selection and detection of the version relies on the Core building blocks
+(`EbicsVersion` registry, `EbicsVersionDetector`, envelope bindings). Background
+and strategy: [Version dispatch](../protocol/version-dispatch.md) and
+[ADR-0004 (multi-version strategy)](../adr/0004-multi-version-strategie.md).
 
-## DI-Registrierung
+## DI registration
 
-Umgesetzt in **#46** (siehe [Client-Kern & Konfiguration](client-core.md)).
-`AddEbicoConnector(...)` gibt den `IHttpClientBuilder` des Connector-eigenen
-Named Clients zurück, sodass Timeouts und Resilienz direkt am HttpClient
-konfiguriert werden können (Resilienz-Pakete bleiben caller-seitig):
+Implemented in **#46** (see [Client core & configuration](client-core.md)).
+`AddEbicoConnector(...)` returns the `IHttpClientBuilder` of the connector's own
+named client, so that timeouts and resilience can be configured directly on the
+HttpClient (resilience packages stay on the caller side):
 
 ```csharp
 services.AddEbicoConnector(o =>
@@ -320,65 +318,65 @@ services.AddEbicoConnector(o =>
 .AddStandardResilienceHandler();   // optional, Paket beim Aufrufer
 ```
 
-> Verfeinerung ggü. der ursprünglichen Skizze (`.AddHttpClient()`): Rückgabe ist
-> ein `IHttpClientBuilder`, was Resilienz-/Timeout-Konfiguration am
-> Connector-Client erster Klasse macht.
+> Refinement over the original sketch (`.AddHttpClient()`): the return value is
+> an `IHttpClientBuilder`, which makes resilience/timeout configuration on the
+> connector client first-class.
 
-## Testbarkeit (Bezug zur projektweiten Anforderung)
+## Testability (relation to the project-wide requirement)
 
-Die strikte Stufen-Trennung der Pipeline ist die Grundlage für „Unit-Tests pro
-Feature": Validierung, Serialisierung, Krypto-Stufen, Transport und
-Deserialisierung lassen sich je einzeln testen. Über `ITransport` und
-`IKeyStore` werden Server-Antworten und Schlüssel im Test deterministisch
-gestellt (keine echten Netz-/Dateizugriffe).
+The strict stage separation of the pipeline is the foundation for "unit tests
+per feature": validation, serialization, crypto stages, transport and
+deserialization can each be tested individually. Via `ITransport` and
+`IKeyStore`, server responses and keys are set deterministically in tests (no
+real network/file access).
 
-## Bausteine: vorhanden vs. geplant
+## Building blocks: present vs. planned
 
-Der Connector-**Kern** (Client, Dispatch, Konfiguration, Transport, Key-Store)
-ist mit **#46** angelegt, das Onboarding (INI/HIA/HPB) mit **#47** und die
-**Upload-API** (CCT/CDD/CDB/CIP) mit **#48** und die **Download-API**
-(STA/C53/VMK/C52/C54 sowie HAC/HTD/HKD/HAA/HPD/PTK) mit **#49**. Die clientseitige
-**Validierungsstufe** (Berechtigung/BTF, Pipeline-Stufe 1) kam mit **#44** hinzu und
-schließt die Send-Pipeline ab (siehe [Client-Kern](client-core.md#clientseitige-validierung-stufe-1)).
-Die folgende Tabelle ordnet die
-[Send-Pipeline](#send-pipeline)-Stufen den vorhandenen Bausteinen zu — so ist der
-Reifegrad transparent und es entsteht kein „fertig"-Fehleindruck.
+The connector **core** (client, dispatch, configuration, transport, key store)
+is set up with **#46**, onboarding (INI/HIA/HPB) with **#47**, the **upload
+API** (CCT/CDD/CDB/CIP) with **#48** and the **download API**
+(STA/C53/VMK/C52/C54 as well as HAC/HTD/HKD/HAA/HPD/PTK) with **#49**. The
+client-side **validation stage** (authorisation/BTF, pipeline stage 1) was added
+with **#44** and completes the send pipeline (see
+[Client core](client-core.md#client-side-validation-stage-1)). The following
+table maps the [send pipeline](#send-pipeline) stages to the existing building
+blocks — so the maturity is transparent and no false "done" impression arises.
 
-| Pipeline-Stufe | Baustein | Status |
+| Pipeline stage | Building block | Status |
 | --- | --- | --- |
-| 2. Serialisieren / 10. Deserialisieren | `Core/Serialization/EbicsXmlSerializer` | ✅ vorhanden |
-| (Kanonisierung für Signaturen) | `Core/Serialization/XmlCanonicalizer` (C14N) | ✅ vorhanden |
-| 3. E002-Verschlüsselung / 7. Entschlüsseln | `Core/Crypto/EncryptionE002` | ✅ vorhanden |
-| 3. A00x-Signatur / 7. Verify | `Core/Crypto/BankSignature` (A005/A006) | ✅ vorhanden |
-| (Schlüsselmaterial) | `Core/Crypto/RsaKeyMaterial`, `KeyVersions` | ✅ vorhanden |
+| 2. Serialize / 10. Deserialize | `Core/Serialization/EbicsXmlSerializer` | ✅ present |
+| (Canonicalization for signatures) | `Core/Serialization/XmlCanonicalizer` (C14N) | ✅ present |
+| 3. E002 encryption / 7. Decrypt | `Core/Crypto/EncryptionE002` | ✅ present |
+| 3. A00x signature / 7. Verify | `Core/Crypto/BankSignature` (A005/A006) | ✅ present |
+| (Key material) | `Core/Crypto/RsaKeyMaterial`, `KeyVersions` | ✅ present |
 | 5. Transport (`ITransport`/HttpClient) | `Connector/Transport/HttpClientTransport` | ✅ #46 |
-| Connector-Kern (`IEbicsClient`, Dispatch, Handler, DI) | `Connector` (Client, Dispatch, DI) | ✅ #46 |
-| Key-Store (`IKeyStore`) | `Connector/Keys` (InMemory + File) | ✅ #46 |
-| 8. Returncode-Behandlung (`EbicsResult<T>`) | `Connector/EbicsResult<T>` (vorläufig) | 🟡 #46, Katalog #36 |
-| 3. Komprimierung | `Core/Serialization/EbicsCompression` (ZIP/zlib) | ✅ #47 |
-| 4. X002-Authentifikationssignatur | `Core/Crypto/AuthenticationSignature` (im HPB-Flow verdrahtet) | ✅ #47 (HPB) |
-| Onboarding-Handler (INI/HIA/HPB) | `Connector/Onboarding` (Requests/Handler/Builder, `AddEbicoOnboarding`) | ✅ #47 |
-| Schlüsselgenerierung + INI-/HIA-Brief | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
-| 9. Segmentierung | `Core/Serialization/EbicsSegmentation` (im Upload verdrahtet) | ✅ #48 |
-| Upload-Handler (CCT/CDD/CDB/CIP) | `Connector/Upload` (Requests/Handler/Builder, `AddEbicoUpload`) | ✅ #48 |
-| 1. Validierung (Berechtigung, BTF) | `Connector/Validation/RequestValidator` (im Upload-/Download-Executor verdrahtet) | ✅ #44 |
-| Download-Handler (STA/VMK/C53/C52/C54, HAC/HTD/HKD/HAA/HPD/PTK) | `Connector/Download` (Requests/Handler/Builder, Receipt, Parse-Hooks, `AddEbicoDownload`) | ✅ #49 |
+| Connector core (`IEbicsClient`, dispatch, handler, DI) | `Connector` (client, dispatch, DI) | ✅ #46 |
+| Key store (`IKeyStore`) | `Connector/Keys` (InMemory + File) | ✅ #46 |
+| 8. Return code handling (`EbicsResult<T>`) | `Connector/EbicsResult<T>` (preliminary) | 🟡 #46, catalog #36 |
+| 3. Compression | `Core/Serialization/EbicsCompression` (ZIP/zlib) | ✅ #47 |
+| 4. X002 authentication signature | `Core/Crypto/AuthenticationSignature` (wired in the HPB flow) | ✅ #47 (HPB) |
+| Onboarding handler (INI/HIA/HPB) | `Connector/Onboarding` (requests/handler/builder, `AddEbicoOnboarding`) | ✅ #47 |
+| Key generation + INI/HIA letter | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
+| 9. Segmentation | `Core/Serialization/EbicsSegmentation` (wired in the upload) | ✅ #48 |
+| Upload handler (CCT/CDD/CDB/CIP) | `Connector/Upload` (requests/handler/builder, `AddEbicoUpload`) | ✅ #48 |
+| 1. Validation (authorisation, BTF) | `Connector/Validation/RequestValidator` (wired in the upload/download executor) | ✅ #44 |
+| Download handler (STA/VMK/C53/C52/C54, HAC/HTD/HKD/HAA/HPD/PTK) | `Connector/Download` (requests/handler/builder, Receipt, parse hooks, `AddEbicoDownload`) | ✅ #49 |
 
-## Verwandte Doku
+## Related docs
 
-- [Client-Kern & Konfiguration](client-core.md) — #46: Abstraktionen, Options/DI, Dispatch, Transport, Key-Store
-- [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Schlüsselgenerierung, INI/HIA/HPB-Handler, Versions-Dispatch, INI-Brief (Text/PDF)
-- [ADR-0005 — Connector-Dispatch ohne MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
-- [ADR-0004 — Multi-Version-Strategie](../adr/0004-multi-version-strategie.md)
-- [Versions-Dispatch](../protocol/version-dispatch.md)
-- [XML-Serialisierung & C14N](../protocol/serialization-c14n.md)
-- [Verschlüsselung E002](../protocol/encryption-e002.md)
-- [Banktechnische Signatur A005/A006](../protocol/bank-signature.md)
-- [Schlüsselpaare & -repräsentation (A/E/X)](../protocol/key-representation.md)
+- [Client core & configuration](client-core.md) — #46: abstractions, options/DI, dispatch, transport, key store
+- [Onboarding flows INI / HIA / HPB](onboarding.md) — #47: key generation, INI/HIA/HPB handlers, version dispatch, INI letter (text/PDF)
+- [ADR-0005 — Connector dispatch without MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
+- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategie.md)
+- [Version dispatch](../protocol/version-dispatch.md)
+- [XML serialization & C14N](../protocol/serialization-c14n.md)
+- [Encryption E002](../protocol/encryption-e002.md)
+- [Bank-technical signature A005/A006](../protocol/bank-signature.md)
+- [Key pairs & representation (A/E/X)](../protocol/key-representation.md)
 
 ---
 
-> Diese Seite ist die gepflegte Referenz. Bei Architekturänderungen hier (und
-> ggf. in einer ADR) nachziehen; der Connector-Epic im Issue-Tracker verweist
-> auf dieses Dokument. Änderungen am Returncode-Modell werden mit #36 (M4)
-> abgeglichen, Dispatch-Entscheidungen mit ADR-0005.
+> This page is the maintained reference. On architecture changes, update it here
+> (and possibly in an ADR); the connector epic in the issue tracker points to
+> this document. Changes to the return code model are reconciled with #36 (M4),
+> dispatch decisions with ADR-0005.

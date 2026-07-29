@@ -1,82 +1,82 @@
-# Server: Upload-Orders — Zahlungsverkehr (CCT/CDD/CDB/CIP)
+# Server: Upload orders — payments (CCT/CDD/CDB/CIP)
 
-> Umsetzung von **Issue #39** (Milestone M5 — Server: Orders & BTF). Diese Seite beschreibt die
-> erste **fachliche Order-Verarbeitung** auf der [Upload-Transaktion](upload-transaction.md): das
-> **Validieren** hochgeladener SEPA-Zahlungsverkehr-Payloads und das **Ablegen eines
-> Statusreports (pain.002) zur späteren Auslieferung**.
+> Implementation of **Issue #39** (Milestone M5 — Server: Orders & BTF). This page describes the
+> first **business order processing** on top of the [upload transaction](upload-transaction.md): the
+> **validation** of uploaded SEPA payment payloads and the **storing of a
+> status report (pain.002) for later delivery**.
 >
-> Bewusst **enthalten**: der pluggbare `IUploadOrderProcessor` (Default `SepaPaymentUploadProcessor`),
-> die strukturelle pain-Validierung (`EBICO.Core.Payments.SepaPaymentValidator`), der pain.002-Builder
-> (`PainStatusReportBuilder`), die Auflösung des effektiven Order-Codes über alle drei
-> Einreichungs-Konventionen (`BtfOrderTypeCatalog.ResolveUploadOrderType`) und das Ablegen des
-> Statusreports über den `IDownloadDataProvider`. Order-Typen: **CCT** (SEPA Credit Transfer /
+> Deliberately **included**: the pluggable `IUploadOrderProcessor` (default `SepaPaymentUploadProcessor`),
+> the structural pain validation (`EBICO.Core.Payments.SepaPaymentValidator`), the pain.002 builder
+> (`PainStatusReportBuilder`), the resolution of the effective order code across all three
+> submission conventions (`BtfOrderTypeCatalog.ResolveUploadOrderType`) and the storing of the
+> status report via the `IDownloadDataProvider`. Order types: **CCT** (SEPA Credit Transfer /
 > `pain.001`), **CIP** (SEPA Instant / `pain.001`), **CDD** (SEPA Direct Debit CORE / `pain.008`),
 > **CDB** (SEPA Direct Debit B2B / `pain.008`).
-> Bewusst **noch nicht**: eine echte **ISO-20022-XSD-Validierung** (strukturell/semantisch statt XSD);
-> die **ES/`SignatureFlag`-Prüfung** (weiterhin zurückgestellt, konsistent mit
-> [#32](upload-transaction.md)); das **End-to-End-Herunterladen** des Statusreports (Mapping
-> FDL-`FileFormat`/BTD-BTF → `PSR`-Queue): die Generate-on-Demand-Download-Maschine kam mit den
-> [Download-Orders (#40)](statement-orders.md), das `PSR`-Mapping selbst bleibt aber offen (kein
-> BTF/Order-Typ zeigt auf `PSR`).
+> Deliberately **not yet**: a real **ISO 20022 XSD validation** (structural/semantic instead of XSD);
+> the **ES/`SignatureFlag` check** (still deferred, consistent with
+> [#32](upload-transaction.md)); the **end-to-end download** of the status report (mapping
+> FDL `FileFormat`/BTD BTF → `PSR` queue): the generate-on-demand download machine arrived with the
+> [download orders (#40)](statement-orders.md), but the `PSR` mapping itself remains open (no
+> BTF/order type points to `PSR`).
 
-## Zweck
+## Purpose
 
-Ein Zahlungsverkehr-Auftrag ist ein **generischer, segmentierter Upload** (kein eigener Handler): er
-läuft über die [Upload-Transaktion](upload-transaction.md) (FUL/BTU) bzw. — bei den klassischen
-Auftragsarten — direkt über den Order-Code. Nach dem Reassemblieren/Entschlüsseln/Dekomprimieren lag
-die Klartext-Payload bisher nur auf der Transaktion. #39 hängt an dieser Stelle die **fachliche
-Verarbeitung** ein: die Payload wird gegen die erwartete pain-Nachricht geprüft und — bei Erfolg — ein
-positiver **pain.002 Customer Payment Status Report** erzeugt und zur späteren Auslieferung abgelegt.
+A payments order is a **generic, segmented upload** (no dedicated handler): it
+runs over the [upload transaction](upload-transaction.md) (FUL/BTU) or — for the classic
+order types — directly over the order code. After reassembly/decryption/decompression, the
+plaintext payload previously lived only on the transaction. #39 hooks in the **business
+processing** at this point: the payload is checked against the expected pain message and — on success — a
+positive **pain.002 Customer Payment Status Report** is generated and stored for later delivery.
 
-## Einreichungs-Konventionen & Routing
+## Submission conventions & routing
 
-Der Emulator akzeptiert alle drei üblichen EBICS-Konventionen; der **effektive** Order-Code wird zentral
-über `BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, btf, fileFormat)` aufgelöst (Reihenfolge:
-BTF → FileFormat → roher Code):
+The emulator accepts all three usual EBICS conventions; the **effective** order code is resolved centrally
+via `BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, btf, fileFormat)` (order:
+BTF → FileFormat → raw code):
 
-| Version | Konvention | Beispiel | Auflösung |
+| Version | Convention | Example | Resolution |
 | --- | --- | --- | --- |
 | H005 | `AdminOrderType=BTU` + `BTUOrderParams/Service` (BTF) | Service `SCT`/`pain.001` | → `CCT` |
-| H003/H004 | klassischer `OrderType` **direkt** | `OrderType=CCT` | → `CCT` |
-| H003/H004 | generisches `OrderType=FUL` + `FULOrderParams/FileFormat` | `FileFormat=pain.001.001.09` | → `CCT` |
+| H003/H004 | classic `OrderType` **directly** | `OrderType=CCT` | → `CCT` |
+| H003/H004 | generic `OrderType=FUL` + `FULOrderParams/FileFormat` | `FileFormat=pain.001.001.09` | → `CCT` |
 
-Die Routing-Erkennung (`UploadTransactionEngine.IsUploadOrderType`) kennt neben `FUL`/`BTU` jetzt auch
-die direkten Upload-Codes (`BtfOrderTypeCatalog.IsUploadOrderType`). Der aufgelöste Code wird **vor** der
-Berechtigungsprüfung ([#38](btf-framework.md)) verwendet und auf der `UploadTransaction`
-(`EffectiveOrderType`) mitgespeichert, weil die Transfer-Phase keinen Order-Typ mehr trägt.
+The routing detection (`UploadTransactionEngine.IsUploadOrderType`) now knows, besides `FUL`/`BTU`, also
+the direct upload codes (`BtfOrderTypeCatalog.IsUploadOrderType`). The resolved code is used **before** the
+authorisation check ([#38](btf-framework.md)) and also stored on the `UploadTransaction`
+(`EffectiveOrderType`), because the transfer phase no longer carries an order type.
 
-> **Hinweis zur FUL-FileFormat-Auflösung:** CDD (CORE) und CDB (B2B) tragen beide `pain.008`; aus dem
-> FileFormat allein ist die Service-Option nicht ableitbar — der un-optionierte Default (CDD) gewinnt.
-> Für B2B über FUL wäre ein expliziter Marker nötig (Best-Effort, siehe [ADR-0017](../adr/0017-zahlungsverkehr-order-verarbeitung.md)).
+> **Note on FUL FileFormat resolution:** CDD (CORE) and CDB (B2B) both carry `pain.008`; from the
+> FileFormat alone the service option cannot be derived — the un-optioned default (CDD) wins.
+> For B2B via FUL an explicit marker would be needed (best-effort, see [ADR-0017](../adr/0017-zahlungsverkehr-order-verarbeitung.md)).
 
-## Ablauf
+## Flow
 
-Die Auftragstyp-Erkennung/Autorisierung passiert in der **Initialisation**, die Verarbeitung beim
-**letzten Segment** der **Transfer**-Phase (dort liegt die vollständige Payload vor):
+The order type detection/authorisation happens in the **initialisation**, the processing on the
+**last segment** of the **transfer** phase (where the full payload is available):
 
-| Schritt | Phase | Aktion |
+| Step | Phase | Action |
 | --- | --- | --- |
-| 1. Auflösen | Init | effektiven Order-Code bestimmen (BTF/FileFormat/direkt), gegen Berechtigung prüfen (sonst `090003`), auf der Transaktion ablegen |
-| 2. Dekodieren | Transfer (last) | Reassemble → E002-Decrypt → Dekompress (Fehler → `090004`) |
-| 3. Verarbeiten | Transfer (last) | ist der Order-Code ein Zahlungsverkehr-Typ, ruft die Engine den `IUploadOrderProcessor` |
-| 4a. Validieren | — | `SepaPaymentValidator.Validate(orderType, payload)` — ungültig → `090004`, **keine** Ablage, `OrderRejected`-Event |
-| 4b. Ablegen | — | pain.002 bauen (`OrgnlMsgId`/`OrgnlMsgNmId`, `GrpSts=ACCP`) und via `IDownloadDataProvider.EnqueueAsync(subscriber, "PSR", …)` ablegen, `OrderAccepted`-Event |
-| 5. Antwort | Transfer | `ebicsResponse`, `phase=Transfer`, `EBICS_OK` (bzw. `090004` bei Reject) |
+| 1. Resolve | Init | determine the effective order code (BTF/FileFormat/direct), check against the authorisation (otherwise `090003`), store on the transaction |
+| 2. Decode | Transfer (last) | reassemble → E002 decrypt → decompress (error → `090004`) |
+| 3. Process | Transfer (last) | if the order code is a payments type, the engine calls the `IUploadOrderProcessor` |
+| 4a. Validate | — | `SepaPaymentValidator.Validate(orderType, payload)` — invalid → `090004`, **no** storing, `OrderRejected` event |
+| 4b. Store | — | build pain.002 (`OrgnlMsgId`/`OrgnlMsgNmId`, `GrpSts=ACCP`) and store via `IDownloadDataProvider.EnqueueAsync(subscriber, "PSR", …)`, `OrderAccepted` event |
+| 5. Respond | Transfer | `ebicsResponse`, `phase=Transfer`, `EBICS_OK` (or `090004` on reject) |
 
-### Validierung (strukturell/semantisch)
+### Validation (structural/semantic)
 
-`SepaPaymentValidator` (in `EBICO.Core.Payments`) prüft — **ohne** XSD, Elemente über Local Names:
+`SepaPaymentValidator` (in `EBICO.Core.Payments`) checks — **without** XSD, elements by local names:
 
-- Wohlgeformtes XML; `Document`-Root in der erwarteten ISO-Namespace-Familie
-  (`urn:iso:std:iso:20022:tech:xsd:pain.001` bzw. `…pain.008`);
-- Initiation-Root (`CstmrCdtTrfInitn` / `CstmrDrctDbtInitn`);
-- `GrpHdr/MsgId` und `GrpHdr/CreDtTm` (nicht leer), `GrpHdr/NbOfTxs`;
-- ≥1 `PmtInf` und ≥1 Transaktion (`CdtTrfTxInf` / `DrctDbtTxInf`);
-- **Cross-Check 1:** `NbOfTxs` == Anzahl Transaktionen;
-- **Cross-Check 2:** falls `CtrlSum` vorhanden: == Summe der `InstdAmt`.
+- well-formed XML; `Document` root in the expected ISO namespace family
+  (`urn:iso:std:iso:20022:tech:xsd:pain.001` or `…pain.008`);
+- initiation root (`CstmrCdtTrfInitn` / `CstmrDrctDbtInitn`);
+- `GrpHdr/MsgId` and `GrpHdr/CreDtTm` (not empty), `GrpHdr/NbOfTxs`;
+- ≥1 `PmtInf` and ≥1 transaction (`CdtTrfTxInf` / `DrctDbtTxInf`);
+- **cross-check 1:** `NbOfTxs` == number of transactions;
+- **cross-check 2:** if `CtrlSum` is present: == sum of the `InstdAmt`.
 
 ```xml
-<!-- pain.001 (CCT), gekürzt -->
+<!-- pain.001 (CCT), abridged -->
 <Document xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.09">
   <CstmrCdtTrfInitn>
     <GrpHdr><MsgId>MSG-CCT-1</MsgId><CreDtTm>2026-07-14T10:00:00</CreDtTm>
@@ -87,9 +87,9 @@ Die Auftragstyp-Erkennung/Autorisierung passiert in der **Initialisation**, die 
 </Document>
 ```
 
-### Statusreport (pain.002)
+### Status report (pain.002)
 
-`PainStatusReportBuilder` erzeugt einen minimalen, gruppen-bezogenen **pain.002** (Default
+`PainStatusReportBuilder` generates a minimal, group-level **pain.002** (default
 `pain.002.001.03`):
 
 ```xml
@@ -102,66 +102,66 @@ Die Auftragstyp-Erkennung/Autorisierung passiert in der **Initialisation**, die 
 </Document>
 ```
 
-Er wird unter `EbicoServerOptions.PaymentStatusReportOrderType` (Default `"PSR"`) für den einreichenden
-Teilnehmer abgelegt und ist über die [Admin-API](master-data.md) (`GET
-…/subscribers/{userId}/downloads/PSR`) bzw. den `IDownloadDataProvider` beobachtbar.
+It is stored under `EbicoServerOptions.PaymentStatusReportOrderType` (default `"PSR"`) for the submitting
+subscriber and is observable via the [admin API](master-data.md) (`GET
+…/subscribers/{userId}/downloads/PSR`) or the `IDownloadDataProvider`.
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-| Situation | Returncode | Ablage |
+| Situation | Return code | Storing |
 | --- | --- | --- |
-| Erfolg (validiert, Statusreport abgelegt) | `000000` EBICS_OK | Header + Body |
-| pain-Payload ungültig (Struktur/Cross-Check) | `090004` EBICS_INVALID_ORDER_DATA_FORMAT | Body |
-| keine Berechtigung für den (aufgelösten) Order-Typ | `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED | Body |
+| success (validated, status report stored) | `000000` EBICS_OK | header + body |
+| pain payload invalid (structure/cross-check) | `090004` EBICS_INVALID_ORDER_DATA_FORMAT | body |
+| no authorisation for the (resolved) order type | `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED | body |
 
-Die übrigen Transaktions-/Segment-Codes (`091101`/`091104`/…) stammen unverändert aus der
-[Upload-Transaktion](upload-transaction.md).
+The remaining transaction/segment codes (`091101`/`091104`/…) come unchanged from the
+[upload transaction](upload-transaction.md).
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **Keine echte XSD-Validierung.** Struktur/Semantik statt ISO-20022-XSD (ADR-0017); pluggbar für
-  echtes XSD über einen ersetzten `IUploadOrderProcessor`/Validator.
-- **ES/`SignatureFlag` weiterhin ungeprüft.** Die Payload ist entschlüsselt, aber nicht authentifiziert
-  (konsistent mit [#32](upload-transaction.md)).
-- **Statusreport-Download offen.** `PaymentStatusReportOrderType` (`"PSR"`) ist ein Best-Effort-
-  Platzhalter. Die [Download-Orders (#40)](statement-orders.md) haben die Download-Engine so umgestellt,
-  dass sie nach dem **aufgelösten** Order-Typ entnimmt (statt nur nach rohem FDL/BTD); es gibt aber weiterhin
-  **kein** BTF/Order-Typ, der auf die `PSR`-Queue zeigt, sodass der Statusreport nur über die
-  [Admin-API](master-data.md) beobachtbar ist. Das `PSR`-Mapping bleibt ein Folgeschritt.
-- **FUL-B2B-Ambiguität.** CDD/CDB teilen `pain.008`; über FUL/FileFormat gewinnt der CORE-Default (CDD).
-- **pain.002-Version.** Fest `pain.002.001.03` statt strikt an die Upload-Version gekoppelt.
+- **No real XSD validation.** Structure/semantics instead of ISO 20022 XSD (ADR-0017); pluggable for
+  real XSD via a replaced `IUploadOrderProcessor`/validator.
+- **ES/`SignatureFlag` still unchecked.** The payload is decrypted, but not authenticated
+  (consistent with [#32](upload-transaction.md)).
+- **Status report download open.** `PaymentStatusReportOrderType` (`"PSR"`) is a best-effort
+  placeholder. The [download orders (#40)](statement-orders.md) switched the download engine so that
+  it dequeues by the **resolved** order type (instead of just by the raw FDL/BTD); but there is still
+  **no** BTF/order type that points to the `PSR` queue, so the status report is only observable via the
+  [admin API](master-data.md). The `PSR` mapping remains a follow-up step.
+- **FUL B2B ambiguity.** CDD/CDB share `pain.008`; over FUL/FileFormat the CORE default (CDD) wins.
+- **pain.002 version.** Fixed `pain.002.001.03` instead of being strictly coupled to the upload version.
 
-## EBICS-Versionsbezug
+## EBICS version mapping
 
-| Aspekt | H003 / H004 | H005 |
+| Aspect | H003 / H004 | H005 |
 | --- | --- | --- |
-| Auftragsidentität | `OrderType` direkt **oder** `FUL` + `FULOrderParams/FileFormat` | `AdminOrderType=BTU` + `BTUOrderParams/Service` (BTF) |
-| Auflösung → Code | direkt / FileFormat-Familie → CCT/CDD/CDB/CIP | BTF → klassischer Code (Katalog) |
-| pain-Payload | identisch (`pain.001`/`pain.008`, versionsagnostisch geprüft) | dito |
+| Order identity | `OrderType` directly **or** `FUL` + `FULOrderParams/FileFormat` | `AdminOrderType=BTU` + `BTUOrderParams/Service` (BTF) |
+| Resolution → code | direct / FileFormat family → CCT/CDD/CDB/CIP | BTF → classic code (catalog) |
+| pain payload | identical (`pain.001`/`pain.008`, checked version-agnostically) | ditto |
 
 ## Tests
 
-`tests/EBICO.Tests/` (xUnit v3 + AwesomeAssertions; pain-XML aus dem committeten
-`Infrastructure/PainSamples`-Builder, keine proprietären Fixtures):
+`tests/EBICO.Tests/` (xUnit v3 + AwesomeAssertions; pain XML from the committed
+`Infrastructure/PainSamples` builder, no proprietary fixtures):
 
-- `Core/Payments/SepaPaymentValidatorTests` — gültige `pain.001`/`pain.008`; Negativfälle: falsche
-  Nachrichtenfamilie, fehlende `MsgId`, `NbOfTxs`-Mismatch, `CtrlSum`-Mismatch, kein `PmtInf`,
-  malformed XML, unbekannter Order-Typ.
-- `Core/Payments/PainStatusReportBuilderTests` — pain.002 echot `OrgnlMsgId`/`OrgnlMsgNmId`, `GrpSts=ACCP`.
-- `Core/Btf/BtfOrderTypeCatalogTests` — CIP-Seed, `IsUploadOrderType`, `TryGetOrderTypeByFileFormat`,
-  `ResolveUploadOrderType` (alle drei Konventionen).
-- `Server/PaymentUploadTests` (`[Theory]` über H003/H004/H005) — CCT/CDD/CDB **end-to-end** durch die
-  Pipeline (H005 BTU+BTF, H003/H004 direkt **und** FUL+FileFormat): `000000`, Statusreport im Provider
-  abgelegt, dequeuter pain.002 mit passender `OrgnlMsgId`; ungültige Payload → `090004`, nichts abgelegt,
-  Transaktion nicht abgeschlossen.
+- `Core/Payments/SepaPaymentValidatorTests` — valid `pain.001`/`pain.008`; negative cases: wrong
+  message family, missing `MsgId`, `NbOfTxs` mismatch, `CtrlSum` mismatch, no `PmtInf`,
+  malformed XML, unknown order type.
+- `Core/Payments/PainStatusReportBuilderTests` — pain.002 echoes `OrgnlMsgId`/`OrgnlMsgNmId`, `GrpSts=ACCP`.
+- `Core/Btf/BtfOrderTypeCatalogTests` — CIP seed, `IsUploadOrderType`, `TryGetOrderTypeByFileFormat`,
+  `ResolveUploadOrderType` (all three conventions).
+- `Server/PaymentUploadTests` (`[Theory]` over H003/H004/H005) — CCT/CDD/CDB **end-to-end** through the
+  pipeline (H005 BTU+BTF, H003/H004 direct **and** FUL+FileFormat): `000000`, status report stored in the
+  provider, dequeued pain.002 with matching `OrgnlMsgId`; invalid payload → `090004`, nothing stored,
+  transaction not completed.
 
-## Verwandte Doku
+## Related documentation
 
-- [Upload-Transaktion (Initialisation + Transfer)](upload-transaction.md) — die Empfangsmaschine, an der #39 andockt
-- [BTF-Framework (H005)](btf-framework.md) — BTF↔OrderType-Katalog, Berechtigungsprüfung
-- [Download-Transaktion](download-transaction.md) — der Ablage-/Auslieferungskanal (`IDownloadDataProvider`)
-- [Download-Orders: Kontoauszüge & Reports](statement-orders.md) — die Download-Gegenseite (#40); stellte die Engine auf Entnahme nach aufgelöstem Order-Typ um (`PSR`-Mapping weiter offen)
-- [Ereignis-/Protokollspeicher (IEventLog)](event-log.md) — `OrderAccepted`/`OrderRejected`-Ereignisse
-- [Stammdatenverwaltung](master-data.md) — Berechtigungen, Admin-API (Download-Queue)
-- [EBICS-Returncode-Katalog](../protocol/return-codes.md) — `090004`/`090003`
-- [ADR-0017 (Zahlungsverkehr-Order-Verarbeitung)](../adr/0017-zahlungsverkehr-order-verarbeitung.md) — Validierungstiefe, Statusreport-Ablage, Routing
+- [Upload transaction (initialisation + transfer)](upload-transaction.md) — the receive machine that #39 hooks into
+- [BTF framework (H005)](btf-framework.md) — BTF↔order type catalog, authorisation check
+- [Download transaction](download-transaction.md) — the storing/delivery channel (`IDownloadDataProvider`)
+- [Download orders: account statements & reports](statement-orders.md) — the download counterpart (#40); switched the engine to dequeue by resolved order type (`PSR` mapping still open)
+- [Event/log store (IEventLog)](event-log.md) — `OrderAccepted`/`OrderRejected` events
+- [Master data management](master-data.md) — authorisations, admin API (download queue)
+- [EBICS return code catalog](../protocol/return-codes.md) — `090004`/`090003`
+- [ADR-0017 (payments order processing)](../adr/0017-zahlungsverkehr-order-verarbeitung.md) — validation depth, status report storing, routing

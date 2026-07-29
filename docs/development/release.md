@@ -1,71 +1,71 @@
-# Release-Runbook (Publish nach nuget.org & GHCR)
+# Release runbook
 
-Wie ein Release von EBICO geschnitten wird. Umsetzung von **Issue #62** (Milestone M9 — Packaging &
-Docs). Grundsatzentscheidung: [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md). Der
-Workflow ist [`.github/workflows/release.yml`](../../.github/workflows/release.yml).
+How a release of EBICO is cut, and published to nuget.org & GHCR. Implementation of **issue #62** (Milestone M9 — Packaging &
+Docs). Foundational decision: [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md). The
+workflow is [`.github/workflows/release.yml`](../../.github/workflows/release.yml).
 
-## Kurzfassung
+## In brief
 
-Ein Release entsteht durch **Setzen und Pushen eines Tags** `vJAHR.MONAT.N`. Alles Weitere läuft
-automatisch:
+A release comes about by **setting and pushing a tag** `vYEAR.MONTH.N`. Everything else runs
+automatically:
 
 ```bash
 git tag v2026.7.1      # CalVer: {JAHR}.{MONAT}.{BUILD}
 git push origin v2026.7.1
 ```
 
-Der Tag-Push triggert `release.yml`; ein normaler `main`-Push oder PR löst **kein** Release aus
-(der läuft weiter über [`ci.yml`](ci.md)).
+The tag push triggers `release.yml`; a normal `main` push or PR triggers **no** release
+(that still runs via [`ci.yml`](ci.md)).
 
-## Voraussetzungen (einmalig durch Maintainer)
+## Prerequisites (once, by maintainers)
 
-- **Secret `NUGET_API_KEY`** — ein API-Key von nuget.org mit Push-Recht für `EBICO.*`, hinterlegt unter
-  *Repo → Settings → Secrets and variables → Actions*. **Ohne** dieses Secret schlägt der NuGet-Push
-  fehl; nichts wird veröffentlicht.
-- **GHCR** braucht **kein** zusätzliches Secret — der Container-Push nutzt das automatische
-  `GITHUB_TOKEN` (`permissions: packages: write` im Workflow).
+- **Secret `NUGET_API_KEY`** — an API key from nuget.org with push rights for `EBICO.*`, stored under
+  *Repo → Settings → Secrets and variables → Actions*. **Without** this secret the NuGet push
+  fails; nothing is published.
+- **GHCR** needs **no** additional secret — the container push uses the automatic
+  `GITHUB_TOKEN` (`permissions: packages: write` in the workflow).
 
-## Versionsschema
+## Version scheme
 
-Die Version folgt **CalVer `{JAHR}.{MONAT}.{BUILD}`** ([ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)).
-Beim Release ist der **Tag die Quelle der Wahrheit**: `v2026.7.42` → Paket-/Image-Version `2026.7.42`
-(das `v`-Präfix wird entfernt). Der Workflow bricht ab, wenn der Tag nicht dem Muster
-`v<zahl>.<zahl>.<zahl>` entspricht. NuGet normalisiert führende Nullen (`v2026.07.1` → `2026.7.1`).
+The version follows **CalVer `{YEAR}.{MONTH}.{BUILD}`** ([ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)).
+At release the **tag is the source of truth**: `v2026.7.42` → package/image version `2026.7.42`
+(the `v` prefix is removed). The workflow aborts if the tag does not match the pattern
+`v<number>.<number>.<number>`. NuGet normalizes leading zeros (`v2026.07.1` → `2026.7.1`).
 
-> Abgrenzung zum `pack`-Job in `ci.yml`: dort kommt die BUILD-Komponente aus `github.run_number` (reiner
-> Regressions-Pack, kein Push). Für **Releases** überschreibt die Tag-Version das per `-p:Version=`.
+> Distinction from the `pack` job in `ci.yml`: there the BUILD component comes from `github.run_number` (a pure
+> regression pack, no push). For **releases** the tag version overrides that via `-p:Version=`.
 
-## Was der Workflow tut (`release.yml`)
+## What the workflow does (`release.yml`)
 
-1. **Version aus dem Tag ableiten** und gegen das CalVer-Muster prüfen.
-2. **Restore → Build → Test** in Release (mit der Tag-Version; `TreatWarningsAsErrors` gilt weiter).
-3. **Pack** `EBICO.Core` + `EBICO.Connector` (`*.nupkg` + `*.snupkg`) mit der Tag-Version → `./artifacts`.
-4. **Push nach nuget.org** (`dotnet nuget push`, `--skip-duplicate`; `.snupkg`-Symbole werden automatisch
-   mit publiziert).
-5. **GHCR-Container-Push** `ghcr.io/dominikz98/ebico-server:{VERSION}` **und** `:latest`.
-6. **GitHub-Release** mit auto-generierten Release-Notes (aus den PRs/Commits seit dem letzten Tag) und
-   den NuGet-Artefakten als Anhang.
+1. **Derive the version from the tag** and check it against the CalVer pattern.
+2. **Restore → Build → Test** in Release (with the tag version; `TreatWarningsAsErrors` still applies).
+3. **Pack** `EBICO.Core` + `EBICO.Connector` (`*.nupkg` + `*.snupkg`) with the tag version → `./artifacts`.
+4. **Push to nuget.org** (`dotnet nuget push`, `--skip-duplicate`; `.snupkg` symbols are automatically
+   published along with them).
+5. **GHCR container push** `ghcr.io/dominikz98/ebico-server:{VERSION}` **and** `:latest`.
+6. **GitHub release** with auto-generated release notes (from the PRs/commits since the last tag) and
+   the NuGet artifacts as attachments.
 
-## Nach dem Release prüfen
+## Check after the release
 
-- **nuget.org:** `EBICO.Core` und `EBICO.Connector` in der Ziel-Version gelistet (Indizierung kann einige
-  Minuten dauern). nuget.org-Pushes sind praktisch **unwiderruflich** (nur „unlisten").
-- **GHCR:** `docker pull ghcr.io/dominikz98/ebico-server:<version>` funktioniert.
-- **GitHub-Release:** unter *Releases* mit generierten Notes und angehängten `*.nupkg`/`*.snupkg`.
+- **nuget.org:** `EBICO.Core` and `EBICO.Connector` listed in the target version (indexing can take a few
+  minutes). nuget.org pushes are practically **irreversible** (only "unlist").
+- **GHCR:** `docker pull ghcr.io/dominikz98/ebico-server:<version>` works.
+- **GitHub release:** under *Releases* with generated notes and attached `*.nupkg`/`*.snupkg`.
 
-## Fehlersuche
+## Troubleshooting
 
-| Symptom | Ursache / Abhilfe |
+| Symptom | Cause / remedy |
 | --- | --- |
-| Workflow bricht bei „Version aus Tag ableiten" ab | Tag entspricht nicht `vJAHR.MONAT.BUILD` (nur Ziffern, drei Komponenten). |
-| NuGet-Push schlägt fehl (401/403) | `NUGET_API_KEY` fehlt/abgelaufen oder ohne Push-Recht für `EBICO.*`. |
-| Paket „already exists" | Version wurde bereits gepusht; `--skip-duplicate` überspringt sie (kein Fehler). |
-| GHCR-Push „denied" | `packages: write`-Permission fehlt bzw. Package-Sichtbarkeit/Verknüpfung prüfen. |
+| Workflow aborts at "derive version from tag" | Tag does not match `vYEAR.MONTH.BUILD` (only digits, three components). |
+| NuGet push fails (401/403) | `NUGET_API_KEY` missing/expired or without push rights for `EBICO.*`. |
+| Package "already exists" | Version was already pushed; `--skip-duplicate` skips it (no error). |
+| GHCR push "denied" | `packages: write` permission missing, or check package visibility/linkage. |
 
-## Verwandte Doku
+## Related documentation
 
-- [CI-Pipeline](ci.md) — Build/Test/Pack (build-only) je Push/PR
-- [Packaging & Beispiele (NuGet)](../connector/packaging.md) — Paketmetadaten, Symbols, CalVer
-- [Container-Image](../deployment/container.md) — Image-Build & GHCR-Push
-- [ADR-0027 — NuGet-Publish- & Release-Pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
-- [ADR-0024 — NuGet-Packaging & Versionierung](../adr/0024-nuget-packaging-und-versionierung.md)
+- [CI pipeline](ci.md) — build/test/pack (build-only) per push/PR
+- [Packaging & examples (NuGet)](../connector/packaging.md) — package metadata, symbols, CalVer
+- [Container image](../deployment/container.md) — image build & GHCR push
+- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
+- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-und-versionierung.md)

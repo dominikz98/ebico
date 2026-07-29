@@ -70,10 +70,10 @@ public class ContainerArtifactsTests
     }
 
     [Theory]
-    [InlineData("## Zweck")]
-    [InlineData("## Images & Build")]
-    [InlineData("## Konfiguration via ENV")]
-    [InlineData("## Sicherheit")]
+    [InlineData("## Purpose")]
+    [InlineData("## Images & build")]
+    [InlineData("## Configuration via ENV")]
+    [InlineData("## Security")]
     [InlineData("## Health")]
     [InlineData("## Tests")]
     public void ContainerDoc_HasRequiredSections(string heading)

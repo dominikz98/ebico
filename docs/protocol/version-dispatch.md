@@ -1,59 +1,59 @@
-# Versionsabstraktion / Protokoll-Dispatch (H003/H004/H005)
+# Version abstraction / protocol dispatch (H003/H004/H005)
 
-Die zentrale Abstraktion in `EBICO.Core`, über die Server und Connector
-versionsabhängig arbeiten, ohne die Logik dreifach zu duplizieren. Sie ist der
-Dreh- und Angelpunkt zwischen dem `EbicsVersion`-Enum und den generierten
-[XSD-Bindings](xsd-bindings.md). Issue **#14** (Milestone M1),
-Entwurf: [ADR-0004](../adr/0004-multi-version-strategie.md).
+The central abstraction in `EBICO.Core`, over which server and connector work
+version-dependently without duplicating the logic three times. It is the
+pivot between the `EbicsVersion` enum and the generated
+[XSD bindings](xsd-bindings.md). Issue **#14** (Milestone M1),
+design: [ADR-0004](../adr/0004-multi-version-strategie.md).
 
-## Bausteine
+## Building blocks
 
-Alle unter `src/EBICO.Core/` (Bindings unter `Schema/`, der Rest unter `Versioning/`):
+All under `src/EBICO.Core/` (bindings under `Schema/`, the rest under `Versioning/`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `EbicsVersion` (Enum) | `EbicsVersion.cs` | `H003`/`H004`/`H005` — der Diskriminator |
-| `EbicsVersionInfo` | `Versioning/EbicsVersionInfo.cs` | unveränderliche Metadaten je Version (Code, Namespace, 6 Envelope-CLR-Typen) |
-| `EbicsVersions` | `Versioning/EbicsVersions.cs` | statische Registry (Single Source of Truth) + Reverse-Lookups |
-| `IEbicsEnvelope` (+ Request/Response-Marker) | `Versioning/IEbicsEnvelope.cs` u. a. | versionsunabhängige Sicht auf jedes Envelope |
-| `EbicsVersionDetector` | `Versioning/EbicsVersionDetector.cs` | erkennt die Version aus rohem XML (Inbound-Dispatch) |
-| `EbicsVersion*Exception` | `Versioning/EbicsVersionExceptions.cs` | Fehler beim Erkennen/Dispatchen |
+| `EbicsVersion` (enum) | `EbicsVersion.cs` | `H003`/`H004`/`H005` — the discriminator |
+| `EbicsVersionInfo` | `Versioning/EbicsVersionInfo.cs` | immutable metadata per version (code, namespace, 6 envelope CLR types) |
+| `EbicsVersions` | `Versioning/EbicsVersions.cs` | static registry (single source of truth) + reverse lookups |
+| `IEbicsEnvelope` (+ request/response markers) | `Versioning/IEbicsEnvelope.cs` among others | version-independent view of any envelope |
+| `EbicsVersionDetector` | `Versioning/EbicsVersionDetector.cs` | detects the version from raw XML (inbound dispatch) |
+| `EbicsVersion*Exception` | `Versioning/EbicsVersionExceptions.cs` | errors during detecting/dispatching |
 
 ## Registry (`EbicsVersions`)
 
-Die eine Stelle, die das Enum mit Schema-Code, Wurzel-Namespace und den
-Envelope-Bindings verdrahtet:
+The one place that wires the enum with schema code, root namespace and the
+envelope bindings:
 
-- `All` — alle Versionen, geordnet von alt (H003) nach neu (H005).
-- `Get(EbicsVersion)` → `EbicsVersionInfo` (wirft `ArgumentOutOfRangeException` bei
-  undefiniertem Enum-Wert). So wählt aufrufender Code die Zielversion:
-  z. B. `EbicsVersions.Get(options.Version).RequestType`.
-- `TryFromNamespace(string?, out EbicsVersionInfo?)` — Reverse-Lookup über den
-  Wurzel-Namespace; kennt den **H003-Legacy-Sonderfall**.
-- `TryFromCode(string?, out EbicsVersionInfo?)` — Reverse-Lookup über den
-  vierstelligen Code (z. B. `"H005"`). Beide Lookups vergleichen **ordinal**
-  (case-sensitiv) und liefern bei Unbekanntem/`null` einfach `false`.
+- `All` — all versions, ordered from old (H003) to new (H005).
+- `Get(EbicsVersion)` → `EbicsVersionInfo` (throws `ArgumentOutOfRangeException` for an
+  undefined enum value). This is how calling code selects the target version:
+  e.g. `EbicsVersions.Get(options.Version).RequestType`.
+- `TryFromNamespace(string?, out EbicsVersionInfo?)` — reverse lookup via the
+  root namespace; knows the **H003 legacy special case**.
+- `TryFromCode(string?, out EbicsVersionInfo?)` — reverse lookup via the
+  four-character code (e.g. `"H005"`). Both lookups compare **ordinally**
+  (case-sensitive) and simply return `false` for unknown/`null`.
 
-| Version | Code | Wurzel-Namespace |
+| Version | Code | Root namespace |
 |---|---|---|
 | H003 | `H003` | `http://www.ebics.org/H003` (legacy) |
 | H004 | `H004` | `urn:org:ebics:H004` |
 | H005 | `H005` | `urn:org:ebics:H005` |
 
-## Envelope-Schnittstellen & Partial-Wiring
+## Envelope interfaces & partial wiring
 
-`IEbicsEnvelope` bietet die versionsunabhängige Sicht (`Version`, `Revision`,
-`ProtocolVersion`). Die Marker `IEbicsRequestEnvelope` / `IEbicsResponseEnvelope`
-trennen Sende- (`ebicsRequest`, `ebicsUnsecuredRequest`, `ebicsUnsignedRequest`,
-`ebicsNoPubKeyDigestsRequest`) von Empfangsrichtung (`ebicsResponse`,
+`IEbicsEnvelope` offers the version-independent view (`Version`, `Revision`,
+`ProtocolVersion`). The markers `IEbicsRequestEnvelope` / `IEbicsResponseEnvelope`
+separate the send direction (`ebicsRequest`, `ebicsUnsecuredRequest`, `ebicsUnsignedRequest`,
+`ebicsNoPubKeyDigestsRequest`) from the receive direction (`ebicsResponse`,
 `ebicsKeyManagementResponse`).
 
-`Version`/`Revision` liefern bereits die generierten Bindings (via ihres
-per-Version-`IVersionAttrGroup`). Hinzu kommt nur `ProtocolVersion` — aus dem CLR-
-Namespace abgeleitet und daher zuverlässig, **unabhängig vom (frei wählbaren)
-`@Version`-Attribut auf der Leitung**.
+`Version`/`Revision` already provide the generated bindings (via their
+per-version `IVersionAttrGroup`). Only `ProtocolVersion` is added — derived from the CLR
+namespace and therefore reliable, **independent of the (freely choosable)
+`@Version` attribute on the wire**.
 
-Die Anbindung geschieht über **hand­geschriebene partielle Klassen**
+The wiring happens via **hand-written partial classes**
 (`src/EBICO.Core/Versioning/Bindings/EnvelopeBindings.{H003,H004,H005}.cs`):
 
 ```csharp
@@ -66,46 +66,46 @@ public partial class EbicsRequest : IEbicsRequestEnvelope
 }
 ```
 
-> **Warum nicht neben den generierten Dateien in `Schema/{Hxxx}/`?**
-> `scripts/generate-bindings.sh` löscht und erzeugt diese Ordner bei jedem Lauf neu
-> (`rm -rf`, vgl. [XSD-Bindings → Regenerierung](xsd-bindings.md#tooling--regenerierung)).
-> Handgeschriebener Code dort ginge verloren. Der C#-Namespace bleibt trotzdem
-> `EBICO.Core.Schema.Hxxx` — Ordner ≠ Namespace, das SDK kompiliert alle `*.cs`.
+> **Why not next to the generated files in `Schema/{Hxxx}/`?**
+> `scripts/generate-bindings.sh` deletes and recreates these folders on each run
+> (`rm -rf`, cf. [XSD bindings → regeneration](xsd-bindings.md#tooling--regeneration)).
+> Hand-written code there would be lost. The C# namespace nonetheless stays
+> `EBICO.Core.Schema.Hxxx` — folder ≠ namespace, the SDK compiles all `*.cs`.
 
-## Versionserkennung (`EbicsVersionDetector`)
+## Version detection (`EbicsVersionDetector`)
 
-Erkennt die Version eines rohen Envelopes, **ohne** das ganze Dokument zu
-deserialisieren — es wird nur das Wurzelelement via `XmlReader` gelesen. Der
-Wurzel-Namespace ist der Diskriminator (aufgelöst über `TryFromNamespace`).
+Detects the version of a raw envelope **without** deserializing the whole document
+— only the root element is read via `XmlReader`. The
+root namespace is the discriminator (resolved via `TryFromNamespace`).
 
 - `Detect(string)` / `Detect(string, bool strict)` / `Detect(Stream, bool strict = false)`
-  → `EbicsVersionInfo`. Der Stream wird **nicht** geschlossen.
-- `TryDetect(…, out EbicsVersionInfo?)` → `bool` (nicht-werfende, lenient Variante).
+  → `EbicsVersionInfo`. The stream is **not** closed.
+- `TryDetect(…, out EbicsVersionInfo?)` → `bool` (non-throwing, lenient variant).
 
-**Lenient als Default:** Das `@Version`-Attribut ist freier Text auf der Leitung;
-maßgeblich ist der Namespace, weil er bestimmt, welches Schema greift. `strict: true`
-verlangt zusätzlich, dass ein vorhandenes `@Version` zum Namespace passt.
+**Lenient as the default:** The `@Version` attribute is free text on the wire;
+what is authoritative is the namespace, because it determines which schema applies. `strict: true`
+additionally requires that a present `@Version` matches the namespace.
 
-| Eingabe | Ergebnis |
+| Input | Result |
 |---|---|
-| Wurzel in bekanntem Namespace (inkl. H003-Legacy) | `EbicsVersionInfo` |
-| unbekannter / fehlender Namespace | `EbicsVersionNotSupportedException` |
-| `null` | `ArgumentNullException` (kein Versions-Fehler) |
-| leer / nur Whitespace | `EbicsEnvelopeFormatException` |
-| kein XML / abgeschnittenes Tag / kein Wurzelelement / DOCTYPE | `EbicsEnvelopeFormatException` |
-| `strict` und `@Version`-Code ≠ Namespace-Code | `EbicsVersionMismatchException` |
-| `strict` und `@Version` fehlt | OK (Namespace-Version) |
-| lenient und `@Version` widerspricht Namespace | OK (Namespace gewinnt) |
+| root in a known namespace (incl. H003 legacy) | `EbicsVersionInfo` |
+| unknown / missing namespace | `EbicsVersionNotSupportedException` |
+| `null` | `ArgumentNullException` (not a version error) |
+| empty / whitespace only | `EbicsEnvelopeFormatException` |
+| not XML / truncated tag / no root element / DOCTYPE | `EbicsEnvelopeFormatException` |
+| `strict` and `@Version` code ≠ namespace code | `EbicsVersionMismatchException` |
+| `strict` and `@Version` missing | OK (namespace version) |
+| lenient and `@Version` contradicts the namespace | OK (namespace wins) |
 
-> **Sicherheit:** Der Reader läuft mit `DtdProcessing.Prohibit` und
-> `XmlResolver = null` — ein `<!DOCTYPE …>` wird abgelehnt (XXE-Härtung), da der
-> Server unvertrautes XML verarbeitet.
+> **Security:** The reader runs with `DtdProcessing.Prohibit` and
+> `XmlResolver = null` — a `<!DOCTYPE …>` is rejected (XXE hardening), since the
+> server processes untrusted XML.
 
-`TryDetect` schluckt nur `EbicsVersionException` (also leeres/fehlerhaftes/unbekanntes
-XML) und liefert dann `false`; ein `null`-Argument bleibt eine `ArgumentNullException`,
-weil es ein Aufrufer-Bug ist, keine schlechten Eingabedaten.
+`TryDetect` only swallows `EbicsVersionException` (i.e. empty/faulty/unknown
+XML) and then returns `false`; a `null` argument remains an `ArgumentNullException`,
+because it is a caller bug, not bad input data.
 
-## Verwendung
+## Usage
 
 ```csharp
 // Zielversion auswählen (z. B. Connector-DI: o.Version = EbicsVersion.H005)
@@ -118,20 +118,20 @@ var info = EbicsVersionDetector.Detect(rawRequestXml);
 
 ## Tests
 
-`tests/EBICO.Tests/Versioning/` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Versioning/` (Tier A, CI-safe, without proprietary samples):
 
-- `EbicsVersionsTests` — `All`-Reihenfolge, `Get` (inkl. CLR-Typ-Verdrahtung und
-  Out-of-Range), `TryFromNamespace`/`TryFromCode` (bekannt inkl. H003-Legacy,
-  unbekannt, `null`, Case-Sensitivität).
-- `EnvelopeBindingWiringTests` — alle 18 Envelopes implementieren den richtigen
-  Marker und melden die korrekte `ProtocolVersion`; `Version`/`Revision` über das
-  Interface round-trippen.
-- `EbicsVersionDetectorTests` — Erfolgs- und alle vier Exception-Pfade, lenient vs.
-  strict, Stream, Prolog/Kommentar, DOCTYPE-Härtung, `TryDetect`.
+- `EbicsVersionsTests` — `All` order, `Get` (incl. CLR-type wiring and
+  out-of-range), `TryFromNamespace`/`TryFromCode` (known incl. H003 legacy,
+  unknown, `null`, case sensitivity).
+- `EnvelopeBindingWiringTests` — all 18 envelopes implement the correct
+  marker and report the correct `ProtocolVersion`; `Version`/`Revision` round-trip via the
+  interface.
+- `EbicsVersionDetectorTests` — success and all four exception paths, lenient vs.
+  strict, stream, prolog/comment, DOCTYPE hardening, `TryDetect`.
 
-## Verwandtes
+## Related
 
-- [ADR-0004 — Multi-Version-Strategie](../adr/0004-multi-version-strategie.md)
-- [XSD-Bindings](xsd-bindings.md) — die generierten Klassen, auf denen dies aufsetzt
-- [Connector-Architektur](../connector/architecture.md) — die app-seitige
-  `IEbicsRequest<TResult>`-Abstraktion (anderer Layer als `IEbicsRequestEnvelope`)
+- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategie.md)
+- [XSD bindings](xsd-bindings.md) — the generated classes on which this builds
+- [Connector architecture](../connector/architecture.md) — the app-side
+  `IEbicsRequest<TResult>` abstraction (a different layer than `IEbicsRequestEnvelope`)

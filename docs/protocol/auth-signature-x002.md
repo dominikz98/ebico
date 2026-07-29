@@ -1,66 +1,66 @@
-# Authentifikationssignatur X002 (H003/H004/H005)
+# Authentication signature X002 (H003/H004/H005)
 
-Die EBICS-**Authentifikationssignatur** über den Request: eine XML Digital Signature
-(`ds:Signature`), die im `AuthSignature`-Element zwischen `header` und `body` steht und
-**alle Elemente mit `authenticate="true"`** absichert — Schlüsselversion **X002**
-(RSASSA-PKCS1-v1.5 über **SHA-256**, inklusive Canonical XML 1.0). Sie schützt Integrität
-und Authentizität des Transports. Baut auf der Schlüssel-Schicht aus
-[#18](key-representation.md) und dem Canonicalizer aus [#15](serialization-c14n.md) auf.
-Issue **#20** (Milestone M2), Krypto-Bibliothek:
-[ADR-0008](../adr/0008-krypto-bibliothek.md) (`System.Security.Cryptography`, kein BouncyCastle).
+The EBICS **authentication signature** over the request: an XML Digital Signature
+(`ds:Signature`) that sits in the `AuthSignature` element between `header` and `body` and
+secures **all elements with `authenticate="true"`** — key version **X002**
+(RSASSA-PKCS1-v1.5 over **SHA-256**, including Canonical XML 1.0). It protects the integrity
+and authenticity of the transport. Builds on the key layer from
+[#18](key-representation.md) and the canonicalizer from [#15](serialization-c14n.md).
+Issue **#20** (Milestone M2), crypto library:
+[ADR-0008](../adr/0008-krypto-bibliothek.md) (`System.Security.Cryptography`, no BouncyCastle).
 
-> **Abgrenzung:** Diese Schicht liefert nur **Erzeugung und Verifikation** der `AuthSignature`
-> über ein serialisiertes Request-XML. Sie ist gegenüber der *banktechnischen* Signatur
-> A005/A006 ([#19](bank-signature.md), autorisierend über Auftragsdaten) und der Verschlüsselung
-> E002 ([#21](encryption-e002.md)) abgegrenzt. Das automatische Setzen der `AuthSignature` im
-> Send-/Dispatch-Weg sowie die Interop-Verifikation gegen echte Bank-Beispiele gehören in
-> spätere Milestones (M3–M6) — hier bleibt X002 eine policy-freie Krypto-Primitive.
+> **Scope:** This layer only provides **creation and verification** of the `AuthSignature`
+> over a serialized request XML. It is delimited from the *bank-technical* signature
+> A005/A006 ([#19](bank-signature.md), authorising over order data) and from the encryption
+> E002 ([#21](encryption-e002.md)). Automatically setting the `AuthSignature` in the
+> send/dispatch path as well as interop verification against real bank samples belong in
+> later milestones (M3–M6) — here X002 stays a policy-free crypto primitive.
 >
-> **Anwendung:** Der Connector *setzt* die `AuthSignature` beim Senden; der Server *verifiziert* sie
-> seit **#58** für jeden signierten `ebicsRequest` (`X002EbicsRequestVerifier` →
-> [Negativ- & Sicherheitsfälle](../development/negative-security-cases.md)). Die Primitive hier bleibt
-> davon unberührt policy-frei.
+> **Application:** The connector *sets* the `AuthSignature` when sending; the server *verifies* it
+> since **#58** for every signed `ebicsRequest` (`X002EbicsRequestVerifier` →
+> [Negative & security cases](../development/negative-security-cases.md)). The primitive here
+> stays policy-free regardless.
 
-## Bausteine
+## Building blocks
 
-Unter `src/EBICO.Core/Crypto/` (Namespace `EBICO.Core.Crypto`):
+Under `src/EBICO.Core/Crypto/` (namespace `EBICO.Core.Crypto`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `AuthenticationSignature` (static) | `AuthenticationSignature.cs` | `Sign`/`Verify` der X002-`AuthSignature` (zustandslose BCL-Wrapper) |
+| `AuthenticationSignature` (static) | `AuthenticationSignature.cs` | `Sign`/`Verify` of the X002 `AuthSignature` (stateless BCL wrappers) |
 
-Wiederverwendet aus [#15](serialization-c14n.md): `XmlCanonicalizer` (C14N als UTF-8-Oktette,
-Node-Set-Overload), `C14nMode`/`C14nAlgorithms` (Modus ↔ `@Algorithm`-URI). Aus
+Reused from [#15](serialization-c14n.md): `XmlCanonicalizer` (C14N as UTF-8 octets,
+node-set overload), `C14nMode`/`C14nAlgorithms` (mode ↔ `@Algorithm` URI). From
 [#18](key-representation.md): `RsaKeyMaterial` (`CreateRsa()`, `HasPrivateKey`, `ToPublicOnly()`),
-die `KeyVersions`-Registry (`TryGet`, `Purpose`, `PaddingIntent`) sowie `KeyMaterialException`.
-Die `ds:`-Objektmodelle (`SignatureType`, `SignedInfoType`, `ReferenceType`, …) stammen aus den
-committeten [XSD-Bindings](xsd-bindings.md) unter `src/EBICO.Core/Schema/Shared/XmlDsig/`.
+the `KeyVersions` registry (`TryGet`, `Purpose`, `PaddingIntent`) as well as `KeyMaterialException`.
+The `ds:` object models (`SignatureType`, `SignedInfoType`, `ReferenceType`, …) come from the
+committed [XSD bindings](xsd-bindings.md) under `src/EBICO.Core/Schema/Shared/XmlDsig/`.
 
-## X002 — Verfahren
+## X002 — procedure
 
-Die Signatur enthält **zwei** Hashes:
+The signature contains **two** hashes:
 
-1. **Reference-Digest** — SHA-256 über die C14N der **authentifizierten Knotenmenge** (die
-   `authenticate="true"`-Teilbäume). Ergebnis → `ds:Reference/ds:DigestValue`. Die Reference
-   trägt `URI="#xpointer(//*[@authenticate='true'])"`, einen C14N-`ds:Transform` und
+1. **Reference digest** — SHA-256 over the C14N of the **authenticated node set** (the
+   `authenticate="true"` subtrees). Result → `ds:Reference/ds:DigestValue`. The reference
+   carries `URI="#xpointer(//*[@authenticate='true'])"`, a C14N `ds:Transform` and
    `ds:DigestMethod`.
-2. **SignatureValue** — RSA-Signatur (PKCS1-v1.5 über SHA-256) über die C14N des
-   `ds:SignedInfo`. Die Padding-Variante wird **registry-getrieben** aus
-   `KeyVersionInfo.PaddingIntent` aufgelöst (nicht hartkodiert): X001/X002 → `RSASignaturePadding.Pkcs1`.
+2. **SignatureValue** — RSA signature (PKCS1-v1.5 over SHA-256) over the C14N of the
+   `ds:SignedInfo`. The padding variant is resolved **registry-driven** from
+   `KeyVersionInfo.PaddingIntent` (not hard-coded): X001/X002 → `RSASignaturePadding.Pkcs1`.
 
-| Element | `@Algorithm`-URI |
+| Element | `@Algorithm` URI |
 |---|---|
-| `ds:CanonicalizationMethod` / `ds:Transform` | `http://www.w3.org/TR/2001/REC-xml-c14n-20010315` (inklusiv, Default) |
+| `ds:CanonicalizationMethod` / `ds:Transform` | `http://www.w3.org/TR/2001/REC-xml-c14n-20010315` (inclusive, default) |
 | `ds:SignatureMethod` | `http://www.w3.org/2001/04/xmldsig-more#rsa-sha256` |
 | `ds:DigestMethod` | `http://www.w3.org/2001/04/xmlenc#sha256` |
 
-**Dokumentkontext-Kanonisierung.** Beide C14N-Schritte laufen im Kontext des Envelopes: das
-signierte Material erbt die Namespace-Deklarationen der Request-Wurzel (Protokoll-Namespace als
-Default, `ds`-Präfix). Inklusive C14N rendert diese am Apex der Knotenmenge — der kanonische
-Header trägt also z. B. `xmlns="urn:org:ebics:H005"`, genau wie eine Gegenstelle es erzeugt und
-erwartet. Für die SignedInfo-C14N wird das (nur mit `ds` präfigierte) `ds:SignedInfo` in einen
-Klon des Request-DOM eingehängt und als Teilbaum kanonisiert; **derselbe** Seam bedient Signieren
-und Verifizieren, sodass Round-Trips symmetrisch bleiben.
+**Document-context canonicalization.** Both C14N steps run in the context of the envelope: the
+signed material inherits the namespace declarations of the request root (protocol namespace as
+default, `ds` prefix). Inclusive C14N renders these at the apex of the node set — so the canonical
+header carries e.g. `xmlns="urn:org:ebics:H005"`, exactly as a counterpart produces and expects.
+For the SignedInfo C14N, the (`ds`-prefixed-only) `ds:SignedInfo` is grafted into a clone of the
+request DOM and canonicalized as a subtree; the **same** seam serves signing and verification, so
+round-trips stay symmetric.
 
 ```csharp
 // Request serialisieren (AuthSignature noch leer/abwesend), dann signieren:
@@ -72,67 +72,67 @@ request.AuthSignature = auth;
 bool ok = AuthenticationSignature.Verify(requestXml, request.AuthSignature, signerPubKey, KeyVersion.Create("X002"));
 ```
 
-Das `AuthSignature`-Element ist selbst **nicht** `authenticate="true"` und beeinflusst den
-Digest daher nicht — `Verify` funktioniert unabhängig davon, ob das übergebene `requestXml` die
-Signatur bereits enthält.
+The `AuthSignature` element is itself **not** `authenticate="true"` and therefore does not
+affect the digest — `Verify` works regardless of whether the supplied `requestXml` already
+contains the signature.
 
-## Spec-Vorbehalt
+## Spec caveat
 
-> **⚠️ Spec-Vorbehalt:** Der exakte **C14N-Modus** (inklusiv vs. exklusiv), der
-> **Reference-Selektor** (`#xpointer(//*[@authenticate='true'])` und seine XPath-Realisierung
-> `(//. | //@*)[ancestor-or-self::*[@authenticate='true']]`) sowie der
-> **SignedInfo-Kanonisierungskontext** sind EBICS-Spec-Details, die **noch nicht gegen die
-> offiziellen Annexe verifiziert** sind (die XSDs sind proprietär und liegen nicht im Repo —
-> vgl. `CLAUDE.md` und [serialization-c14n.md](serialization-c14n.md)). Sie sind auf Konstanten
-> bzw. den `c14n`-Parameter begrenzt; der Default ist `Inclusive`. In sich konsistente
-> Sign-→-Verify-Round-Trips und der deterministische Known-Answer-Vektor bleiben von der Wahl
-> unberührt. Die byte-genaue Interop gegen echte Banken wird über einen Tier-B-Test validiert,
-> sobald ein Beispiel lokal vorliegt.
+> **⚠️ Spec caveat:** The exact **C14N mode** (inclusive vs. exclusive), the
+> **reference selector** (`#xpointer(//*[@authenticate='true'])` and its XPath realisation
+> `(//. | //@*)[ancestor-or-self::*[@authenticate='true']]`) as well as the
+> **SignedInfo canonicalization context** are EBICS spec details that are **not yet verified
+> against the official annexes** (the XSDs are proprietary and not in the repo —
+> cf. `CLAUDE.md` and [serialization-c14n.md](serialization-c14n.md)). They are confined to
+> constants and the `c14n` parameter respectively; the default is `Inclusive`. Internally
+> consistent sign-→-verify round-trips and the deterministic known-answer vector remain
+> unaffected by the choice. The byte-exact interop against real banks is validated via a Tier B
+> test as soon as a sample is available locally.
 
-## Fehlerverhalten
+## Error behaviour
 
-| Bedingung | Verhalten |
+| Condition | Behaviour |
 |---|---|
 | `requestXml` / `authSignature` / `key` == `null` | `ArgumentNullException` |
-| Signieren ohne privaten Schlüssel | `KeyMaterialException` |
-| `version` keine bekannte **Authentifikations**-Version (`A005`, `E002`, `X999`, `default`) | `InvalidOperationException` |
-| Verify: falscher Schlüssel, manipuliertes authentifiziertes Element, manipulierte `SignatureValue`/`DigestValue`, fehlendes/leeres `SignedInfo`/`Reference`/`SignatureValue`, unbekannte/nicht unterstützte Algorithmus-URI | Rückgabe `false` (wirft **nicht**) |
+| Signing without a private key | `KeyMaterialException` |
+| `version` not a known **authentication** version (`A005`, `E002`, `X999`, `default`) | `InvalidOperationException` |
+| Verify: wrong key, tampered authenticated element, tampered `SignatureValue`/`DigestValue`, missing/empty `SignedInfo`/`Reference`/`SignatureValue`, unknown/unsupported algorithm URI | returns `false` (does **not** throw) |
 
-> **Keine Versions-Permission-Prüfung hier:** Ob eine Version mit einer EBICS-Protokollversion
-> erlaubt ist, bleibt Aufgabe von `KeyVersions.EnsurePermitted` in der Dispatch-/Onboarding-Schicht.
-> Diese Primitive bleibt policy-frei. Der `false`-statt-Werfen-Pfad beim Verifizieren hält den
-> Server robust: eine fehlerhafte Client-Signatur ist eine saubere Ablehnung, kein Crash.
+> **No version-permission check here:** Whether a version is permitted with an EBICS protocol
+> version remains the task of `KeyVersions.EnsurePermitted` in the dispatch/onboarding layer.
+> This primitive stays policy-free. The `false`-instead-of-throw path during verification keeps
+> the server robust: a faulty client signature is a clean rejection, not a crash.
 
-## EBICS-Versionsbezug
+## EBICS version relation
 
-Das Verfahren (Digest über `authenticate="true"` + RSA-Signatur über `SignedInfo`) ist über
-H003/H004/H005 identisch. **X002** ist über alle drei Versionen die Standard-Authentifikations­version;
-das Legacy **X001** ist über dasselbe PKCS1-v1.5-Mapping abgedeckt, aber nicht Ziel dieses Issues.
-Die zulässigen Versionen liegen zentral in [`KeyVersions`](key-representation.md).
+The procedure (digest over `authenticate="true"` + RSA signature over `SignedInfo`) is identical
+across H003/H004/H005. **X002** is the standard authentication version across all three versions;
+the legacy **X001** is covered by the same PKCS1-v1.5 mapping, but is not the target of this issue.
+The permitted versions reside centrally in [`KeyVersions`](key-representation.md).
 
 ## Tests
 
-`tests/EBICO.Tests/Crypto/AuthenticationSignatureTests.cs` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Crypto/AuthenticationSignatureTests.cs` (Tier A, CI-safe, without proprietary samples):
 
-- Happy Path Sign → Verify; Cross-Verify mit `ToPublicOnly()`.
-- Mehrere (auch verschachtelte) `authenticate="true"`-Elemente in einem Nicht-EBICS-Namespace
-  (belegt die Node-Set-Union und Namespace-Unabhängigkeit).
-- Negativfälle (Rückgabe `false`): manipuliertes authentifiziertes Element, manipulierte
-  `SignatureValue`/`DigestValue`, falscher Schlüssel, unbekannte `CanonicalizationMethod`-URI,
-  falsche `SignatureMethod`-URI, fehlendes `SignedInfo`/`SignatureValue`.
-- Exceptions: `null`-Argumente, Signieren ohne Private Key, Nicht-Auth/unbekannte/`default`-Version.
-- **Deterministischer X002-Known-Answer-Vektor**: fixes Request-XML + fixer PKCS#8-Schlüssel
-  (derselbe wie in `BankSignatureTests`) → byte-gleiche `DigestValue` **und** `SignatureValue`
-  (pinnt C14N, SignedInfo-Assembly und Padding).
-- Dokumentkontext-Beleg: die kanonische Form der authentifizierten Knoten enthält das geerbte
+- Happy path Sign → Verify; cross-verify with `ToPublicOnly()`.
+- Multiple (including nested) `authenticate="true"` elements in a non-EBICS namespace
+  (demonstrates the node-set union and namespace independence).
+- Negative cases (returns `false`): tampered authenticated element, tampered
+  `SignatureValue`/`DigestValue`, wrong key, unknown `CanonicalizationMethod` URI,
+  wrong `SignatureMethod` URI, missing `SignedInfo`/`SignatureValue`.
+- Exceptions: `null` arguments, signing without a private key, non-auth/unknown/`default` version.
+- **Deterministic X002 known-answer vector**: fixed request XML + fixed PKCS#8 key
+  (the same as in `BankSignatureTests`) → byte-identical `DigestValue` **and** `SignatureValue`
+  (pins C14N, SignedInfo assembly and padding).
+- Document-context evidence: the canonical form of the authenticated nodes contains the inherited
   `xmlns="urn:org:ebics:H005"`.
-- Real-`EbicsRequest`-Round-Trip (serialisieren → signieren → anhängen → deserialisieren → verifizieren).
-- Tier-B-Interop gegen ein reales Bank-Sample (`SampleXml.TryLoad`, skippt wenn abwesend).
+- Real `EbicsRequest` round-trip (serialize → sign → attach → deserialize → verify).
+- Tier B interop against a real bank sample (`SampleXml.TryLoad`, skips when absent).
 
-## Verwandtes
+## Related
 
-- [Banktechnische Signatur A005/A006](bank-signature.md) — die autorisierende Signatur über Auftragsdaten (#19)
-- [Verschlüsselung E002](encryption-e002.md) — hybride Transportverschlüsselung (#21)
-- [XML-Serialisierung & C14N](serialization-c14n.md) — Canonicalizer und C14N-Modi (#15)
-- [Schlüsselpaare & -repräsentation (A/E/X)](key-representation.md) — die zugrunde liegende Schlüssel-Schicht (#18)
-- [ADR-0008 — Krypto-Bibliothek](../adr/0008-krypto-bibliothek.md)
+- [Bank-technical signature A005/A006](bank-signature.md) — the authorising signature over order data (#19)
+- [Encryption E002](encryption-e002.md) — hybrid transport encryption (#21)
+- [XML serialization & C14N](serialization-c14n.md) — canonicalizer and C14N modes (#15)
+- [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
+- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)

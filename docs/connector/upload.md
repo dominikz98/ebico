@@ -1,49 +1,49 @@
-# Connector: Upload-API (CCT / CDD / CDB / CIP …)
+# Connector: Upload API (CCT / CDD / CDB / CIP …)
 
-> Umsetzung von **Issue #48** (Milestone M6 — Connector). Diese Seite beschreibt die clientseitige
-> Upload-API des `EBICO.Connector`: die generische Upload-Methode, die SEPA-Convenience-Requests, die
-> clientseitige Krypto-Pipeline (Komprimieren → E002-Verschlüsseln → elektronische Unterschrift →
-> Segmentieren → X002-Authentifikationssignatur) und die zweiphasige Upload-Transaktion. Grundlage ist
-> der [Client-Kern](client-core.md) (#46) und das abgeschlossene [Onboarding](onboarding.md) (#47);
-> der Gesamtentwurf steht in der [Connector-Architektur](architecture.md).
+> Implementation of **issue #48** (milestone M6 — Connector). This page describes the client-side
+> upload API of the `EBICO.Connector`: the generic upload method, the SEPA convenience requests, the
+> client-side crypto pipeline (compress → E002 encrypt → electronic signature → segment → X002
+> authentication signature) and the two-phase upload transaction. The basis is the
+> [client core](client-core.md) (#46) and the completed [onboarding](onboarding.md) (#47);
+> the overall design is in the [Connector architecture](architecture.md).
 
-## Zweck
+## Purpose
 
-Nach abgeschlossenem Onboarding (INI/HIA/HPB und Aktivierung durch die Bank) kann ein Teilnehmer
-fachliche Aufträge hochladen. Die Upload-API nimmt eine Payload (z. B. eine SEPA-`pain`-Nachricht),
-bereitet sie clientseitig kryptografisch auf und überträgt sie in der EBICS-Upload-Transaktion aus
-zwei Phasen: **Initialisation** (Auftragsmetadaten, verschlüsselter Transaktionsschlüssel, Signatur)
-und **Transfer** (die Auftragsdaten segmentweise).
+After completed onboarding (INI/HIA/HPB and activation by the bank) a subscriber can upload business
+orders. The upload API takes a payload (e.g. a SEPA `pain` message), prepares it cryptographically on
+the client side and transfers it in the EBICS upload transaction consisting of two phases:
+**Initialisation** (order metadata, encrypted transaction key, signature) and **Transfer** (the order
+data segment by segment).
 
-Die Gegenseite ist der Emulator: die
-[Upload-Transaktion](../server/upload-transaction.md) (#32) und die
-[Zahlungsverkehrs-Order-Verarbeitung](../server/payment-orders.md) (#39) verarbeiten CCT/CDD/CDB/CIP
-serverseitig. Diese API ist der **inverse** Ablauf.
+The counterpart is the emulator: the
+[upload transaction](../server/upload-transaction.md) (#32) and the
+[payment order processing](../server/payment-orders.md) (#39) process CCT/CDD/CDB/CIP on the server
+side. This API is the **inverse** flow.
 
 ```mermaid
 sequenceDiagram
-    participant C as Teilnehmer (Connector)
-    participant S as EBICS-Server (Bank)
-    Note over C: Payload komprimieren, E002-verschlüsseln,<br/>A00x-signieren (ES), X002-Authentifikationssignatur
+    participant C as Subscriber (connector)
+    participant S as EBICS server (bank)
+    Note over C: compress payload, E002-encrypt,<br/>A00x-sign (ES), X002 authentication signature
     C->>S: ebicsRequest — Initialisation (NumSegments, TransactionKey, SignatureData)
-    S-->>C: Transaction-ID + Returncode
-    loop je Segment (1 … NumSegments)
-        C->>S: ebicsRequest — Transfer (Segment n, X002-signiert)
-        S-->>C: Returncode
+    S-->>C: transaction ID + return code
+    loop each segment (1 … NumSegments)
+        C->>S: ebicsRequest — Transfer (segment n, X002-signed)
+        S-->>C: return code
     end
-    Note over C: letzte Transfer-Antwort trägt das fachliche Ergebnis (z. B. pain-Validierung)
+    Note over C: the last Transfer response carries the business result (e.g. pain validation)
 ```
 
-## Öffentliche API
+## Public API
 
 ```csharp
 services.AddEbicoConnector(o => { /* Url, HostId, PartnerId, UserId, Version */ })
         .Services.AddEbicoUpload();
 ```
 
-### Convenience-Requests (SEPA-Zahlungsverkehr)
+### Convenience requests (SEPA payments)
 
-Für die gängigen SEPA-Orders genügt ein sprechender Request; der Order-Typ ist fest hinterlegt:
+For the common SEPA orders a descriptive request suffices; the order type is fixed:
 
 ```csharp
 var client = provider.GetRequiredService<IEbicsClient>();
@@ -61,16 +61,16 @@ else
 }
 ```
 
-| Request | Order-Typ | Nachricht |
+| Request | Order type | Message |
 | --- | --- | --- |
 | `CctUploadRequest` | `CCT` — SEPA Credit Transfer | `pain.001` |
 | `CddUploadRequest` | `CDD` — SEPA Direct Debit (CORE) | `pain.008` |
 | `CdbUploadRequest` | `CDB` — SEPA Direct Debit (B2B) | `pain.008` |
 | `CipUploadRequest` | `CIP` — SEPA Instant Credit Transfer | `pain.001` |
 
-### Generische Upload-Methode
+### Generic upload method
 
-Für andere Auftragsarten oder feine Kontrolle dient `UploadRequest`:
+For other order types or fine control, `UploadRequest` serves:
 
 ```csharp
 // H005 über eine BTF …
@@ -87,100 +87,101 @@ await client.Send(new UploadRequest { OrderData = painBytes, OrderType = "CCT" }
 await client.Send(new UploadRequest { OrderData = painBytes, FileFormat = "pain.001.001.09" });
 ```
 
-`MaxSegmentSizeBytes` steuert die (rohe, vor-Base64-) Segmentgröße; ohne Angabe gilt der geteilte
-Default `EbicsSegmentation.DefaultSegmentSizeBytes` (**512 KiB**), auf den sich auch
-`EbicoServerOptions.SegmentSizeBytes` bezieht. Das Ergebnis ist stets ein `EbicsResult<UploadResult>` mit
-der hex-kodierten `TransactionId` und der Segmentanzahl.
+`MaxSegmentSizeBytes` controls the (raw, pre-Base64) segment size; without a value the shared
+default `EbicsSegmentation.DefaultSegmentSizeBytes` (**512 KiB**) applies, which
+`EbicoServerOptions.SegmentSizeBytes` also refers to. The result is always an
+`EbicsResult<UploadResult>` with the hex-encoded `TransactionId` and the segment count.
 
-> **Beim Anheben mitdenken (#124):** Ein Segment reist base64-kodiert (Faktor 4/3) *zusammen mit seinem
-> Envelope* in einem HTTP-Body. Wer die Segmentgröße erhöht, muss das Body-Limit der Gegenstelle im Blick
-> behalten — sonst antwortet sie mit **HTTP 413**, also einer Transport-Exception mitten in der
-> Transaktion statt eines EBICS-Returncodes. `EbicsSegmentation.MaxSegmentSizeForRequestBody(limit)`
-> leitet den größten sicheren Wert ab. Genau diese Abstimmung fehlte bis #124: der Default lag auf
-> 768 KiB, deren Base64-Form das 1-MiB-Limit des Emulators exakt ausfüllt
-> ([Segmentierung](../server/segmentation.md#der-default-ist-geteilt-124)).
+> **Think along when raising it (#124):** A segment travels base64-encoded (factor 4/3) *together with
+> its envelope* in one HTTP body. Whoever raises the segment size must keep an eye on the body limit of
+> the counterpart — otherwise it responds with **HTTP 413**, i.e. a transport exception in the middle
+> of the transaction instead of an EBICS return code.
+> `EbicsSegmentation.MaxSegmentSizeForRequestBody(limit)` derives the largest safe value. Exactly this
+> coordination was missing up to #124: the default sat at 768 KiB, whose base64 form fills the
+> emulator's 1-MiB limit exactly
+> ([segmentation](../server/segmentation.md#the-default-is-shared-124)).
 
-`DistributedSignature = true` bittet die Bank, den Auftrag für die **verteilte elektronische
-Unterschrift** zu parken statt ihn auszuführen (H005 `SignatureFlag`, H003/H004 `OrderAttribute=OZHNN`).
-Der weitere Ablauf — zeichnen, stornieren, Übersicht — steht in [Connector: VEU](veu.md).
+`DistributedSignature = true` asks the bank to park the order for the **distributed electronic
+signature** instead of executing it (H005 `SignatureFlag`, H003/H004 `OrderAttribute=OZHNN`).
+The further flow — signing, cancelling, overview — is in [Connector: VEU](veu.md).
 
-## Ablauf (clientseitig)
+## Flow (client-side)
 
-Der `UploadExecutor` orchestriert je `Send`:
+The `UploadExecutor` orchestrates per `Send`:
 
-1. **Komprimieren** — `EbicsCompression.Compress` (zlib).
-2. **Transaktionsschlüssel** — `EncryptionE002.GenerateTransactionKey` (einmalige AES-128).
-3. **Schlüssel verschlüsseln** — `EncryptionE002.EncryptTransactionKey` (RSA-OAEP für den
-   **Bank-E002-Schlüssel** aus dem `IKeyStore`; setzt gelaufenes HPB voraus).
-4. **Auftragsdaten verschlüsseln** — `EncryptionE002.EncryptOrderData` (AES-128-CBC unter dem
-   Transaktionsschlüssel).
-5. **Elektronische Unterschrift (ES)** — `BankSignature.Sign` (A00x) über die Auftragsdaten, in eine
-   versionsabhängige `UserSignatureData` verpackt (`S001` für H003/H004, `S002` für H005), dann
-   komprimiert und mit demselben Transaktionsschlüssel verschlüsselt (`DataTransfer/SignatureData`).
-6. **Segmentieren** — `EbicsSegmentation.Split` teilt den Chiffretext in `NumSegments` Segmente.
-7. **Initialisation** — versionsabhängiger `ebicsRequest` mit `NumSegments`, `DataEncryptionInfo`
-   (verschlüsselter Transaktionsschlüssel + Bank-Key-Fingerprint) und `SignatureData`; unsigniert
-   serialisiert, dann **X002-Authentifikationssignatur** (`AuthenticationSignature.Sign`) gesetzt.
-8. **Transaction-ID** aus der Antwort übernehmen (Fehler-Returncode → `EbicsResult.Failure`).
-9. **Transfer** — je Segment ein X002-signierter `ebicsRequest`; die **letzte** Antwort trägt das
-   fachliche Ergebnis (z. B. `090004` bei ungültiger pain).
-10. **Ergebnis** — `EbicsResult.Success(UploadResult)`.
+1. **Compress** — `EbicsCompression.Compress` (zlib).
+2. **Transaction key** — `EncryptionE002.GenerateTransactionKey` (one-time AES-128).
+3. **Encrypt key** — `EncryptionE002.EncryptTransactionKey` (RSA-OAEP for the
+   **bank E002 key** from the `IKeyStore`; requires HPB to have run).
+4. **Encrypt order data** — `EncryptionE002.EncryptOrderData` (AES-128-CBC under the
+   transaction key).
+5. **Electronic signature (ES)** — `BankSignature.Sign` (A00x) over the order data, wrapped into a
+   version-dependent `UserSignatureData` (`S001` for H003/H004, `S002` for H005), then compressed and
+   encrypted with the same transaction key (`DataTransfer/SignatureData`).
+6. **Segment** — `EbicsSegmentation.Split` divides the ciphertext into `NumSegments` segments.
+7. **Initialisation** — version-dependent `ebicsRequest` with `NumSegments`, `DataEncryptionInfo`
+   (encrypted transaction key + bank key fingerprint) and `SignatureData`; serialized unsigned, then
+   the **X002 authentication signature** (`AuthenticationSignature.Sign`) is set.
+8. **Take over the transaction ID** from the response (error return code → `EbicsResult.Failure`).
+9. **Transfer** — one X002-signed `ebicsRequest` per segment; the **last** response carries the
+   business result (e.g. `090004` for an invalid pain).
+10. **Result** — `EbicsResult.Success(UploadResult)`.
 
-Wiederverwendete Core-Primitives:
+Reused Core primitives:
 [`EbicsCompression`](../server/segmentation.md), [`EncryptionE002`](../protocol/encryption-e002.md),
 [`BankSignature`](../protocol/bank-signature.md),
 [`AuthenticationSignature`](../protocol/auth-signature-x002.md),
 [`EbicsSegmentation`](../server/segmentation.md), `PublicKeyFingerprint`, `KeyVersions`,
 [`BtfOrderTypeCatalog`](../server/btf-framework.md).
 
-## Versions-Dispatch
+## Version dispatch
 
-Die drei Einreichungs-Konventionen (kompatibel zu
-[`BtfOrderTypeCatalog.ResolveUploadOrderType`](../server/payment-orders.md)) werden über je einen
-Envelope-Builder pro Version hinter einer Registry abgebildet (Muster wie beim Onboarding):
+The three submission conventions (compatible with
+[`BtfOrderTypeCatalog.ResolveUploadOrderType`](../server/payment-orders.md)) are mapped via one
+envelope builder per version behind a registry (same pattern as with onboarding):
 
-| Version | Order-Details |
+| Version | Order details |
 | --- | --- |
-| **H005** | `AdminOrderType = "BTU"` + `BTUOrderParams/Service` (BTF); BTF wird aus dem Order-Typ aufgelöst, wenn nicht direkt gesetzt |
-| **H003 / H004** | klassischer `OrderType` (z. B. `CCT`) direkt, oder `FUL` + `FULOrderParams/FileFormat`; `OrderAttribute = DZHNN` (nicht `OZHNN` = verteilte Unterschrift) |
+| **H005** | `AdminOrderType = "BTU"` + `BTUOrderParams/Service` (BTF); the BTF is resolved from the order type if not set directly |
+| **H003 / H004** | classic `OrderType` (e.g. `CCT`) directly, or `FUL` + `FULOrderParams/FileFormat`; `OrderAttribute = DZHNN` (not `OZHNN` = distributed signature) |
 
-## Fehlerbehandlung
+## Error handling
 
-- **Fachliche Returncodes** (z. B. `090003` keine Berechtigung, `090004` ungültige pain, `091101`
-  unbekannte Transaction-ID) landen in `EbicsResult.Failure(ReturnCode, ReturnText)`.
-- **Technische/Konfigurationsfehler** werfen: fehlender Bank-E002-Schlüssel (HPB nicht gelaufen) oder
-  fehlende Teilnehmerschlüssel → `EbicsConfigurationException`; Transportfehler →
+- **Business return codes** (e.g. `090003` no authorisation, `090004` invalid pain, `091101`
+  unknown transaction ID) end up in `EbicsResult.Failure(ReturnCode, ReturnText)`.
+- **Technical/configuration errors** throw: missing bank E002 key (HPB not run) or
+  missing subscriber keys → `EbicsConfigurationException`; transport errors →
   `EbicsTransportException`.
 
 ## Tests
 
-`tests/EBICO.Tests/Connector/Upload/` prüft über alle drei Versionen (H003/H004/H005):
-Happy-Path-**Round-Trip** (der Test dekodiert die gesendeten Bytes exakt wie der Server —
-Reassemble → E002-entschlüsseln → dekomprimieren — und vergleicht mit der Original-Payload),
-**Mehrsegment**-Uploads, die korrekte Order-Identität der Convenience-Requests (Order-Typ bzw.
-H005-BTF) sowie die Negativfälle (Init-`090003`, Transfer-`090004`, `091101`, fehlender Bank-Key).
-Die Server-Antworten baut ein Tier-A-Fake mit dem echten `EbicsResponseFactory`.
+`tests/EBICO.Tests/Connector/Upload/` checks across all three versions (H003/H004/H005):
+happy-path **round-trip** (the test decodes the sent bytes exactly like the server —
+reassemble → E002 decrypt → decompress — and compares against the original payload),
+**multi-segment** uploads, the correct order identity of the convenience requests (order type or
+H005 BTF) as well as the negative cases (init `090003`, transfer `090004`, `091101`, missing bank
+key). The server responses are built by a tier-A fake with the real `EbicsResponseFactory`.
 
-## Spec-Vorbehalte
+## Spec caveats
 
-- Die **ES** wird mitgesendet, serverseitig aber (noch) **nicht verifiziert**
-  (siehe [Upload-Transaktion](../server/upload-transaction.md)); Auftragsdaten und ES teilen sich —
-  spec-konform — denselben Transaktionsschlüssel.
-- Die **X002-Antwortsignatur** des Servers wird nicht geprüft (Server antwortet unsigniert, M4).
-- Die genaue Segmentgröße/Base64-Grenze, das `SecurityMedium` (`"0000"`) und die
-  `OrderAttribute`-Wahl sind gegen die offiziellen EBICS-Annexe zu verifizieren.
+- The **ES** is sent along but (not yet) **verified** on the server side
+  (see [upload transaction](../server/upload-transaction.md)); order data and ES share —
+  spec-compliant — the same transaction key.
+- The server's **X002 response signature** is not checked (the server answers unsigned, M4).
+- The exact segment size/base64 limit, the `SecurityMedium` (`"0000"`) and the
+  `OrderAttribute` choice need to be verified against the official EBICS annexes.
 
-## Verwandte Doku
+## Related docs
 
-- [Connector-Architektur](architecture.md) — Send-Pipeline, Transaktions-Skelett
-- [Client-Kern & Konfiguration](client-core.md) — #46: Dispatch, Options/DI, Transport, Key-Store
-- [Onboarding-Flows INI / HIA / HPB](onboarding.md) — #47: Voraussetzung (Bank-E002-Schlüssel)
-- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: CCT als echter Round-Trip gegen den Server (statt gegen `FakeUploadServer`)
-- [Server: Upload-Transaktion](../server/upload-transaction.md) — die Gegenseite (#32)
-- [Server: Zahlungsverkehrs-Orders](../server/payment-orders.md) — CCT/CDD/CDB/CIP-Verarbeitung (#39)
-- [Verschlüsselung E002](../protocol/encryption-e002.md) · [Banktechnische Signatur A005/A006](../protocol/bank-signature.md) · [Authentifikationssignatur X002](../protocol/auth-signature-x002.md)
+- [Connector architecture](architecture.md) — send pipeline, transaction skeleton
+- [Client core & configuration](client-core.md) — #46: dispatch, options/DI, transport, key store
+- [Onboarding flows INI / HIA / HPB](onboarding.md) — #47: prerequisite (bank E002 key)
+- [E2E: Connector ↔ Server](../development/e2e-connector-server.md) — #57: CCT as a real round-trip against the server (instead of against `FakeUploadServer`)
+- [Server: upload transaction](../server/upload-transaction.md) — the counterpart (#32)
+- [Server: payment orders](../server/payment-orders.md) — CCT/CDD/CDB/CIP processing (#39)
+- [Encryption E002](../protocol/encryption-e002.md) · [Bank-technical signature A005/A006](../protocol/bank-signature.md) · [Authentication signature X002](../protocol/auth-signature-x002.md)
 
 ---
 
-> Diese Seite ist die gepflegte Referenz. Bei Änderungen an der Upload-API hier (und im
-> [Doku-Index](../index.md)) nachziehen.
+> This page is the maintained reference. On changes to the upload API, update it here (and in the
+> [doc index](../index.md)).

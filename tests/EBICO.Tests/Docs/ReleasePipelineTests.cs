@@ -112,7 +112,7 @@ public class ReleasePipelineTests
     public void ReleaseRunbook_ExistsAndIsLinkedFromTheDocIndex()
     {
         ReadRepoFile("docs", "development", "release.md")
-            .Should().Contain("# Release-Runbook", "the runbook documents how to cut a release");
+            .Should().Contain("# Release runbook", "the runbook documents how to cut a release");
 
         var index = ReadRepoFile("docs", "index.md");
         index.Should().Contain("development/release.md", "every doc page must be linked from the index (Docs-as-Code)");

@@ -1,80 +1,80 @@
-# EBICS-Schemas/Specs — Lizenz & Repo-Policy
+# EBICS schemas/specs — license & repo policy
 
-Diese Seite ordnet die Lizenzlage der EBICS-Schemas/Spezifikationen ein und legt
-die daraus abgeleitete **Repo-Policy** fest. Sie gehört zu Issue **#5 —
-Lizenz-/Terms-of-Use-Klärung** (Milestone M0).
+This page classifies the licensing situation of the EBICS schemas/specifications and lays down
+the **repo policy** derived from it. It belongs to Issue **#5 —
+License/Terms-of-Use clarification** (Milestone M0).
 
-> ⚠️ **Kein Rechtsrat.** Dies ist eine technische/organisatorische Einordnung auf
-> Basis der öffentlich einsehbaren EBICS-Nutzungsbedingungen, keine
-> Rechtsberatung. Die verbindliche Entscheidung — insbesondere zur offenen Frage
-> der generierten Bindings (siehe unten) — und ggf. die Kontaktaufnahme mit der
-> EBICS SC liegen beim Betreiber des Projekts.
+> ⚠️ **Not legal advice.** This is a technical/organisational classification based
+> on the publicly viewable EBICS terms of use, not
+> legal advice. The binding decision — in particular on the open question
+> of the generated bindings (see below) — and, where applicable, contacting the
+> EBICS SC rest with the operator of the project.
 
-## Ausgangslage
+## Starting point
 
-Die EBICS-Schemas (XSDs) und -Spezifikationen sind **proprietäres Eigentum der
-EBICS SC** (EBICS Société par Actions Simplifiée). Auf Basis der Quellen
-(siehe [../protocol/schema-sources.md](../protocol/schema-sources.md)) gilt:
+The EBICS schemas (XSDs) and specifications are **proprietary property of the
+EBICS SC** (EBICS Société par Actions Simplifiée). Based on the sources
+(see [../protocol/schema-sources.md](../protocol/schema-sources.md)), the following applies:
 
 | | |
 | --- | --- |
-| ✅ **Erlaubt** | Download und **Reproduktion** der Schemas/Specs **mit vollständigem Copyright-Vermerk** (nicht-exklusiv, nicht-unterlizenzierbar). |
-| ❌ **Nicht erlaubt** (ohne schriftliche Genehmigung der EBICS SC) | **Modifikation** und **derivative uses** der Schemas/Specs. |
-| ⚠️ **Marken/Bezeichnung** | Produkte, die **nicht** auf den veröffentlichten Specs basieren, dürfen nicht „EBICS" genannt werden / das Logo nicht führen. |
+| ✅ **Permitted** | Download and **reproduction** of the schemas/specs **with the full copyright notice** (non-exclusive, non-sublicensable). |
+| ❌ **Not permitted** (without written approval of the EBICS SC) | **Modification** and **derivative uses** of the schemas/specs. |
+| ⚠️ **Trademark/designation** | Products that are **not** based on the published specs may not be called "EBICS" / carry the logo. |
 
-## Repo-Policy (Entscheidung)
+## Repo policy (decision)
 
-1. **Keine XSD-Dateien im Repository.** Die EBICS-XSDs werden **nicht** eingecheckt.
-   `.gitignore` schließt sie aus:
+1. **No XSD files in the repository.** The EBICS XSDs are **not** checked in.
+   `.gitignore` excludes them:
    - `schemas/**/*.xsd`, `schemas/**/MANIFEST.sha256`, `schemas/manifest.json`
-2. **Keine offiziellen Beispiel-XML im Repository.** Die EBICS-Beispiele
-   (ebics.org) sind ebenso proprietär und werden nicht eingecheckt:
+2. **No official sample XML in the repository.** The EBICS samples
+   (ebics.org) are likewise proprietary and are not checked in:
    - `tests/**/Fixtures/Xml/**/*.xml`
-3. **Lokaler, reproduzierbarer Bezug** über
-   [`scripts/fetch-schemas.sh`](../../scripts/fetch-schemas.sh): manueller Download
-   (ablaufende securedl-URLs, „I accept") → Skript entpackt/sortiert/prüft per
-   SHA-256-Manifest nach `schemas/<VERSION>/`.
-4. **Copyright-Vermerke bleiben erhalten.** Beim lokalen Bezug werden die
-   Original-Header der Dateien nicht entfernt; abgeleitete Artefakte verweisen auf
-   die Herkunft.
+3. **Local, reproducible retrieval** via
+   [`scripts/fetch-schemas.sh`](../../scripts/fetch-schemas.sh): manual download
+   (expiring securedl URLs, "I accept") → script unpacks/sorts/verifies via
+   SHA-256 manifest into `schemas/<VERSION>/`.
+4. **Copyright notices are preserved.** On local retrieval, the
+   original headers of the files are not removed; derived artifacts point to
+   the origin.
 
-Diese Policy ist bereits umgesetzt (M0): `.gitignore`, `fetch-schemas.sh`,
-`schema-sources.md` und die Test-Fixture-READMEs spiegeln sie wider.
+This policy is already implemented (M0): `.gitignore`, `fetch-schemas.sh`,
+`schema-sources.md` and the test-fixture READMEs reflect it.
 
-## Generierte Bindings: „derivative works"? (M1-Gate — entschieden)
+## Generated bindings: "derivative works"? (M1 gate — decided)
 
-M1 erzeugt aus den XSDs **C#-Bindings** (Klassen). Ob diese als **derivative use**
-der proprietären Schemas gelten, war das M1-Gate. **Entschieden (Option B,
+M1 generates **C# bindings** (classes) from the XSDs. Whether these count as a **derivative use**
+of the proprietary schemas was the M1 gate. **Decided (Option B,
 [../adr/0006-generierte-xsd-bindings-committen.md](../adr/0006-generierte-xsd-bindings-committen.md)):
-die Bindings werden committet, die XSDs selbst bleiben ungetrackt.** So baut/testet
-die CI den Protokoll-Kern ohne proprietäre Schemas; die schriftliche Genehmigung
-der EBICS SC wird parallel verfolgt.
+the bindings are committed, the XSDs themselves stay untracked.** This way CI builds/tests
+the protocol core without proprietary schemas; the written approval
+of the EBICS SC is pursued in parallel.
 
-Optionen (zur Einordnung, Details in [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)):
+Options (for classification, details in [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)):
 
-- **(A) Bindings nicht committen — beim Build aus lokal bezogenen XSDs generieren.**
-  Konservativ, keine generierten Ableitungen im Repo. Nachteil: Contributor/CI
-  brauchen die lokal bezogenen XSDs zum Bauen → der schema-abhängige Teil von
-  `EBICO.Core` ist ohne Schemas nicht baubar/testbar. **Verworfen.**
-- **(B) Bindings committen (XSDs bleiben ungetrackt).** Beste Developer-Experience;
-  CI baut/testet den Protokoll-Kern ohne proprietäre Schemas. **Gewählt.**
-- **(C) Handgeschriebene Modelle** statt generierter Bindings — kein direkter
-  derivative use des XSD-Texts, dafür deutlich höherer Aufwand und Fehlerrisiko.
+- **(A) Do not commit the bindings — generate them at build time from locally obtained XSDs.**
+  Conservative, no generated derivatives in the repo. Drawback: contributor/CI
+  need the locally obtained XSDs to build → the schema-dependent part of
+  `EBICO.Core` is not buildable/testable without schemas. **Rejected.**
+- **(B) Commit the bindings (XSDs stay untracked).** Best developer experience;
+  CI builds/tests the protocol core without proprietary schemas. **Chosen.**
+- **(C) Hand-written models** instead of generated bindings — no direct
+  derivative use of the XSD text, but at significantly higher effort and error risk.
 
-**Entscheidung:** **(B)** — die generierten Bindings werden committet (XSDs
-bleiben ungetrackt), Genehmigung der EBICS SC parallel verfolgt. Begründung und
-Konsequenzen: [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md). Es
-werden nur generierte Artefakte committet, nicht der XSD-Originaltext; lässt die
-EBICS SC dies nicht zu, sind die Bindings entfernbar/neu generierbar.
+**Decision:** **(B)** — the generated bindings are committed (XSDs
+stay untracked), approval of the EBICS SC pursued in parallel. Rationale and
+consequences: [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md). Only
+generated artifacts are committed, not the original XSD text; should the
+EBICS SC not permit this, the bindings can be removed/regenerated.
 
-## Bezug zu EBICO
+## Relation to EBICO
 
-„EBICO" ist eine eigenständige Emulator-/Client-Implementierung und führt kein
-EBICS-Branding. Konformitätsaussagen sind nur zulässig, soweit die Implementierung
-den veröffentlichten Specs entspricht (vgl. M8 — Validation & Conformance).
+"EBICO" is an independent emulator/client implementation and carries no
+EBICS branding. Conformance claims are only permissible insofar as the implementation
+matches the published specs (cf. M8 — Validation & Conformance).
 
-## Verweise
+## References
 
-- [Schema-Quellen & Bezug](../protocol/schema-sources.md)
+- [Schema sources & retrieval](../protocol/schema-sources.md)
 - [`scripts/fetch-schemas.sh`](../../scripts/fetch-schemas.sh)
 - EBICS Terms of Use: <https://www.ebics.org/en/informationen/disclaimer>

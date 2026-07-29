@@ -13,9 +13,9 @@ public class ConformanceMatrixTests
     private static readonly string PageText = File.ReadAllText(ConformancePagePath());
 
     [Theory]
-    [InlineData("## Kompatibilitätsmatrix")]
-    [InlineData("## Abweichungen")]
-    [InlineData("## Capture-Anleitung")]
+    [InlineData("## Compatibility matrix")]
+    [InlineData("## Deviations")]
+    [InlineData("## Capture guide")]
     public void Page_HasRequiredSections(string heading)
     {
         PageText.Should().Contain(heading);

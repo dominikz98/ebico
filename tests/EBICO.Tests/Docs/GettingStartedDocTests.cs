@@ -3,8 +3,8 @@ using AwesomeAssertions;
 namespace EBICO.Tests.Docs;
 
 /// <summary>
-/// Guard tests for the getting-started / quickstart documentation (issue #63): the "In 5 Minuten zum
-/// laufenden Emulator"-page (<c>docs/getting-started.md</c>), its wiring into the doc index and the
+/// Guard tests for the getting-started / quickstart documentation (issue #63): the "Getting started in
+/// 5 minutes" page (<c>docs/getting-started.md</c>), its wiring into the doc index and the
 /// root README. They keep the consumer-facing entry point present and coherent — the two ways to start
 /// the emulator, the connector sample, the multi-version hint (H003/H004/H005) and the schema/license
 /// note — so it cannot silently lose a building block or drop out of the index.
@@ -39,10 +39,10 @@ public class GettingStartedDocTests
     private static string GettingStartedDoc() => ReadRepoFile("docs", "getting-started.md");
 
     [Theory]
-    [InlineData("## 1. Emulator starten")]
-    [InlineData("## 2. Client ausprobieren (Quickstart-Sample)")]
-    [InlineData("## Andere EBICS-Versionen (H003 / H004 / H005)")]
-    [InlineData("## Schemas & Lizenz")]
+    [InlineData("## 1. Start the emulator")]
+    [InlineData("## 2. Try the client (Quickstart sample)")]
+    [InlineData("## Other EBICS versions (H003 / H004 / H005)")]
+    [InlineData("## Schemas & license")]
     public void GettingStartedDoc_HasRequiredSections(string heading)
     {
         GettingStartedDoc().Should().Contain(heading);

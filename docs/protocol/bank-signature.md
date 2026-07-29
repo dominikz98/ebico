@@ -1,46 +1,46 @@
-# Banktechnische Signatur A005/A006 (H003/H004/H005)
+# Bank-technical signature A005/A006 (H003/H004/H005)
 
-Die erste echte Krypto-**Operation** in `EBICO.Core` (`Crypto/`): die banktechnische
-(autorisierende) Signatur über Auftragsdaten erzeugen und verifizieren — Schlüsselversion
-**A005** (RSASSA-PKCS1-v1.5) und **A006** (RSASSA-PSS), beide über **SHA-256**. Baut auf der
-Schlüssel-Schicht aus [#18](key-representation.md) auf. Issue **#19** (Milestone M2),
-Krypto-Bibliothek: [ADR-0008](../adr/0008-krypto-bibliothek.md)
-(`System.Security.Cryptography`, kein BouncyCastle).
+The first real crypto **operation** in `EBICO.Core` (`Crypto/`): creating and verifying the
+bank-technical (authorising) signature over order data — key version **A005**
+(RSASSA-PKCS1-v1.5) and **A006** (RSASSA-PSS), both over **SHA-256**. Builds on the key layer
+from [#18](key-representation.md). Issue **#19** (Milestone M2), crypto library:
+[ADR-0008](../adr/0008-krypto-bibliothek.md)
+(`System.Security.Cryptography`, no BouncyCastle).
 
-> **Abgrenzung:** Bewusst nur die **Byte-Ebene** der RSA-Signatur plus der Order-Hash
-> (SHA-256). Die X002-Authentifikationssignatur (#20), die Verschlüsselung E002 (#21),
-> Hashing/Public-Key-Fingerprints (#22) und die X.509-Kettenprüfung (#23) gehören **nicht**
-> hierher. Auch das XML-DSig-`SignedInfo`-Envelope, die C14N der signierten XML und das
-> `UserSignatureData`/`OrderSignatureData`-Container-Assembly sind auf die Order-Data-/
-> Transaktions-Issues verschoben — diese Schicht liefert nur die Signatur-Bytes und den Hash,
-> die jene Schichten zusammensetzen.
+> **Scope:** Deliberately only the **byte level** of the RSA signature plus the order hash
+> (SHA-256). The X002 authentication signature (#20), the encryption E002 (#21),
+> hashing/public-key fingerprints (#22) and the X.509 chain check (#23) do **not** belong
+> here. The XML-DSig `SignedInfo` envelope, the C14N of the signed XML and the
+> `UserSignatureData`/`OrderSignatureData` container assembly are likewise deferred to the
+> order-data/transaction issues — this layer only provides the signature bytes and the hash
+> that those layers assemble.
 
-## Bausteine
+## Building blocks
 
-Unter `src/EBICO.Core/Crypto/` (Namespace `EBICO.Core.Crypto`):
+Under `src/EBICO.Core/Crypto/` (namespace `EBICO.Core.Crypto`):
 
-| Baustein | Ort | Aufgabe |
+| Building block | Location | Purpose |
 |---|---|---|
-| `BankSignature` (static) | `BankSignature.cs` | Order-Hash, Signieren/Verifizieren A005/A006 (zustandslose BCL-Wrapper) |
+| `BankSignature` (static) | `BankSignature.cs` | Order hash, signing/verifying A005/A006 (stateless BCL wrappers) |
 
-Wiederverwendet aus [#18](key-representation.md): `RsaKeyMaterial` (`CreateRsa()`,
-`HasPrivateKey`, `ToPublicOnly()`), die `KeyVersions`-Registry (`TryGet`, `PaddingIntent`),
-`KeyPurpose` sowie `KeyMaterialException`.
+Reused from [#18](key-representation.md): `RsaKeyMaterial` (`CreateRsa()`,
+`HasPrivateKey`, `ToPublicOnly()`), the `KeyVersions` registry (`TryGet`, `PaddingIntent`),
+`KeyPurpose` as well as `KeyMaterialException`.
 
-## A005 / A006 — Verfahren
+## A005 / A006 — procedure
 
-EBICS bildet die banktechnische Signatur über einen **SHA-256-Order-Hash** der Auftragsdaten
-und signiert diesen mit dem privaten Signaturschlüssel (`A`). Die Padding-Variante hängt an
-der Schlüsselversion und wird **registry-getrieben** aus `KeyVersionInfo.PaddingIntent`
-aufgelöst (nicht hartkodiert):
+EBICS forms the bank-technical signature over a **SHA-256 order hash** of the order data
+and signs it with the private signature key (`A`). The padding variant depends on the
+key version and is resolved **registry-driven** from `KeyVersionInfo.PaddingIntent`
+(not hard-coded):
 
-| Version | RSA-Schema | BCL-Padding | Determinismus |
+| Version | RSA scheme | BCL padding | Determinism |
 |---|---|---|---|
-| A005 | RSASSA-PKCS1-v1.5 | `RSASignaturePadding.Pkcs1` | deterministisch (gleiche Eingabe → gleiche Signatur) |
-| A006 | RSASSA-PSS | `RSASignaturePadding.Pss` | randomisiert (zufälliges Salt) |
+| A005 | RSASSA-PKCS1-v1.5 | `RSASignaturePadding.Pkcs1` | deterministic (same input → same signature) |
+| A006 | RSASSA-PSS | `RSASignaturePadding.Pss` | randomised (random salt) |
 
-PSS verwendet den BCL-Default (Salt-Länge = Hash-Länge = 32 Byte, MGF1-SHA-256), was der
-A006-Erwartung entspricht. Beides läuft über `RSA.SignHash`/`RSA.VerifyHash` mit
+PSS uses the BCL default (salt length = hash length = 32 bytes, MGF1-SHA-256), which matches
+the A006 expectation. Both run over `RSA.SignHash`/`RSA.VerifyHash` with
 `HashAlgorithmName.SHA256`.
 
 ```csharp
@@ -53,58 +53,57 @@ var sig2 = BankSignature.SignHash(hash, signerKey, KeyVersion.Create("A006"));
 bool ok2 = BankSignature.VerifyHash(hash, sig2, signerPubKey, KeyVersion.Create("A006"));
 ```
 
-`ComputeOrderHash` ist **öffentlich**, damit die Order-Data- und die Fingerprint-Schicht (#22)
-exakt dieselben Bytes verwenden (gleiche Begründung wie der kanonische Modulus/Exponent in #18).
+`ComputeOrderHash` is **public**, so that the order-data layer and the fingerprint layer (#22)
+use exactly the same bytes (same rationale as the canonical modulus/exponent in #18).
 
-## Order-Hash & Normalisierung
+## Order hash & normalisation
 
-> **⚠️ Spec-Vorbehalt:** Die genaue **Normalisierung** der Auftragsdaten vor dem Hashen (z. B.
-> Zeilenende-Normalisierung für bestimmte Formate) ist ein EBICS-Spec-Detail, das **noch nicht
-> gegen die offiziellen Schemas/Annexe verifiziert** ist (vgl. CLAUDE.md). Sie ist auf eine
-> einzige Stelle begrenzt (`NormalizeOrderData`, derzeit Identität/Pass-through) und wird dort
-> nachgezogen, sobald die Spec vorliegt. Da **sowohl** `Sign` als auch `Verify` durch diese
-> Stelle laufen, bleiben in sich konsistente Sign-→-Verify-Round-Trips davon unberührt.
+> **⚠️ Spec caveat:** The exact **normalisation** of the order data before hashing (e.g.
+> line-ending normalisation for certain formats) is an EBICS spec detail that is **not yet
+> verified against the official schemas/annexes** (cf. CLAUDE.md). It is confined to a single
+> place (`NormalizeOrderData`, currently identity/pass-through) and is caught up there as soon as
+> the spec is available. Since **both** `Sign` and `Verify` run through this place, internally
+> consistent sign-→-verify round-trips remain unaffected.
 
-## Fehlerverhalten
+## Error behaviour
 
-| Bedingung | Verhalten |
+| Condition | Behaviour |
 |---|---|
 | `key == null` (Sign/Verify) | `ArgumentNullException` |
-| Signieren ohne privaten Schlüssel | `KeyMaterialException` |
-| `version` keine bekannte **Signatur**-Version (`A999`, `E002`, `X002`, `default`) | `InvalidOperationException` |
-| Verify: falscher Schlüssel / manipulierte Daten / manipulierte oder zu kurze Signatur | Rückgabe `false` (wirft **nicht**) |
+| Signing without a private key | `KeyMaterialException` |
+| `version` not a known **signature** version (`A999`, `E002`, `X002`, `default`) | `InvalidOperationException` |
+| Verify: wrong key / tampered data / tampered or too-short signature | returns `false` (does **not** throw) |
 
-> **Keine Versions-Permission-Prüfung hier:** Ob eine Version mit einer EBICS-Protokollversion
-> erlaubt ist (z. B. A006 mit H003), bleibt Aufgabe von `KeyVersions.EnsurePermitted` in der
-> Dispatch-/Onboarding-Schicht. Diese Primitive bleibt policy-frei und löst **kein**
-> `KeyVersionNotPermittedException` aus. Der `false`-statt-Werfen-Pfad beim Verifizieren hält
-> den Server robust: eine fehlerhafte Client-Signatur ist eine saubere Ablehnung, kein Crash.
+> **No version-permission check here:** Whether a version is permitted with an EBICS protocol
+> version (e.g. A006 with H003) remains the task of `KeyVersions.EnsurePermitted` in the
+> dispatch/onboarding layer. This primitive stays policy-free and does **not** raise a
+> `KeyVersionNotPermittedException`. The `false`-instead-of-throw path during verification keeps
+> the server robust: a faulty client signature is a clean rejection, not a crash.
 
-## EBICS-Versionsbezug
+## EBICS version relation
 
-Das Verfahren (SHA-256-Order-Hash + RSA-Signatur) ist über H003/H004/H005 identisch; nur die
-**zulässigen Versionen** unterscheiden sich (A006 ab EBICS 2.5/H004, siehe #117 und
-[ADR-0029](../adr/0029-interop-fixes-reale-clients.md)) und liegen zentral in
-[`KeyVersions`](key-representation.md). A004 (Legacy) ist über dasselbe PKCS1-v1.5-Mapping
-abgedeckt, ist aber nicht Ziel dieses Issues.
+The procedure (SHA-256 order hash + RSA signature) is identical across H003/H004/H005; only the
+**permitted versions** differ (A006 from EBICS 2.5/H004 on, see #117 and
+[ADR-0029](../adr/0029-interop-fixes-reale-clients.md)) and reside centrally in
+[`KeyVersions`](key-representation.md). A004 (legacy) is covered by the same PKCS1-v1.5 mapping,
+but is not the target of this issue.
 
 ## Tests
 
-`tests/EBICO.Tests/Crypto/BankSignatureTests.cs` (Tier A, CI-sicher, ohne proprietäre Beispiele):
+`tests/EBICO.Tests/Crypto/BankSignatureTests.cs` (Tier A, CI-safe, without proprietary samples):
 
-- Happy Path A005 und A006 (Sign → Verify).
-- Round-Trip über expliziten Hash; `ComputeOrderHash`-Länge == 32.
-- Cross-Verify mit `ToPublicOnly()` (privater Schlüssel beim Verifizieren nicht nötig).
-- Negativfälle: manipulierte Daten, manipulierte Signatur, zu kurze Signatur, falscher Schlüssel,
-  falsche/unbekannte Version (`E002`/`X002`/`A999`/`default`), Signieren ohne privaten Schlüssel,
-  `null`-Schlüssel, Cross-Version (A005-Signatur als A006 verifiziert und umgekehrt).
-- **Deterministischer A005-Known-Answer-Vektor**: fixer PKCS#8-Schlüssel (derselbe wie in
-  `RsaKeyImportExportTests`) + feste Auftragsdaten → byte-gleiche Signatur (pinnt Padding und
-  Normalisierung).
-- **A006/PSS-Nichtdeterminismus**: zweimal signieren → unterschiedliche Signaturen, beide
-  verifizieren.
+- Happy path A005 and A006 (Sign → Verify).
+- Round-trip over an explicit hash; `ComputeOrderHash` length == 32.
+- Cross-verify with `ToPublicOnly()` (private key not needed for verification).
+- Negative cases: tampered data, tampered signature, too-short signature, wrong key,
+  wrong/unknown version (`E002`/`X002`/`A999`/`default`), signing without a private key,
+  `null` key, cross-version (A005 signature verified as A006 and vice versa).
+- **Deterministic A005 known-answer vector**: fixed PKCS#8 key (the same as in
+  `RsaKeyImportExportTests`) + fixed order data → byte-identical signature (pins padding and
+  normalisation).
+- **A006/PSS non-determinism**: sign twice → different signatures, both verify.
 
-## Verwandtes
+## Related
 
-- [Schlüsselpaare & -repräsentation (A/E/X)](key-representation.md) — die zugrunde liegende Schlüssel-Schicht (#18)
-- [ADR-0008 — Krypto-Bibliothek](../adr/0008-krypto-bibliothek.md)
+- [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
+- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)

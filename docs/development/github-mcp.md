@@ -1,16 +1,16 @@
-# GitHub MCP-Server (Claude Code)
+# GitHub MCP server (Claude Code)
 
-Bindet den **GitHub MCP-Server** in Claude Code ein, damit die Arbeit an EBICO
-(Issues, Pull Requests, Repo-Inhalte, Commits, Code-Suche, Actions) direkt über
-strukturierte Tools statt nur über die `gh`-CLI läuft. Ergänzt die
-issue-getriebene Arbeitsweise (`feat/<nr>-<slug>` + PR mit `Closes #<nr>`).
+Integrates the **GitHub MCP server** into Claude Code so that the work on EBICO
+(issues, pull requests, repo content, commits, code search, actions) runs directly through
+structured tools instead of only through the `gh` CLI. Complements the
+issue-driven way of working (`feat/<nr>-<slug>` + PR with `Closes #<nr>`).
 
-Betrifft die Entwickler-Umgebung (Tooling), keinen EBICS-Feature-Code.
+Concerns the developer environment (tooling), not any EBICS feature code.
 
-## Konfiguration
+## Configuration
 
-Der Server ist im **Project-Scope** in `.mcp.json` (Repo-Root) eingetragen und
-wird damit mit dem Team geteilt:
+The server is registered in **project scope** in `.mcp.json` (repo root) and
+is thereby shared with the team:
 
 ```json
 {
@@ -26,47 +26,47 @@ wird damit mit dem Team geteilt:
 }
 ```
 
-- **Remote-Server**: der offizielle, von GitHub gehostete MCP-Endpoint
-  (`https://api.githubcopilot.com/mcp/`) — kein lokaler Docker-Container, keine
-  eigene Versionspflege.
-- **Auth per Personal Access Token (PAT)** im `Authorization`-Header. `${GITHUB_MCP_PAT}`
-  wird zur Laufzeit aus einer Umgebungsvariable expandiert — **kein Secret im Repo**.
+- **Remote server**: the official MCP endpoint hosted by GitHub
+  (`https://api.githubcopilot.com/mcp/`) — no local Docker container, no
+  own version maintenance.
+- **Auth via personal access token (PAT)** in the `Authorization` header. `${GITHUB_MCP_PAT}`
+  is expanded at runtime from an environment variable — **no secret in the repo**.
 
-### Warum PAT statt OAuth?
+### Why PAT instead of OAuth?
 
-Claude Codes eingebauter OAuth-Flow benötigt **Dynamic Client Registration
-(RFC 7591)**. Der GitHub-MCP-Endpoint unterstützt das aktuell nicht; der Login
-scheitert mit `Incompatible auth server: does not support dynamic client
-registration`. Der PAT-Header ist der dokumentierte Ausweg und für die
-Remote-Variante die zuverlässige Auth-Methode.
+Claude Code's built-in OAuth flow needs **Dynamic Client Registration
+(RFC 7591)**. The GitHub MCP endpoint does not currently support it; the login
+fails with `Incompatible auth server: does not support dynamic client
+registration`. The PAT header is the documented way out and, for the
+remote variant, the reliable auth method.
 
-## Einrichtung je Entwickler
+## Setup per developer
 
-Jeder nutzt seinen **eigenen** PAT — die `.mcp.json` referenziert nur die
-Variable, den Token setzt jeder lokal.
+Everyone uses their **own** PAT — the `.mcp.json` only references the
+variable, the token is set by each person locally.
 
-### 1. Fine-grained PAT erstellen
+### 1. Create a fine-grained PAT
 
 <https://github.com/settings/personal-access-tokens> → *Generate new token*
 
-- **Resource owner / Repository access**: das/die relevanten Repos (z. B. `dominikz98/ebico`).
-- **Repository permissions** (Minimum für den Alltag):
+- **Resource owner / Repository access**: the relevant repo(s) (e.g. `dominikz98/ebico`).
+- **Repository permissions** (minimum for everyday use):
 
-  | Permission     | Zugriff          | Wofür                          |
+  | Permission     | Access           | For what                       |
   | -------------- | ---------------- | ------------------------------ |
-  | Contents       | Read (o. Write)  | Dateien/Branches lesen, pushen |
-  | Metadata       | Read (Pflicht)   | Grundzugriff aufs Repo         |
-  | Issues         | Read and write   | Issues lesen/anlegen/kommentieren |
-  | Pull requests  | Read and write   | PRs erstellen/reviewen         |
-  | Actions        | Read             | CI-Läufe/Logs (optional)       |
+  | Contents       | Read (or Write)  | Read files/branches, push      |
+  | Metadata       | Read (mandatory) | Basic access to the repo       |
+  | Issues         | Read and write   | Read/create/comment on issues  |
+  | Pull requests  | Read and write   | Create/review PRs              |
+  | Actions        | Read             | CI runs/logs (optional)        |
 
-  Nur Lesezugriff genügt, wenn der Server ausschließlich lesen soll.
-- Alternativ ein Classic-Token mit Scope `repo`.
+  Read-only access is enough if the server is only meant to read.
+- Alternatively a classic token with scope `repo`.
 
-### 2. Token als Umgebungsvariable `GITHUB_MCP_PAT` setzen
+### 2. Set the token as environment variable `GITHUB_MCP_PAT`
 
-Dauerhaft im User-Profil hinterlegen (den Token **nicht** in freigegebene
-Terminals/Transcripts einfügen):
+Store it permanently in the user profile (do **not** paste the token into shared
+terminals/transcripts):
 
 **PowerShell** (`pwsh`):
 
@@ -86,38 +86,38 @@ setx GITHUB_MCP_PAT "<DEIN_TOKEN>"
 export GITHUB_MCP_PAT="<DEIN_TOKEN>"
 ```
 
-> Die Variable greift nur für **neu gestartete** Prozesse. Terminal **und**
-> Claude Code danach neu starten, damit der MCP-Client sie im Environment sieht.
+> The variable only takes effect for **newly started** processes. Restart the terminal **and**
+> Claude Code afterwards, so that the MCP client sees it in the environment.
 
-### 3. Claude Code neu starten & Server freigeben
+### 3. Restart Claude Code & trust the server
 
-Beim Start fragt Claude Code, ob dem Server aus der Project-`.mcp.json`
-vertraut wird (Sicherheitsabfrage für geteilte MCP-Configs) → **bestätigen**.
+On startup, Claude Code asks whether the server from the project `.mcp.json`
+is trusted (security prompt for shared MCP configs) → **confirm**.
 
-### 4. Verbindung prüfen
+### 4. Check the connection
 
 ```
 claude mcp get github     # erwartet: ✔ connected
 ```
 
-## Sicherheit
+## Security
 
-- **Kein Token im Repo**: `.mcp.json` enthält nur die Env-Referenz
-  `${GITHUB_MCP_PAT}`, nie den Klartext-Token.
-- **Pro Entwickler ein PAT** mit minimalen Permissions; bei Verdacht auf Leak in
-  den GitHub-Settings widerrufen und neu erzeugen.
-- Fine-grained Tokens auf die konkret benötigten Repos einschränken.
+- **No token in the repo**: `.mcp.json` contains only the env reference
+  `${GITHUB_MCP_PAT}`, never the plaintext token.
+- **One PAT per developer** with minimal permissions; on suspicion of a leak, revoke it in
+  the GitHub settings and regenerate.
+- Restrict fine-grained tokens to the specifically needed repos.
 
 ## Troubleshooting
 
-| Symptom | Ursache / Lösung |
+| Symptom | Cause / solution |
 | ------- | ---------------- |
-| `Incompatible auth server: does not support dynamic client registration` | OAuth wird nicht unterstützt → PAT-Header nutzen (siehe oben), nicht per `/mcp → Authenticate` einloggen. |
-| `The filename, directory name, or volume label syntax is incorrect` | PowerShell-Syntax in cmd.exe ausgeführt. Entweder `pwsh` starten oder `setx` verwenden. |
-| Server bleibt `failed` / Variable „leer" | Env-Variable erst nach Neustart aktiv; Terminal **und** Claude Code neu starten. |
-| `⏸ Pending approval` | Project-Scope-Server müssen einmalig bestätigt werden (`claude` erneut starten und Vertrauen bestätigen). |
+| `Incompatible auth server: does not support dynamic client registration` | OAuth is not supported → use the PAT header (see above), do not log in via `/mcp → Authenticate`. |
+| `The filename, directory name, or volume label syntax is incorrect` | PowerShell syntax executed in cmd.exe. Either start `pwsh` or use `setx`. |
+| Server stays `failed` / variable "empty" | Env variable only active after restart; restart terminal **and** Claude Code. |
+| `⏸ Pending approval` | Project-scope servers must be confirmed once (restart `claude` and confirm trust). |
 
-Schnelltest des Tokens (ohne ihn auszugeben) gegen den Endpoint:
+Quick test of the token (without printing it) against the endpoint:
 
 ```powershell
 $t = [Environment]::GetEnvironmentVariable("GITHUB_MCP_PAT","User")

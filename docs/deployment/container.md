@@ -1,28 +1,28 @@
-# Betrieb: Container-Image für EBICO.Server
+# Operations: Container image for EBICO.Server
 
-> Umsetzung von **Issue #61** (Milestone M9 — Packaging & Docs). Diese Seite beschreibt das
-> **Docker-Container-Image** für den EBICS-Emulator (`EBICO.Server`), die **Konfiguration über
-> Umgebungsvariablen** und ein **Beispiel-`docker-compose`** (Server + Suite). Die Images sind für
-> lokalen/Emulator-Betrieb gedacht — nicht für den ungeschützten Betrieb in einem
-> nicht vertrauenswürdigen Netz (siehe [Sicherheit](#sicherheit)).
+> Implements **Issue #61** (Milestone M9 — Packaging & Docs). This page describes the
+> **Docker container image** for the EBICS emulator (`EBICO.Server`), the **configuration via
+> environment variables** and an example **`docker-compose`** (server + suite). The images are intended for
+> local/emulator operation — not for unprotected operation in an
+> untrusted network (see [Security](#security)).
 
-## Zweck
+## Purpose
 
-`EBICO.Server` ist der EBICS-Server-Emulator (konzeptionell wie *Azurite* für Azure Storage). #61
-macht ihn als schlankes Container-Image lauffähig, sodass er ohne lokales .NET-SDK gestartet werden
-kann. Ein einziges, parametrisiertes `Dockerfile` im Repo-Root baut wahlweise den Server oder die
-Blazor-Suite; ein `docker-compose.yml` startet beide nebeneinander.
+`EBICO.Server` is the EBICS server emulator (conceptually like *Azurite* for Azure Storage). #61
+makes it runnable as a slim container image, so that it can be started without a local .NET SDK.
+A single, parameterised `Dockerfile` in the repo root builds either the server or the
+Blazor suite; a `docker-compose.yml` starts both side by side.
 
-## Images & Build
+## Images & build
 
-Das `Dockerfile` ist ein **Multi-Stage-Build**:
+The `Dockerfile` is a **multi-stage build**:
 
-- **Build-Stage** `mcr.microsoft.com/dotnet/sdk:10.0` — restauriert und published das gewählte
-  Projekt (`dotnet publish -c Release`, framework-abhängig).
-- **Runtime-Stage** `mcr.microsoft.com/dotnet/aspnet:10.0` — enthält nur das Publish-Ergebnis, läuft
-  als **nicht-root** (`USER $APP_UID`) und lauscht auf Port **8080**.
+- **Build stage** `mcr.microsoft.com/dotnet/sdk:10.0` — restores and publishes the chosen
+  project (`dotnet publish -c Release`, framework-dependent).
+- **Runtime stage** `mcr.microsoft.com/dotnet/aspnet:10.0` — contains only the publish result, runs
+  as **non-root** (`USER $APP_UID`) and listens on port **8080**.
 
-Der Build-Arg **`PROJECT`** wählt das Projekt (Default `EBICO.Server`):
+The build arg **`PROJECT`** selects the project (default `EBICO.Server`):
 
 ```bash
 # Server-Image (Standard):
@@ -32,15 +32,15 @@ docker build -t ebico-server:local .
 docker build --build-arg PROJECT=EBICO.Suite -t ebico-suite:local .
 ```
 
-`ENTRYPOINT` ist `["dotnet"]`, `CMD` ist `["EBICO.Server.dll"]`. Für die Suite wird das Kommando auf
-`EBICO.Suite.dll` überschrieben (siehe `docker-compose.yml`).
+`ENTRYPOINT` is `["dotnet"]`, `CMD` is `["EBICO.Server.dll"]`. For the suite the command is overridden to
+`EBICO.Suite.dll` (see `docker-compose.yml`).
 
-> **SDK-Pin:** `global.json` pinnt das SDK auf `10.0.100` (`rollForward: latestFeature`, seit #124 die
-> niedrigste taugliche Version statt eines hohen Feature-Bands). Das Floating-Tag `sdk:10.0` liefert
-> stets das neueste 10.0.x-SDK und erfüllt den Pin. Es gibt bewusst **keine** `packages.lock.json`
-> (zentrale Paketverwaltung), daher wird `dotnet restore` **nicht** im `--locked-mode` ausgeführt.
+> **SDK pin:** `global.json` pins the SDK to `10.0.100` (`rollForward: latestFeature`, since #124 the
+> lowest usable version instead of a high feature band). The floating tag `sdk:10.0` always delivers
+> the newest 10.0.x SDK and satisfies the pin. There is deliberately **no** `packages.lock.json`
+> (central package management), so `dotnet restore` is **not** run in `--locked-mode`.
 
-Der Container starten & prüfen:
+Start & check the container:
 
 ```bash
 docker run --rm -p 5014:8080 ebico-server:local
@@ -48,36 +48,36 @@ docker run --rm -p 5014:8080 ebico-server:local
 curl -i http://localhost:5014/health        # -> 200 "Healthy"
 ```
 
-## Konfiguration via ENV
+## Configuration via ENV
 
-Zwei Ebenen greifen im Container über Umgebungsvariablen:
+Two levels take effect in the container via environment variables:
 
-**1. Standard-ASP.NET-Core-Host-Variablen** (vom Framework verarbeitet):
+**1. Standard ASP.NET Core host variables** (processed by the framework):
 
-| Variable | Zweck | Beispiel |
+| Variable | Purpose | Example |
 | --- | --- | --- |
-| `ASPNETCORE_HTTP_PORTS` | HTTP-Port(s) von Kestrel | `8080` (Image-Default) |
-| `ASPNETCORE_URLS` | vollständige Bind-URLs (überschreibt `*_PORTS`) | `http://+:8080` |
-| `ASPNETCORE_ENVIRONMENT` | Umgebung | `Production` |
-| `Logging__LogLevel__Default` | Log-Level | `Information` |
-| `AllowedHosts` | erlaubte Hosts | `*` |
+| `ASPNETCORE_HTTP_PORTS` | HTTP port(s) of Kestrel | `8080` (image default) |
+| `ASPNETCORE_URLS` | full bind URLs (overrides `*_PORTS`) | `http://+:8080` |
+| `ASPNETCORE_ENVIRONMENT` | environment | `Production` |
+| `Logging__LogLevel__Default` | log level | `Information` |
+| `AllowedHosts` | allowed hosts | `*` |
 
-**2. Emulator-Optionen** (`EbicoServerOptions`) — gebunden aus der Konfigurations-Section
-**`Ebico`**. Im Container werden verschachtelte Keys per **Doppel-Unterstrich** gesetzt
-(`Ebico__<Property>`). Beispiele:
+**2. Emulator options** (`EbicoServerOptions`) — bound from the configuration section
+**`Ebico`**. In the container, nested keys are set via **double underscore**
+(`Ebico__<Property>`). Examples:
 
-| Umgebungsvariable | Wirkung | Default |
+| Environment variable | Effect | Default |
 | --- | --- | --- |
-| `Ebico__EndpointPath` | Pfad des EBICS-Endpoints | `/ebics` |
-| `Ebico__AdminApiPath` | Prefix der Admin-API | `/admin` |
-| `Ebico__FallbackResponseVersion` | Fehler-Antwortversion bei unerkannter Version | `H005` |
-| `Ebico__MaxRequestBodyBytes` | max. Request-Body (Bytes) | `1048576` |
-| `Ebico__SegmentSizeBytes` | Roh-Segmentgröße (Bytes) | `524288` |
-| `Ebico__TransactionTimeout` | Idle-Timeout je Transaktion (`hh:mm:ss`) | `01:00:00` |
-| `Ebico__MaxConcurrentTransactions` | Obergrenze paralleler Transaktionen (`0` = unbegrenzt) | `0` |
-| `Ebico__MaxEventLogEntries` | Ring-Puffergröße des Ereignis-Logs | `10000` |
+| `Ebico__EndpointPath` | path of the EBICS endpoint | `/ebics` |
+| `Ebico__AdminApiPath` | prefix of the admin API | `/admin` |
+| `Ebico__FallbackResponseVersion` | error response version for an unrecognised version | `H005` |
+| `Ebico__MaxRequestBodyBytes` | max. request body (bytes) | `1048576` |
+| `Ebico__SegmentSizeBytes` | raw segment size (bytes) | `524288` |
+| `Ebico__TransactionTimeout` | idle timeout per transaction (`hh:mm:ss`) | `01:00:00` |
+| `Ebico__MaxConcurrentTransactions` | upper bound on parallel transactions (`0` = unlimited) | `0` |
+| `Ebico__MaxEventLogEntries` | ring-buffer size of the event log | `10000` |
 
-Alle Felder von `EbicoServerOptions` sind so überschreibbar (siehe
+All fields of `EbicoServerOptions` can be overridden this way (see
 [`src/EBICO.Server/EbicoServerOptions.cs`](../../src/EBICO.Server/EbicoServerOptions.cs)).
 
 ```bash
@@ -85,13 +85,13 @@ docker run --rm -e Ebico__EndpointPath=/custom-ebics -p 5014:8080 ebico-server:l
 curl -sk -X POST http://localhost:5014/custom-ebics -H "Content-Type: text/xml" --data "<x/>"
 ```
 
-**Precedence** (spätere Quelle gewinnt je Property): Defaults < `Ebico`-Config/ENV <
-Code-`configure`-Delegate an `AddEbicoServer(...)`. Die Bindung ist **null-sicher**: fehlt eine
-`IConfiguration` (z. B. in Unit-Tests mit einer nackten `ServiceCollection`), bleiben die Defaults.
+**Precedence** (later source wins per property): defaults < `Ebico` config/ENV <
+code `configure` delegate on `AddEbicoServer(...)`. The binding is **null-safe**: if an
+`IConfiguration` is missing (e.g. in unit tests with a bare `ServiceCollection`), the defaults remain.
 
-## docker-compose (Server + Suite)
+## docker-compose (server + suite)
 
-`docker-compose.yml` im Repo-Root startet beide Hosts:
+`docker-compose.yml` in the repo root starts both hosts:
 
 ```bash
 docker compose up --build
@@ -99,46 +99,46 @@ docker compose up --build
 #   suite  -> http://localhost:5267
 ```
 
-Beide Services werden aus demselben `Dockerfile` gebaut (via `PROJECT`-Build-Arg); der `suite`-Service
-überschreibt das Startkommando mit `EBICO.Suite.dll`.
+Both services are built from the same `Dockerfile` (via the `PROJECT` build arg); the `suite` service
+overrides the start command with `EBICO.Suite.dll`.
 
-> **Kein geteilter Live-Zustand:** Suite und Server teilen heute **keinen** Zustand. Die Suite betreibt
-> einen eigenen In-Memory-Store mit geseedeten Beispieldaten und spricht den Server **nicht** über HTTP
-> an ([ADR-0009](../adr/0009-blazor-render-mode.md)); die prozessübergreifende Live-Inspektion gegen
-> einen laufenden Server ist ein dokumentiertes Folgethema ([ADR-0015](../adr/0015-ereignis-protokollspeicher.md)).
-> Das compose zeigt also „beide laufen", nicht „gekoppelt".
+> **No shared live state:** the suite and server share **no** state today. The suite runs
+> its own in-memory store with seeded sample data and does **not** talk to the server over HTTP
+> ([ADR-0009](../adr/0009-blazor-render-mode.md)); cross-process live inspection against
+> a running server is a documented follow-up topic ([ADR-0015](../adr/0015-ereignis-protokollspeicher.md)).
+> So the compose shows "both are running", not "coupled".
 
-Die Suite ruft `UseHttpsRedirection()` auf; ohne konfigurierten HTTPS-Port loggt sie beim Start eine
-Warnung und liefert die Inhalte weiter über HTTP aus (im Container unkritisch; TLS terminiert man
-üblicherweise an einem vorgelagerten Proxy).
+The suite calls `UseHttpsRedirection()`; without a configured HTTPS port it logs a
+warning at startup and serves the content over HTTP (harmless in the container; TLS is usually
+terminated at an upstream proxy).
 
-## Sicherheit
+## Security
 
-Der EBICS-Endpoint ist unsigniert, und die **Admin-API (`/admin`) ist unauthentifiziert by design** —
-der Server ist ein lokaler Emulator (wie *Azurite*). Das Container-Image ändert daran nichts:
+The EBICS endpoint is unsigned, and the **admin API (`/admin`) is unauthenticated by design** —
+the server is a local emulator (like *Azurite*). The container image does not change that:
 
-- **Nicht** ungeschützt in ein nicht vertrauenswürdiges Netz exponieren.
-- Bevorzugt an `127.0.0.1` binden bzw. hinter einem authentifizierenden Reverse-Proxy betreiben.
-- Kein Secrets-Management im Image; Konfiguration erfolgt über ENV/Config.
+- Do **not** expose it unprotected to an untrusted network.
+- Preferably bind to `127.0.0.1` or run it behind an authenticating reverse proxy.
+- No secrets management in the image; configuration is done via ENV/config.
 
 ## Health
 
-Der Server mappt einen Liveness-Endpoint **`/health`** (`AddHealthChecks()` /
-`MapHealthChecks("/health")`, Antwort `200 "Healthy"`). Er dient Orchestrator-Probes
-(Kubernetes-Liveness/-Readiness) und externen Checks. Ein `healthcheck` im `docker-compose.yml`
-entfällt bewusst, weil das `aspnet`-Runtime-Image keinen HTTP-Client (`curl`/`wget`) mitbringt —
-die Probe erfolgt vom Host bzw. vom Orchestrator.
+The server maps a liveness endpoint **`/health`** (`AddHealthChecks()` /
+`MapHealthChecks("/health")`, response `200 "Healthy"`). It serves orchestrator probes
+(Kubernetes liveness/readiness) and external checks. A `healthcheck` in the `docker-compose.yml`
+is deliberately omitted, because the `aspnet` runtime image ships no HTTP client (`curl`/`wget`) —
+the probe is performed from the host or from the orchestrator.
 
-## CI & Registry-Push
+## CI & registry push
 
-Die CI (`.github/workflows/ci.yml`) baut das Server-Image bei jedem Push/PR in einem eigenen Job
-`container-build` (**build-only**, kein Registry-Push), damit das `Dockerfile` nicht verrottet.
+CI (`.github/workflows/ci.yml`) builds the server image on every push/PR in a dedicated job
+`container-build` (**build-only**, no registry push), so that the `Dockerfile` does not rot.
 
-Der **Push nach GHCR** erfolgt in der tag-getriggerten **Release-Pipeline**
+The **push to GHCR** happens in the tag-triggered **release pipeline**
 (`.github/workflows/release.yml`, #62 / [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)):
-Beim Pushen eines Tags `vJAHR.MONAT.N` wird das Server-Image gebaut und als
-`ghcr.io/dominikz98/ebico-server:{VERSION}` **und** `:latest` nach GHCR gepusht — authentifiziert über
-das automatische `GITHUB_TOKEN` (kein externes Secret). Ablauf: [Release-Runbook](../development/release.md).
+when a tag `vJAHR.MONAT.N` is pushed, the server image is built and pushed to GHCR as
+`ghcr.io/dominikz98/ebico-server:{VERSION}` **and** `:latest` — authenticated via
+the automatic `GITHUB_TOKEN` (no external secret). Procedure: [Release runbook](../development/release.md).
 
 ```bash
 # Veröffentlichtes Image ziehen und starten:
@@ -149,19 +149,19 @@ curl -i http://localhost:5014/health        # -> 200 "Healthy"
 ## Tests
 
 - [`tests/EBICO.Tests/Docs/ContainerArtifactsTests.cs`](../../tests/EBICO.Tests/Docs/ContainerArtifactsTests.cs) —
-  Guard-Tests: `Dockerfile`, `.dockerignore`, `docker-compose.yml` und diese Doku existieren, sind im
-  Doku-Index verlinkt und enthalten die erwarteten Kern-Bestandteile (Base-Images, `PROJECT`-Arg,
-  Service-Namen, ADR-Verweis).
+  guard tests: `Dockerfile`, `.dockerignore`, `docker-compose.yml` and this doc exist, are linked in
+  the doc index and contain the expected core components (base images, `PROJECT` arg,
+  service names, ADR reference).
 - [`tests/EBICO.Tests/Server/EbicoServerOptionsConfigurationTests.cs`](../../tests/EBICO.Tests/Server/EbicoServerOptionsConfigurationTests.cs) —
-  Bindung von `EbicoServerOptions` aus der `Ebico`-Config-Section (Happy Path), Precedence des
-  Code-Delegates und Null-Sicherheit ohne `IConfiguration`.
+  binding of `EbicoServerOptions` from the `Ebico` config section (happy path), precedence of the
+  code delegate and null safety without an `IConfiguration`.
 - [`tests/EBICO.Tests/Server/HealthEndpointIntegrationTests.cs`](../../tests/EBICO.Tests/Server/HealthEndpointIntegrationTests.cs) —
-  End-to-End über `WebApplicationFactory`: `/health` liefert 200; ein per Konfiguration gesetzter
-  `Ebico__EndpointPath` steuert nachweislich den gemappten EBICS-Pfad.
+  end-to-end via `WebApplicationFactory`: `/health` returns 200; an `Ebico__EndpointPath` set via
+  configuration demonstrably steers the mapped EBICS path.
 
-## Verwandte Doku
+## Related docs
 
-- [Hostable Server-Grundgerüst](../server/host.md) — `Program.cs`, `AddEbicoServer`, `EbicoServerOptions`, Pipeline
-- [CI-Pipeline (GitHub Actions)](../development/ci.md) — Build/Test, Container-Build-Job
-- [ADR-0022 — Container-Image & ENV-Konfiguration](../adr/0022-container-image-und-konfiguration.md)
-- [ADR-0009 — Blazor Render-Modus](../adr/0009-blazor-render-mode.md)
+- [Hostable server skeleton](../server/host.md) — `Program.cs`, `AddEbicoServer`, `EbicoServerOptions`, pipeline
+- [CI pipeline (GitHub Actions)](../development/ci.md) — build/test, container-build job
+- [ADR-0022 — Container image & ENV configuration](../adr/0022-container-image-und-konfiguration.md)
+- [ADR-0009 — Blazor render mode](../adr/0009-blazor-render-mode.md)

@@ -50,9 +50,9 @@ public class OrderCoverageMatrixTests
     }
 
     [Theory]
-    [InlineData("## Legende")]
-    [InlineData("## Offene Lücken")]
-    [InlineData("## EBICS-Versionsbezug")]
+    [InlineData("## Legend")]
+    [InlineData("## Open gaps")]
+    [InlineData("## EBICS version mapping")]
     public void Matrix_HasRequiredSections(string heading)
     {
         MatrixText.Should().Contain(heading);

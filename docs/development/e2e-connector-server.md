@@ -1,65 +1,65 @@
 # E2E: Connector ↔ Server — Happy Paths
 
-> Umsetzung von **Issue #57** (Milestone M8 — Validation & Conformance). Diese Seite beschreibt den
-> ersten Testaufbau, in dem `EBICO.Connector` und `EBICO.Server` **direkt miteinander** sprechen.
+> Implementation of **issue #57** (Milestone M8 — Validation & Conformance). This page describes the
+> first test setup in which `EBICO.Connector` and `EBICO.Server` talk **directly to each other**.
 >
-> Bewusst **enthalten**: INI/HIA/HPB, Upload **CCT**, Download **C53** — je **H003/H004/H005**,
-> gegen den in-process gehosteten Emulator; drei Negativfälle, die genau an dieser Nahtstelle
-> entstehen (Reihenfolge, Berechtigung, ungültige Nutzdaten).
+> Deliberately **included**: INI/HIA/HPB, upload **CCT**, download **C53** — each in **H003/H004/H005**,
+> against the in-process hosted emulator; three negative cases that arise precisely at this seam
+> (order, authorisation, invalid payload).
 >
-> Seit **Issue #58** prüft der Server die Authentifikationssignatur X002; die breiten Negativ-/
-> Sicherheitsfälle liegen in [Negativ- & Sicherheitsfälle](negative-security-cases.md). Bewusst
-> **noch nicht**: reale Fremd-Clients (Issue #59), Signatur der Server-Antworten.
+> Since **issue #58** the server verifies the X002 authentication signature; the broad negative/
+> security cases are in [Negative & security cases](negative-security-cases.md). Deliberately
+> **not yet**: real third-party clients (issue #59), signature of the server responses.
 
-## Zweck
+## Purpose
 
-Beide Seiten waren bis M8 **gut getestet — aber nur gegen ein Modell der jeweils anderen**:
+Until M8 both sides were **well tested — but only against a model of the respective other**:
 
-- Die Connector-Tests (`OnboardingTestHarness`, `UploadTestHarness`, `DownloadTestHarness`) antworten
-  mit selbst gebauten Bank-Antworten (Tier-A-Fakes).
-- Die Server-Tests bauen ihr Request-XML von Hand (`ServerTestHelpers`).
+- The connector tests (`OnboardingTestHarness`, `UploadTestHarness`, `DownloadTestHarness`) respond
+  with self-built bank responses (Tier-A fakes).
+- The server tests build their request XML by hand (`ServerTestHelpers`).
 
-Eine Annahme über das Wire-Format, die **beide Seiten konsistent, aber falsch** getroffen haben, wäre
-so unsichtbar geblieben. Genau diese Lücke schließt #57: der echte Connector-Pipeline spricht das
-echte EBICS-Wire-Format gegen die echte Server-Pipeline.
+An assumption about the wire format that **both sides made consistently, but wrongly**, would
+have stayed invisible this way. This is exactly the gap #57 closes: the real connector pipeline speaks the
+real EBICS wire format against the real server pipeline.
 
 ```mermaid
 sequenceDiagram
-    participant C as IEbicsClient (echt)
-    participant T as HttpClientTransport (echt)
-    participant H as TestServer-Handler (in-process)
-    participant P as EbicsRequestPipeline (echt)
-    participant S as State/Stores (echt)
+    participant C as IEbicsClient (real)
+    participant T as HttpClientTransport (real)
+    participant H as TestServer handler (in-process)
+    participant P as EbicsRequestPipeline (real)
+    participant S as State/stores (real)
 
-    C->>T: Send(request) — komprimieren, E002, ES, segmentieren, X002
+    C->>T: Send(request) — compress, E002, ES, segment, X002
     T->>H: POST /ebics (text/xml)
-    H->>P: Roh-XML
-    P->>S: Parse → Version-Dispatch → Verify → Handle
-    S-->>P: Zustand/Order-Data
+    H->>P: raw XML
+    P->>S: Parse → version dispatch → verify → handle
+    S-->>P: state/order data
     P-->>H: ebicsResponse
     H-->>T: HTTP 200
-    T-->>C: Verify → entschlüsseln → Returncode → EbicsResult<T>
+    T-->>C: verify → decrypt → return code → EbicsResult<T>
 ```
 
-## Aufbau
+## Setup
 
-`tests/EBICO.Tests/E2E/EbicsE2EHarness.cs` verdrahtet beide Seiten:
+`tests/EBICO.Tests/E2E/EbicsE2EHarness.cs` wires both sides together:
 
-**Host.** `WebApplicationFactory<Program>` hostet den Server in-process. `Program` ist in
-`EBICO.Server` bewusst als `public partial class Program;` deklariert; weil `EBICO.Suite` ebenfalls
-ein `Program` hat, trägt die ProjectReference im Testprojekt `Aliases="global,EbicoServer"` — daher
-`extern alias EbicoServer;` als **erste Zeile** jeder Datei und
+**Host.** `WebApplicationFactory<Program>` hosts the server in-process. `Program` is
+deliberately declared in `EBICO.Server` as `public partial class Program;`; because `EBICO.Suite` also
+has a `Program`, the ProjectReference in the test project carries `Aliases="global,EbicoServer"` — hence
+`extern alias EbicoServer;` as the **first line** of every file and
 `using ServerProgram = EbicoServer::Program;`.
 
-**Transport.** `AddEbicoConnector(…)` liefert einen `IHttpClientBuilder` zurück; daran hängt
-`.ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler())`. Damit bleibt der
-**echte** `HttpClientTransport` im Spiel — nur der unterste Handler zeigt auf den Testhost.
+**Transport.** `AddEbicoConnector(…)` returns an `IHttpClientBuilder`; onto it hangs
+`.ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler())`. This keeps the
+**real** `HttpClientTransport` in play — only the lowest handler points at the test host.
 
-> ⚠️ **Stolperstein:** `HttpClientTransport` postet gegen die **absolute** `EbicsConnection.Url`, nicht
-> gegen die `BaseAddress` des `HttpClient`. Die URL muss daher `http://localhost` + `EndpointPath`
-> lauten (`http://localhost/ebics`).
+> ⚠️ **Pitfall:** `HttpClientTransport` posts against the **absolute** `EbicsConnection.Url`, not
+> against the `BaseAddress` of the `HttpClient`. The URL must therefore be `http://localhost` + `EndpointPath`
+> (`http://localhost/ebics`).
 
-Die Verdrahtung im Kern (aus `EbicsE2EHarness.CreateAsync`):
+The wiring at its core (from `EbicsE2EHarness.CreateAsync`):
 
 ```csharp
 var services = new ServiceCollection();
@@ -80,108 +80,108 @@ services.AddEbicoUpload();
 services.AddEbicoDownload();
 ```
 
-**Schlüssel (`E2EKeyPool`).** RSA-Generierung dominiert die Laufzeit, und
-`RsaKeyMaterial.MinKeySizeBits` (2048) ist eine **harte Untergrenze** — der Konstruktor lehnt kleinere
-Schlüssel ab. Der einzige Hebel ist deshalb **Wiederverwendung, nicht Verkleinerung**: der Pool erzeugt
-je Zweck einen Schlüssel pro Testlauf. Die Onboarding-Tests umgehen den Pool bewusst und treiben den
-echten `ISubscriberKeyGenerator` — dort *ist* die Schlüsselgenerierung Prüfgegenstand. Überall sonst ist
-Onboarding nur Voraussetzung; INI/HIA/HPB laufen trotzdem echt über HTTP, es werden lediglich die
-Schlüssel vorbelegt.
+**Keys (`E2EKeyPool`).** RSA generation dominates the runtime, and
+`RsaKeyMaterial.MinKeySizeBits` (2048) is a **hard lower bound** — the constructor rejects smaller
+keys. The only lever is therefore **reuse, not shrinking**: the pool creates
+one key per purpose per test run. The onboarding tests deliberately bypass the pool and drive the
+real `ISubscriberKeyGenerator` — there key generation *is* the subject under test. Everywhere else,
+onboarding is only a precondition; INI/HIA/HPB still run for real over HTTP, only the
+keys are prepopulated.
 
-**Isolation.** Je Test eine eigene **HostID**, kein eigener Host. Alle Server-Stores sind über `HostId`
-bzw. `SubscriberKeyRef` verschlüsselt, eine eigene HostID isoliert also so wirksam wie ein frischer Host
-(das `WithWebHostBuilder(_ => { })`-Idiom der Server-Tests) — ohne zweiten Host-Boot. IDs dürfen nur
-`[a-zA-Z0-9,=]` enthalten (keine Bindestriche/Unterstriche, max. 35 Zeichen).
+**Isolation.** Each test gets its own **HostID**, not its own host. All server stores are encrypted via `HostId`
+or `SubscriberKeyRef`, so a dedicated HostID isolates as effectively as a fresh host
+(the `WithWebHostBuilder(_ => { })` idiom of the server tests) — without a second host boot. IDs may only
+contain `[a-zA-Z0-9,=]` (no hyphens/underscores, max. 35 characters).
 
-**Zustand.** Der Teilnehmer wird bewusst im Zustand **`New`** geseedet: das echte INI treibt
-`New → Initialized`, das echte HIA `Initialized → Ready`. Ein Vorab-Übergang (wie ihn die
-Einzelschicht-Server-Tests machen) würde genau den Lebenszyklus überspringen, den dieser Test belegen
-soll. Das Bankschlüsselpaar wird über `IServerBankKeyStore.SetAsync` geseedet — das spart zwei
-RSA-Generierungen je Test und macht die HPB-Fingerprints vorab bekannt.
+**State.** The subscriber is deliberately seeded in state **`New`**: the real INI drives
+`New → Initialized`, the real HIA `Initialized → Ready`. A pre-transition (as done by the
+single-layer server tests) would skip exactly the lifecycle this test is meant to prove.
+The bank key pair is seeded via `IServerBankKeyStore.SetAsync` — this saves two
+RSA generations per test and makes the HPB fingerprints known in advance.
 
-## Abgedeckte Abläufe
+## Covered flows
 
-| Ablauf | H003 | H004 | H005 | Kernassertion |
+| Flow | H003 | H004 | H005 | Core assertion |
 | --- | :---: | :---: | :---: | --- |
-| INI/HIA/HPB | ✅ | ✅ | ✅ | `New → Initialized → Ready`, Fingerprint-Abgleich, `FingerprintsVerified` |
-| Upload CCT | ✅ | ✅ | ✅ | Server rekonstruiert die pain.001-Bytes, `EffectiveOrderType == "CCT"` |
-| Upload CCT **über mehrere Segmente** | ✅ | ✅ | ✅ | mit den **ausgelieferten** Defaults, `NumSegments > 1`, Bytes identisch (#124) |
-| Download C53 | ✅ | ✅ | ✅ | camt.053 im ZIP, Receipt → `011000` |
-| VEU: parken → HVU → HVE/HVS → Freigabe | ✅ | ✅ | ✅ | eigene Suite, siehe [Connector: VEU](../connector/veu.md) (#124) |
+| INI/HIA/HPB | ✅ | ✅ | ✅ | `New → Initialized → Ready`, fingerprint match, `FingerprintsVerified` |
+| Upload CCT | ✅ | ✅ | ✅ | Server reconstructs the pain.001 bytes, `EffectiveOrderType == "CCT"` |
+| Upload CCT **across multiple segments** | ✅ | ✅ | ✅ | with the **shipped** defaults, `NumSegments > 1`, bytes identical (#124) |
+| Download C53 | ✅ | ✅ | ✅ | camt.053 in the ZIP, receipt → `011000` |
+| VEU: park → HVU → HVE/HVS → release | ✅ | ✅ | ✅ | own suite, see [Connector: VEU](../connector/veu.md) (#124) |
 
-### Die Ein-Segment-Lücke (#124)
+### The single-segment gap (#124)
 
-Bis #124 fuhr **jeder** Upload-Test in genau einem Segment — `UploadE2ETests` prüfte das sogar explizit
-(`NumSegments == 1`). Damit blieb die Kopplung zwischen der Segmentgröße des Connectors und dem
-Body-Limit des Servers ungetestet, obwohl beide Werte einzeln abgedeckt waren: der Connector-Default
-(768 KiB) erzeugte base64 exakt 1 MiB und damit Requests, die der Server-Default (1 MiB Body) **immer**
-mit HTTP 413 abweisen musste. Der neue Test schließt genau diese Naht.
+Until #124 **every** upload test ran in exactly one segment — `UploadE2ETests` even checked it explicitly
+(`NumSegments == 1`). This left the coupling between the connector's segment size and the
+server's body limit untested, although both values were covered individually: the connector default
+(768 KiB) produced base64 of exactly 1 MiB and thus requests that the server default (1 MiB body) **always**
+had to reject with HTTP 413. The new test closes exactly this seam.
 
-Damit er trägt, ist seine Nutzlast bewusst **inkompressibel** (base64-Rauschen in den Creditor-Namen,
-`PainSamples.IncompressibleCreditTransfer`): ein gewöhnliches pain.001 ist so repetitiv, dass selbst
-zehn Megabyte auf ein einziges Segment deflatieren — ein „großer" Testfall hätte die Lücke also gar
-nicht getroffen.
+For it to hold, its payload is deliberately **incompressible** (base64 noise in the creditor names,
+`PainSamples.IncompressibleCreditTransfer`): an ordinary pain.001 is so repetitive that even
+ten megabytes deflate to a single segment — a "large" test case would therefore not have hit the gap
+at all.
 
-Zwei Assertions tragen die Suite:
+Two assertions carry the suite:
 
-- **`HpbResult.FingerprintsVerified`** — wahr nur, wenn der Connector die E002-Nutzdaten entschlüsselt
-  hat *und* die enthaltenen Bankschlüssel exakt die geseedeten sind (eine Abweichung wirft
-  `EbicsOnboardingException`). Das schließt die Schleife Komprimieren → E002 → Wire → Entschlüsseln.
-- **`UploadTransaction.EffectiveOrderType == "CCT"`** — die Nahtstelle, die keine Einzelschicht prüfen
-  kann: H003/H004 senden `OrderType="CCT"` direkt, H005 `AdminOrderType="BTU"` + BTF (`SCT`/`pain.001`);
-  beide müssen serverseitig auf denselben klassischen Code auflösen
+- **`HpbResult.FingerprintsVerified`** — true only if the connector has decrypted the E002 payload
+  *and* the contained bank keys are exactly the seeded ones (a deviation throws
+  `EbicsOnboardingException`). This closes the loop compress → E002 → wire → decrypt.
+- **`UploadTransaction.EffectiveOrderType == "CCT"`** — the seam that no single layer can check:
+  H003/H004 send `OrderType="CCT"` directly, H005 `AdminOrderType="BTU"` + BTF (`SCT`/`pain.001`);
+  both must resolve server-side to the same classic code
   (`BtfOrderTypeCatalog.ResolveUploadOrderType`).
 
-## Returncodes & Fehlerfälle
+## Return codes & error cases
 
-| Situation | Returncode |
+| Situation | Return code |
 | --- | --- |
-| INI/HIA/HPB, Upload CCT erfolgreich | `000000` `EBICS_OK` |
-| Download C53 erfolgreich | **`011000`** `EBICS_DOWNLOAD_POSTPROCESS_DONE` |
-| HIA/HPB vor INI (Statusmaschine) | `091002` `EBICS_INVALID_USER_OR_USER_STATE` |
-| CCT ohne Berechtigung | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
-| C53 ohne Berechtigung | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
-| CCT mit ungültiger pain.001 | `090004` `EBICS_INVALID_ORDER_DATA_FORMAT` |
+| INI/HIA/HPB, upload CCT successful | `000000` `EBICS_OK` |
+| Download C53 successful | **`011000`** `EBICS_DOWNLOAD_POSTPROCESS_DONE` |
+| HIA/HPB before INI (state machine) | `091002` `EBICS_INVALID_USER_OR_USER_STATE` |
+| CCT without authorisation | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
+| C53 without authorisation | `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` |
+| CCT with invalid pain.001 | `090004` `EBICS_INVALID_ORDER_DATA_FORMAT` |
 
-> ⚠️ **`011000`, nicht `000000`.** Ein erfolgreicher Download endet mit dem Code des **positiven
-> Receipts**: beim Kombinieren der Returncodes gewinnt der Nicht-OK-Slot. `EbicsResult.IsSuccess` ist
-> trotzdem `true`.
+> ⚠️ **`011000`, not `000000`.** A successful download ends with the code of the **positive
+> receipt**: when combining the return codes the non-OK slot wins. `EbicsResult.IsSuccess` is
+> nonetheless `true`.
 
-Die Negativfälle sind bewusst auf vier begrenzt — es sind jene, die **erst an dieser Nahtstelle**
-entstehen. Breite Negativ-/Sicherheitsfälle gehören zu Issue #58, Konformität gegen reale Clients zu
-Issue #59.
+The negative cases are deliberately limited to four — they are those that arise **only at this seam**.
+Broad negative/security cases belong to issue #58, conformance against real clients to
+issue #59.
 
-### ⚠️ Spec-Vorbehalte
+### ⚠️ Spec caveats
 
-- **X002 wird seit #58 serverseitig geprüft; Antworten bleiben unsigniert.** Der Server verifiziert
-  die X002-Signatur jedes signierten `ebicsRequest` (`X002EbicsRequestVerifier`, siehe
-  [Negativ- & Sicherheitsfälle](negative-security-cases.md)) — diese Happy-Path-E2E belegen damit
-  auch den Sign→Verify-Roundtrip Connector→Server. Der Server signiert seine **Antworten** weiterhin
-  nicht, und der Connector prüft umgekehrt keine Antwortsignatur (offener Vorbehalt M4/M6).
-- **ES/A00x ungeprüft.** Die banktechnische Signatur der Order-Data wird serverseitig nicht verifiziert.
-- **C53-Daten sind synthetisch.** Der Server generiert den Auszug bei Bedarf
-  (`StatementDownloadProcessor`); es ist kein reales Bankdatenmaterial.
-- **Die Gegenstelle ist der Emulator, nicht ein realer Client.** Ein grüner E2E belegt Konsistenz
-  zwischen EBICO-Connector und EBICO-Server — nicht Spec-Konformität. Das ist Gegenstand von
-  [#59 (Konformität gegen reale Clients)](conformance-real-clients.md) — der dort dokumentierte
-  `xsi:type`-Fund zeigt genau eine solche geteilte Annahme, die ein realer Client nicht teilt.
+- **X002 has been checked server-side since #58; responses remain unsigned.** The server verifies
+  the X002 signature of every signed `ebicsRequest` (`X002EbicsRequestVerifier`, see
+  [Negative & security cases](negative-security-cases.md)) — these happy-path E2E tests thereby also
+  evidence the sign→verify roundtrip connector→server. The server still does not sign its **responses**,
+  and the connector conversely checks no response signature (open caveat M4/M6).
+- **ES/A00x unchecked.** The bank-technical signature of the order data is not verified server-side.
+- **C53 data is synthetic.** The server generates the statement on demand
+  (`StatementDownloadProcessor`); it is no real bank data material.
+- **The counterpart is the emulator, not a real client.** A green E2E evidences consistency
+  between EBICO connector and EBICO server — not spec conformance. That is the subject of
+  [#59 (conformance against real clients)](conformance-real-clients.md) — the `xsi:type`
+  finding documented there shows exactly such a shared assumption that a real client does not share.
 
-## EBICS-Versionsbezug
+## EBICS version reference
 
-| Aspekt | H003 / H004 | H005 |
+| Aspect | H003 / H004 | H005 |
 | --- | --- | --- |
-| Auftragstyp Upload | `OrderType="CCT"` | `AdminOrderType="BTU"` + BTF (`SCT`/`pain.001`) |
-| Auftragstyp Download | `OrderType="C53"` | `AdminOrderType="BTD"` + BTF (`EOP`/`camt.053`/`Zip`) |
-| Schlüssel im Onboarding | `RSAKeyValue` | X.509 (`X509Data`, self-signed je Antwort) |
-| Berechtigung | `CCT` / `C53` | `CCT` / `C53` (identisch) |
+| Upload order type | `OrderType="CCT"` | `AdminOrderType="BTU"` + BTF (`SCT`/`pain.001`) |
+| Download order type | `OrderType="C53"` | `AdminOrderType="BTD"` + BTF (`EOP`/`camt.053`/`Zip`) |
+| Keys in onboarding | `RSAKeyValue` | X.509 (`X509Data`, self-signed per response) |
+| Authorisation | `CCT` / `C53` | `CCT` / `C53` (identical) |
 
-**Ein** Berechtigungssatz (`CCT`/`C53`) deckt alle drei Versionen ab: der Server autorisiert gegen den
-*aufgelösten* klassischen Code, nicht gegen den Wire-Identifier `BTU`/`BTD`/`FUL`/`FDL`. Genau das
-prüfen `CctUpload_WithoutPermission_IsRejected` und `C53Download_WithoutPermission_IsRejected` für jede
-Version (beide erwarten `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED`).
+**One** authorisation set (`CCT`/`C53`) covers all three versions: the server authorises against the
+*resolved* classic code, not against the wire identifier `BTU`/`BTD`/`FUL`/`FDL`. Exactly this is
+checked by `CctUpload_WithoutPermission_IsRejected` and `C53Download_WithoutPermission_IsRejected` for each
+version (both expect `090003` `EBICS_AUTHORISATION_ORDER_TYPE_FAILED`).
 
-Konkret unterscheiden sich die `OrderDetails` im `ebicsRequest` genau an dieser Stelle — hier für den
-CCT-Upload (vereinfachte Fragmente; Signatur, `DataEncryptionInfo` und Namespaces weggelassen):
+Concretely, the `OrderDetails` in the `ebicsRequest` differ at exactly this point — here for the
+CCT upload (simplified fragments; signature, `DataEncryptionInfo` and namespaces omitted):
 
 ```xml
 <!-- H003/H004: klassischer Auftragstyp direkt (CctUploadRequest -> OrderType="CCT") -->
@@ -208,30 +208,30 @@ CCT-Upload (vereinfachte Fragmente; Signatur, `DataEncryptionInfo` und Namespace
 </static>
 ```
 
-Der Server löst beide Konventionen über `BtfOrderTypeCatalog.ResolveUploadOrderType` auf denselben
-klassischen Code `CCT` auf — dagegen läuft dann Autorisierung und Verarbeitung.
+The server resolves both conventions via `BtfOrderTypeCatalog.ResolveUploadOrderType` to the same
+classic code `CCT` — authorisation and processing then run against that.
 
 ## Tests
 
-`tests/EBICO.Tests/E2E/` (xUnit v3 + AwesomeAssertions; Tier-A: alles in-process erzeugt, keine
-proprietären Fixtures):
+`tests/EBICO.Tests/E2E/` (xUnit v3 + AwesomeAssertions; Tier A: everything generated in-process, no
+proprietary fixtures):
 
-- `EbicsE2EHarness` — `E2EKeyPool`, Harness (Seeding + DI-Verdrahtung), `E2EOnboardingResults`.
-- `OnboardingE2ETests` — `[Theory]` über H003/H004/H005: Happy Path mit echter Schlüsselgenerierung
-  (Zustandsübergänge, Fingerprint-Abgleich gegen den `IServerKeyStore`, `FingerprintsVerified`,
-  Bankschlüssel im Connector-`IKeyStore`) plus Negativfall Reihenfolge (`091002`).
-- `UploadE2ETests` — Happy Path mit serverseitiger Rückgewinnung der pain.001-Bytes und
-  `EffectiveOrderType`-Prüfung; Negativfälle Berechtigung (`090003`) und ungültige pain.001 (`090004`).
-- `DownloadE2ETests` — Happy Path camt.053-im-ZIP über den `Parse`-Hook (läuft **vor** dem Receipt) und
-  Receipt-Returncode `011000`; Negativfall Berechtigung (`090003`).
+- `EbicsE2EHarness` — `E2EKeyPool`, harness (seeding + DI wiring), `E2EOnboardingResults`.
+- `OnboardingE2ETests` — `[Theory]` over H003/H004/H005: happy path with real key generation
+  (state transitions, fingerprint match against the `IServerKeyStore`, `FingerprintsVerified`,
+  bank keys in the connector `IKeyStore`) plus negative case order (`091002`).
+- `UploadE2ETests` — happy path with server-side recovery of the pain.001 bytes and
+  `EffectiveOrderType` check; negative cases authorisation (`090003`) and invalid pain.001 (`090004`).
+- `DownloadE2ETests` — happy path camt.053-in-ZIP via the `Parse` hook (runs **before** the receipt) and
+  receipt return code `011000`; negative case authorisation (`090003`).
 
-Laufzeit: 21 Round-Trips in ≈1 s (drei Testklassen laufen als eigene xUnit-Collections parallel).
+Runtime: 21 round-trips in ≈1 s (three test classes run as their own xUnit collections in parallel).
 
-## Verwandte Doku
+## Related documentation
 
-- [Test-Harness & Fixtures](testing.md) — Framework, Helfer, Tier A/B
-- [Onboarding-Flows INI / HIA / HPB](../connector/onboarding.md)
-- [Upload-API (CCT/CDD/CDB/CIP)](../connector/upload.md)
-- [Download-API (STA/C53/VMK/C52/C54 …)](../connector/download.md)
-- [Hostable Server-Grundgerüst](../server/host.md)
-- [Order-/BTF-Abdeckungsmatrix](../server/order-coverage-matrix.md)
+- [Test harness & fixtures](testing.md) — framework, helpers, Tier A/B
+- [Onboarding flows INI / HIA / HPB](../connector/onboarding.md)
+- [Upload API (CCT/CDD/CDB/CIP)](../connector/upload.md)
+- [Download API (STA/C53/VMK/C52/C54 …)](../connector/download.md)
+- [Hostable server scaffold](../server/host.md)
+- [Order/BTF coverage matrix](../server/order-coverage-matrix.md)
