@@ -1,34 +1,34 @@
-# 0005 — Connector: eigener Dispatch statt MediatR
+# 0005 — Connector: custom dispatch instead of MediatR
 
 - Status: accepted
-- Datum: 2026-06-21
+- Date: 2026-06-21
 
-## Kontext
+## Context
 
-`EBICO.Connector` folgt einem Mediator-Muster: der Aufrufer kennt nur
-`IEbicsClient.Send(request)` und bekommt ein typisiertes `EbicsResult<T>`. Für die
-Zuordnung Request → Handler und die Pipeline (Validierung → Serialisierung →
-Krypto → Transport → …) gibt es die Wahl zwischen einer fertigen Library (z. B.
-MediatR) und einem eigenen Dispatch.
+`EBICO.Connector` follows a mediator pattern: the caller knows only
+`IEbicsClient.Send(request)` and receives a typed `EbicsResult<T>`. For the
+request → handler mapping and the pipeline (validation → serialisation → crypto →
+transport → …) there is a choice between a ready-made library (e.g. MediatR) and a
+custom dispatch.
 
-## Entscheidung
+## Decision
 
-**Eigener Dispatch** statt MediatR-Library.
+**Custom dispatch** instead of the MediatR library.
 
-Begründung und Pipeline-Details: [../connector/architecture.md](../connector/architecture.md).
+Rationale and pipeline details: [../connector/architecture.md](../connector/architecture.md).
 
-## Konsequenzen
+## Consequences
 
-- Volle Kontrolle über die EBICS-spezifische Pipeline-Reihenfolge (Krypto vor
-  Transport, Download-Segmentschleife) und die Versionsabhängigkeit.
-- **Keine Fremd-Dependency** im veröffentlichten NuGet-Paket — eine schlanke
-  Abhängigkeitsliste ist bei einem öffentlichen Connector ein echtes Argument.
-- Trade-off: etwas Dispatch-Boilerplate, die MediatR sparen würde.
-- `EbicsResult<T>` statt Exceptions für **fachliche** Returncodes; echte
-  Transport-/Krypto-Fehler dürfen weiterhin werfen.
+- Full control over the EBICS-specific pipeline order (crypto before transport,
+  download segment loop) and the version dependency.
+- **No third-party dependency** in the published NuGet package — a lean dependency
+  list is a real argument for a public connector.
+- Trade-off: some dispatch boilerplate that MediatR would save.
+- `EbicsResult<T>` instead of exceptions for **business** return codes; genuine
+  transport/crypto errors may still throw.
 
-## Alternativen
+## Alternatives
 
-- **MediatR:** spart Boilerplate, bringt aber Kopplung an die Library und weniger
-  Kontrolle über die Pipeline — verworfen. (MediatR ist zudem inzwischen
-  kommerziell lizenziert, was die schlanke-Dependency-Begründung verstärkt.)
+- **MediatR:** saves boilerplate, but brings coupling to the library and less
+  control over the pipeline — rejected. (MediatR is also commercially licensed by
+  now, which reinforces the lean-dependency rationale.)

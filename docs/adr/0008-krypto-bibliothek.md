@@ -1,55 +1,60 @@
-# 0008 — Krypto-Bibliothek: `System.Security.Cryptography`
+# 0008 — Crypto library: `System.Security.Cryptography`
 
 - Status: accepted
-- Datum: 2026-06-22
+- Date: 2026-06-22
 
-## Kontext
+## Context
 
-Mit Milestone **M2 (Krypto)** beginnt die kryptografische Schicht von EBICO. Issue **#18**
-(Schlüsselpaare & -repräsentation) ist der erste Krypto-Task; die folgenden Issues setzen
-darauf auf: A005/A006-Signatur (#19), X002-Authentifikationssignatur (#20), E002-Verschlüsselung
-mit RSA + AES (#21), Hashing/Public-Key-Fingerprints (#22) und X.509-Zertifikatsprüfung (#23).
+Milestone **M2 (crypto)** begins EBICO's cryptographic layer. Issue **#18** (key
+pairs & representation) is the first crypto task; the following issues build on it:
+A005/A006 signature (#19), X002 authentication signature (#20), E002 encryption with
+RSA + AES (#21), hashing/public-key fingerprints (#22) and X.509 certificate
+verification (#23).
 
-EBICS nutzt durchgängig RSA: Signaturversionen A004/A005 (RSASSA-PKCS1-v1_5) und A006
-(RSASSA-PSS), Authentifikation X001/X002 (RSASSA-PKCS1-v1_5), Verschlüsselung E002
-(RSAES-OAEP für den Transaktionsschlüssel, AES-128-CBC für die Auftragsdaten) sowie SHA-256
-für Hashes/Fingerprints. Schlüssel- und Zertifikatsaustausch erfolgt über PKCS#8 (private
-Schlüssel) und X.509/SubjectPublicKeyInfo (öffentliche Schlüssel).
+EBICS uses RSA throughout: signature versions A004/A005 (RSASSA-PKCS1-v1_5) and A006
+(RSASSA-PSS), authentication X001/X002 (RSASSA-PKCS1-v1_5), encryption E002
+(RSAES-OAEP for the transaction key, AES-128-CBC for the order data) as well as
+SHA-256 for hashes/fingerprints. Key and certificate exchange happens via PKCS#8
+(private keys) and X.509/SubjectPublicKeyInfo (public keys).
 
-Im ADR-Backlog war offen, ob dafür die BCL (`System.Security.Cryptography`) genügt oder ein
-externes Paket (BouncyCastle) nötig ist. Bisher referenziert `EBICO.Core` nur
-`System.Security.Cryptography.Xml` (für C14N, #15); die Test-Infrastruktur
-(`TestCertificates`) erzeugt RSA-Schlüssel/Zertifikate bereits in-process mit der BCL.
+The ADR backlog left open whether the BCL (`System.Security.Cryptography`) suffices
+for this or an external package (BouncyCastle) is needed. So far `EBICO.Core`
+references only `System.Security.Cryptography.Xml` (for C14N, #15); the test
+infrastructure (`TestCertificates`) already generates RSA keys/certificates
+in-process with the BCL.
 
-## Entscheidung
+## Decision
 
-EBICO verwendet für alle kryptografischen Operatonen in M2 ausschließlich
-**`System.Security.Cryptography`** aus dem .NET-Framework. **Kein** zusätzliches Krypto-Paket
-(insbesondere kein BouncyCastle) wird aufgenommen.
+For all cryptographic operations in M2, EBICO uses **`System.Security.Cryptography`**
+from the .NET framework exclusively. **No** additional crypto package (in particular
+no BouncyCastle) is taken on.
 
-Für Issue #18 deckt die BCL alle Anforderungen direkt ab:
+For issue #18 the BCL covers all requirements directly:
 
-- **Schlüsselmodell:** `RSAParameters` (Modulus/Exponent + private Komponenten).
-- **Import/Export:** `RSA.ImportPkcs8PrivateKey`/`ExportPkcs8PrivateKey`,
-  `ImportSubjectPublicKeyInfo`/`ExportSubjectPublicKeyInfo`, `ImportFromPem` sowie die PEM-Exporte;
-  `X509Certificate2.GetRSAPublicKey()` für die Schlüsselentnahme aus Zertifikaten.
-- **EBICS `RSAKeyValue`:** entspricht direkt `RSAParameters.Modulus`/`.Exponent`.
+- **Key model:** `RSAParameters` (modulus/exponent + private components).
+- **Import/export:** `RSA.ImportPkcs8PrivateKey`/`ExportPkcs8PrivateKey`,
+  `ImportSubjectPublicKeyInfo`/`ExportSubjectPublicKeyInfo`, `ImportFromPem` as well
+  as the PEM exports; `X509Certificate2.GetRSAPublicKey()` for extracting the key
+  from certificates.
+- **EBICS `RSAKeyValue`:** maps directly to `RSAParameters.Modulus`/`.Exponent`.
 
-## Konsequenzen
+## Consequences
 
-- Keine zusätzliche Abhängigkeit, keine Lizenz-/Supply-Chain-Fragen, kleinere Build-Matrix.
-- Konsistenz mit der bereits genutzten BCL (Tests, C14N).
-- Die späteren M2-Operationen sind ebenfalls nativ abgedeckt: `RSASignaturePadding.Pss` (A006),
-  `RSASignaturePadding.Pkcs1` (A004/A005, X002), `RSAEncryptionPadding.OaepSHA256` (E002),
-  `Aes` und `SHA256`.
-- **Risiko/Revision:** Sollte bei #21/#23 eine konkrete Interop-Lücke mit einem realen Bank-Setup
-  auftreten (z. B. exotische Zertifikats- oder OAEP-Parametrisierung), wird diese ADR neu bewertet;
-  bevorzugt würde dann eine eng begrenzte Abhängigkeit statt eines pauschalen Bibliothekswechsels.
+- No additional dependency, no license/supply-chain questions, smaller build matrix.
+- Consistency with the BCL already in use (tests, C14N).
+- The later M2 operations are also covered natively: `RSASignaturePadding.Pss` (A006),
+  `RSASignaturePadding.Pkcs1` (A004/A005, X002), `RSAEncryptionPadding.OaepSHA256`
+  (E002), `Aes` and `SHA256`.
+- **Risk/revision:** should a concrete interop gap with a real bank setup arise in
+  #21/#23 (e.g. exotic certificate or OAEP parameterisation), this ADR is
+  re-evaluated; the preference would then be a narrowly scoped dependency rather than
+  a blanket library switch.
 
-## Alternativen
+## Alternatives
 
-- **BouncyCastle:** größere Algorithmenbreite und feinere Kontrolle über Kodierungen, aber eine
-  externe Abhängigkeit, die #18 (und absehbar M2) nicht benötigt — verworfen, bis ein konkreter
-  Bedarf entsteht.
-- **Mischbetrieb (BCL + BouncyCastle punktuell):** erhöht Komplexität ohne aktuellen Nutzen —
-  verworfen; bleibt als Rückfalloption im Risiko-Abschnitt erwähnt.
+- **BouncyCastle:** broader algorithm range and finer control over encodings, but an
+  external dependency that #18 (and, foreseeably, M2) does not need — rejected until
+  a concrete need arises.
+- **Mixed mode (BCL + BouncyCastle selectively):** increases complexity without
+  current benefit — rejected; remains mentioned as a fallback option in the risk
+  section.

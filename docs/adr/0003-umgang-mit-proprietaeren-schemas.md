@@ -1,38 +1,37 @@
-# 0003 — Umgang mit proprietären EBICS-Schemas
+# 0003 — Handling proprietary EBICS schemas
 
 - Status: accepted
-- Datum: 2026-06-21
+- Date: 2026-06-21
 
-## Kontext
+## Context
 
-Die EBICS-Schemas (XSDs), Spezifikationen und offiziellen Beispiel-XML sind
-**proprietäres Eigentum der EBICS SC**. Reproduktion mit Copyright-Vermerk ist
-erlaubt, Modifikation/derivative uses nicht ohne Genehmigung. Das Projekt braucht
-die Schemas zum Bauen der Bindings (ab M1), darf sie aber nicht ungeprüft
-veröffentlichen.
+The EBICS schemas (XSDs), specifications and official sample XML are the
+**proprietary property of the EBICS SC**. Reproduction with a copyright notice is
+permitted, modification/derivative uses are not without approval. The project needs
+the schemas to build the bindings (from M1 onwards) but must not publish them
+unchecked.
 
-## Entscheidung
+## Decision
 
-- **Keine XSDs und keine offiziellen Beispiel-XML im Repository.** `.gitignore`
-  schließt `schemas/**/*.xsd`, die Manifeste und `tests/**/Fixtures/Xml/**/*.xml`
-  aus.
-- **Lokaler, reproduzierbarer Bezug** über `scripts/fetch-schemas.sh` (manueller
-  Download → entpacken/sortieren/SHA-256-Manifest).
-- Tests, die offizielle Beispiele brauchen, **überspringen sich** (`Assert.Skip`),
-  wenn die Dateien fehlen — die Suite bleibt in der CI grün.
+- **No XSDs and no official sample XML in the repository.** `.gitignore` excludes
+  `schemas/**/*.xsd`, the manifests and `tests/**/Fixtures/Xml/**/*.xml`.
+- **Local, reproducible acquisition** via `scripts/fetch-schemas.sh` (manual
+  download → unpack/sort/SHA-256 manifest).
+- Tests that require official samples **skip themselves** (`Assert.Skip`) when the
+  files are missing — the suite stays green in CI.
 
-Vollständige Einordnung: [../legal/ebics-licensing.md](../legal/ebics-licensing.md).
+Full classification: [../legal/ebics-licensing.md](../legal/ebics-licensing.md).
 
-## Konsequenzen
+## Consequences
 
-- Lizenzkonform: keine proprietären Inhalte im öffentlichen Repo.
-- Contributor/CI müssen Schemas (und ggf. Beispiele) lokal beziehen, um die
-  schema-abhängigen Teile zu bauen/zu testen.
-- **Folgeentscheidung (M1-Gate) — entschieden:** ob generierte **Bindings**
-  committet werden — geklärt in [ADR-0006](0006-generierte-xsd-bindings-committen.md)
-  (Option B: Bindings committen, XSDs bleiben ungetrackt).
+- License-compliant: no proprietary content in the public repo.
+- Contributors/CI must obtain the schemas (and possibly samples) locally to
+  build/test the schema-dependent parts.
+- **Follow-up decision (M1 gate) — decided:** whether generated **bindings** are
+  committed — resolved in [ADR-0006](0006-generierte-xsd-bindings-committen.md)
+  (Option B: commit bindings, XSDs stay untracked).
 
-## Alternativen
+## Alternatives
 
-- **XSDs/Beispiele committen:** beste DX, aber ohne Genehmigung lizenzrechtlich
-  riskant — verworfen (bis ggf. Genehmigung vorliegt).
+- **Commit XSDs/samples:** best DX, but legally risky without approval — rejected
+  (until approval is possibly obtained).

@@ -1,56 +1,54 @@
-# 0006 — Generierte XSD-Bindings committen (Option B)
+# 0006 — Commit generated XSD bindings (Option B)
 
 - Status: accepted
-- Datum: 2026-06-21
+- Date: 2026-06-21
 
-## Kontext
+## Context
 
-M1 erzeugt aus den EBICS-XSDs C#-Bindings (Issues #11–#13). [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)
-hat die XSDs selbst aus dem Repo ausgeschlossen und die **Folgefrage offen
-gelassen**, ob die generierten Bindings als *derivative work* gelten und committet
-werden dürfen. Die Optionen sind in [../legal/ebics-licensing.md](../legal/ebics-licensing.md)
-beschrieben:
+M1 generates C# bindings from the EBICS XSDs (issues #11–#13).
+[ADR-0003](0003-umgang-mit-proprietaeren-schemas.md) excluded the XSDs themselves
+from the repo and **left the follow-up question open**: whether the generated
+bindings count as a *derivative work* and may be committed. The options are
+described in [../legal/ebics-licensing.md](../legal/ebics-licensing.md):
 
-- **(A)** Bindings nicht committen, beim Build aus lokalen XSDs generieren.
-- **(B)** Bindings committen (XSDs bleiben ungetrackt).
-- **(C)** Handgeschriebene Modelle.
+- **(A)** Do not commit the bindings, generate them from local XSDs at build time.
+- **(B)** Commit the bindings (XSDs stay untracked).
+- **(C)** Hand-written models.
 
-Option (A) hat einen schweren Nachteil: Ohne lokal bezogene (proprietäre) XSDs ist
-der schema-abhängige Teil von `EBICO.Core` **nicht baubar** — die CI (die keine
-Schemas hat) könnte die Bindings und alles darauf Aufbauende weder kompilieren noch
-testen. Das würde den Kern des Projekts dauerhaft von der CI-Absicherung ausnehmen.
+Option (A) has a serious drawback: without locally obtained (proprietary) XSDs, the
+schema-dependent part of `EBICO.Core` is **not buildable** — CI (which has no
+schemas) could neither compile nor test the bindings and everything built on top.
+That would permanently exclude the core of the project from CI coverage.
 
-## Entscheidung
+## Decision
 
-**Option (B): Die generierten Bindings werden committet; die XSDs bleiben
-ungetrackt (`.gitignore`, ADR-0003).**
+**Option (B): the generated bindings are committed; the XSDs stay untracked
+(`.gitignore`, ADR-0003).**
 
-- Quelle der Wahrheit für den Build sind die **committeten `.cs`** unter
-  `src/EBICO.Core/Schema/`. CI und Contributor bauen/testen ohne Schemas.
-- Die Generierung ist **reproduzierbar**: `dotnet-xscgen` exakt gepinnt in
-  `.config/dotnet-tools.json`, getrieben von `scripts/generate-bindings.sh`. Sie
-  ist ein **Maintainer-Schritt** (nach einem Schema-Update), kein Build-Schritt.
-- Details zu Tool, Namespaces und Layout: [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md).
-- **Lizenz:** Die schriftliche Genehmigung der EBICS SC wird **parallel** verfolgt
-  (`info@ebics.de`); M1 wird darauf nicht blockiert. Es werden nur generierte
-  Artefakte committet, nicht der XSD-Originaltext; die Herkunft ist dokumentiert.
+- The source of truth for the build is the **committed `.cs`** files under
+  `src/EBICO.Core/Schema/`. CI and contributors build/test without schemas.
+- Generation is **reproducible**: `dotnet-xscgen` pinned exactly in
+  `.config/dotnet-tools.json`, driven by `scripts/generate-bindings.sh`. It is a
+  **maintainer step** (after a schema update), not a build step.
+- Details on tool, namespaces and layout: [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md).
+- **License:** the written approval of the EBICS SC is pursued **in parallel**
+  (`info@ebics.de`); M1 is not blocked on it. Only generated artefacts are
+  committed, not the original XSD text; the provenance is documented.
 
-## Konsequenzen
+## Consequences
 
-- **CI deckt den Protokoll-Kern real ab** (Build + Round-Trip-Tests laufen ohne
-  Schemas). Bindings sind im Diff reviewbar.
-- Bei Schema-Updates müssen die Bindings neu generiert und mit-committet werden;
-  ein nicht-deterministischer Generator-Wechsel würde rauschen — daher der exakte
-  Versions-Pin.
-- **Restrisiko (Lizenz):** Sollte die EBICS SC widersprechen, lassen sich die
-  Bindings entfernen/neu generieren — die XSDs waren nie committet. Dies ist
-  **kein Rechtsrat** (vgl. `ebics-licensing.md`); die finale Verantwortung liegt
-  beim Betreiber.
+- **CI covers the protocol core for real** (build + round-trip tests run without
+  schemas). Bindings are reviewable in the diff.
+- On schema updates the bindings must be regenerated and committed along with them;
+  a non-deterministic generator change would create noise — hence the exact version
+  pin.
+- **Residual risk (license):** should the EBICS SC object, the bindings can be
+  removed/regenerated — the XSDs were never committed. This is **not legal advice**
+  (cf. `ebics-licensing.md`); the final responsibility lies with the operator.
 
-## Alternativen
+## Alternatives
 
-- **(A) Generierung beim Build, nicht committen** — verworfen: macht den Kern in
-  der CI nicht baubar/testbar.
-- **(C) Handgeschriebene Modelle** — verworfen: hoher Aufwand und Fehlerrisiko bei
-  der großen EBICS-Schemafläche; kein direkter Mehrwert gegenüber generierten,
-  reviewten Bindings.
+- **(A) Generate at build time, do not commit** — rejected: makes the core not
+  buildable/testable in CI.
+- **(C) Hand-written models** — rejected: high effort and error risk given the large
+  EBICS schema surface; no direct benefit over generated, reviewed bindings.

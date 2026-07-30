@@ -1,54 +1,60 @@
-# 0016 — BTF-Framework & Berechtigungsprüfung
+# 0016 — BTF framework & authorisation check
 
 - Status: accepted
-- Datum: 2026-07-14
+- Date: 2026-07-14
 
-## Kontext
+## Context
 
-EBICS 3.0 (H005) ersetzt die klassischen dreistelligen Auftragsarten (H003/H004) durch die generischen
-Admin-Auftragsarten `BTU`/`BTD` plus ein **Business Transaction Format (BTF)** im
-`BTUOrderParams`/`BTDOrderParams`-Element. Bis dahin behandelte der Server den Auftragstyp als freien
-String, wertete bei H005 nur den `AdminOrderType` aus und erzwang **keine** Berechtigungen (die Engines
-prüften nur `State == Ready`). Issue #38 liefert das Framework für die konkreten Orders (#39–#43):
-typisiertes BTF-Modell, BTF↔OrderType-Mapping und Berechtigungsprüfung pro BTF. Dabei waren zwei
-Entscheidungen zu treffen: (a) wie streng autorisiert wird und (b) wie BTF-Berechtigungen ausgedrückt
-werden.
+EBICS 3.0 (H005) replaces the classic three-letter order types (H003/H004) with the
+generic admin order types `BTU`/`BTD` plus a **Business Transaction Format (BTF)** in
+the `BTUOrderParams`/`BTDOrderParams` element. Until then the server treated the order
+type as a free string, evaluated only the `AdminOrderType` for H005 and enforced **no**
+authorisations (the engines only checked `State == Ready`). Issue #38 delivers the
+framework for the concrete orders (#39–#43): a typed BTF model, BTF↔OrderType mapping
+and an authorisation check per BTF. Two decisions were to be made here: (a) how strict
+authorisation is and (b) how BTF authorisations are expressed.
 
-## Entscheidung
+## Decision
 
-1. **Typisiertes Modell in `EBICO.Core.Btf`.** `BusinessTransactionFormat` (`readonly record struct`,
-   [ADR-0007](0007-domaenen-value-objects-record-struct.md)) als handgeschriebene Projektion des
-   generierten `ServiceType`-Bindings; die generierten `Schema/H005/*`-Typen werden gemappt, nicht
-   editiert ([ADR-0006](0006-generierte-xsd-bindings-committen.md)).
+1. **Typed model in `EBICO.Core.Btf`.** `BusinessTransactionFormat`
+   (`readonly record struct`, [ADR-0007](0007-domaenen-value-objects-record-struct.md))
+   as a hand-written projection of the generated `ServiceType` binding; the generated
+   `Schema/H005/*` types are mapped, not edited
+   ([ADR-0006](0006-generierte-xsd-bindings-committen.md)).
 
-2. **Bridge über OrderType-Code.** Der statische `BtfOrderTypeCatalog` mappt BTF ↔ klassischen Code.
-   Die Autorisierung nutzt einen einzigen **effektiven Auftragstyp-Schlüssel**: für H005 wird der BTF
-   auf seinen klassischen Code aufgelöst, für H003/H004 der OrderType direkt verwendet.
-   `SubscriberPermission.OrderType` bleibt ein String; die Admin-API und der `MasterDataManager` bleiben
-   **unverändert**. (Verworfen: ein natives `BusinessTransactionFormat`-Feld in `SubscriberPermission` —
-   größere API-/Persistenz-Fläche ohne Mehrwert für den Emulator.)
+2. **Bridge via the order-type code.** The static `BtfOrderTypeCatalog` maps BTF ↔ the
+   classic code. Authorisation uses a single **effective order-type key**: for H005 the
+   BTF is resolved to its classic code, for H003/H004 the order type is used directly.
+   `SubscriberPermission.OrderType` stays a string; the admin API and the
+   `MasterDataManager` stay **unchanged**. (Rejected: a native
+   `BusinessTransactionFormat` field on `SubscriberPermission` — a larger
+   API/persistence surface with no benefit for the emulator.)
 
-3. **Striktes Enforcement.** Eine `Ready`-Teilnehmerin muss eine passende Berechtigung halten; sonst
-   `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` (090003). Es gibt **kein** „leere Berechtigungsmenge = alles
-   erlaubt". (Verworfen: lenient/opt-in — der Emulator soll das echte Bankverhalten abbilden.)
+3. **Strict enforcement.** A `Ready` subscriber must hold a matching authorisation;
+   otherwise `EBICS_AUTHORISATION_ORDER_TYPE_FAILED` (090003). There is **no** "empty
+   permission set = everything allowed". (Rejected: lenient/opt-in — the emulator should
+   reflect the real bank behaviour.)
 
-4. **Statische Prüf-Logik, kein neuer DI-Service.** `BtfOrderTypeCatalog` (Core) + `Subscriber.HasPermissionFor`
-   (Core) werden inline in den Engines aufgerufen; die Engine-Konstruktoren und die DI-Registrierung
-   bleiben unverändert. Die Logik ist als statischer Helper direkt unit-testbar.
+4. **Static check logic, no new DI service.** `BtfOrderTypeCatalog` (Core) +
+   `Subscriber.HasPermissionFor` (Core) are called inline in the engines; the engine
+   constructors and the DI registration stay unchanged. The logic is directly
+   unit-testable as a static helper.
 
-## Konsequenzen
+## Consequences
 
-- Der Katalog-Seed ist **repräsentativ und best-effort** (die maßgebliche External Code List ist
-  proprietär, [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)); #39–#43 erweitern und verifizieren ihn.
-- Bestehende Upload-/Download-Tests, die `Ready`-Teilnehmer ohne Berechtigungen anlegten, wurden migriert
-  (passende Berechtigungen geseedet) — Folge des strikten Enforcements.
-- Für H005-BTF-only-Services ohne klassischen Code greift der `CanonicalKey` als Fallback-Schlüssel.
-- `FUL`/`FDL`-`FileFormat` → BTF und die Auswertung von `SignatureFlag` bleiben späteren Issues
-  vorbehalten (siehe [BTF-Framework-Doku](../server/btf-framework.md)).
+- The catalogue seed is **representative and best-effort** (the authoritative External
+  Code List is proprietary, [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md));
+  #39–#43 extend and verify it.
+- Existing upload/download tests that created `Ready` subscribers without authorisations
+  were migrated (matching authorisations seeded) — a consequence of strict enforcement.
+- For H005 BTF-only services without a classic code, the `CanonicalKey` acts as the
+  fallback key.
+- `FUL`/`FDL` `FileFormat` → BTF and the evaluation of `SignatureFlag` remain reserved
+  for later issues (see the [BTF framework docs](../server/btf-framework.md)).
 
-## Alternativen
+## Alternatives
 
-- **Natives BTF in `SubscriberPermission`** (statt Bridge) — abgelehnt (s. o.).
-- **Lenient/opt-in-Enforcement** — abgelehnt (s. o.).
-- **Eigener `IOrderAuthorizationService` via DI** — abgelehnt: unnötige Kopplung/Ctor-Ripple; die
-  statische Variante ist ebenso testbar.
+- **Native BTF in `SubscriberPermission`** (instead of the bridge) — rejected (see above).
+- **Lenient/opt-in enforcement** — rejected (see above).
+- **A dedicated `IOrderAuthorizationService` via DI** — rejected: unnecessary
+  coupling/ctor ripple; the static variant is equally testable.

@@ -1,63 +1,64 @@
-# 0028 — Branch-Protection für `main`: CI als durchgesetztes Merge-Gate
+# 0028 — Branch protection for `main`: CI as an enforced merge gate
 
 - Status: accepted
-- Datum: 2026-07-21
+- Date: 2026-07-21
 
-## Kontext
+## Context
 
-Die projektweite Definition of Done verlangt „CI grün" (`dotnet build` + `dotnet test`,
-keine neuen Warnungen). Die CI-Pipeline (`ci.yml`, #7) läuft auch längst auf jedem PR —
-aber ihr Ergebnis war folgenlos: `main` war ungeschützt
-(`gh api repos/:owner/:repo/branches/main/protection` → *„Branch not protected"*). Ein PR
-mit roter CI war mergebar, und ein direkter Push auf `main` umging den PR-Prozess komplett.
-Die DoD war damit eine reine Selbstverpflichtung.
+The project-wide Definition of Done requires "CI green" (`dotnet build` + `dotnet test`,
+no new warnings). The CI pipeline (`ci.yml`, #7) has long been running on every PR too —
+but its result had no consequence: `main` was unprotected
+(`gh api repos/:owner/:repo/branches/main/protection` → *"Branch not protected"*). A PR
+with red CI was mergeable, and a direct push to `main` bypassed the PR process entirely.
+The DoD was thereby a pure self-commitment.
 
-Erschwerend: EBICO ist faktisch ein **Solo-Repo** (ein Maintainer). Genau dort sind die
-üblichen Standardeinstellungen für Branch-Protection kontraproduktiv — „Required approving
-reviews" blockiert jeden Merge, weil GitHub das Approven des eigenen PRs verbietet, und
-ein Admin-Bypass macht die Regel für den einzigen Committer wirkungslos.
+Complicating matters: EBICO is effectively a **solo repo** (one maintainer). It is
+precisely there that the usual default settings for branch protection are
+counterproductive — "required approving reviews" blocks every merge, because GitHub forbids
+approving one's own PR, and an admin bypass makes the rule ineffective for the only
+committer.
 
-## Entscheidung
+## Decision
 
-Klassische **Branch-Protection-Regel** auf `main` mit diesem Zuschnitt:
+A classic **branch-protection rule** on `main` with this cut:
 
-- **Required status checks** = genau die vier `ci.yml`-Jobs (`Build & Test`,
-  `Docs Link Check`, `Container Build (Server)`, `Pack (NuGet, build-only)`), mit
-  `strict: true` (Branch muss vor dem Merge aktuell sein).
-- **Keine** required approving reviews — die Review-Pflicht bleibt als Checklistenpunkt
-  in `.github/PULL_REQUEST_TEMPLATE.md`, nicht als technisches Gate.
-- **`enforce_admins: true`** — die Regel gilt auch für den Repo-Owner.
-- Direkte Pushes, Force-Pushes und das Löschen von `main` sind blockiert.
+- **Required status checks** = exactly the four `ci.yml` jobs (`Build & Test`,
+  `Docs Link Check`, `Container Build (Server)`, `Pack (NuGet, build-only)`), with
+  `strict: true` (the branch must be up to date before the merge).
+- **No** required approving reviews — the review obligation stays as a checklist item in
+  `.github/PULL_REQUEST_TEMPLATE.md`, not as a technical gate.
+- **`enforce_admins: true`** — the rule applies to the repo owner too.
+- Direct pushes, force pushes and deleting `main` are blocked.
 
-Der Job `Publish (NuGet + Container)` aus `release.yml` wird bewusst **nicht** als Required
-Check geführt: er feuert nur auf `v*.*.*`-Tags.
+The job `Publish (NuGet + Container)` from `release.yml` is deliberately **not** run as a
+required check: it fires only on `v*.*.*` tags.
 
-## Konsequenzen
+## Consequences
 
-- Die DoD „CI grün" ist erstmals technisch durchgesetzt statt nur dokumentiert; jede
-  Änderung an `main` läuft zwingend über einen PR.
-- **Die Regel liegt in den Repo-Settings, nicht im Repo.** Sie ist nicht versioniert, taucht
-  in keinem Diff auf und kann still verändert werden. Gegenmaßnahme: `docs/development/ci.md`
-  beschreibt den Soll-Zustand, und `BranchProtectionDocTests` hält wenigstens die Liste der
-  Required Checks mit den Job-Namen in `ci.yml` synchron — ein umbenannter Job bricht sonst
-  lautlos entweder das Gate (Check existiert nicht mehr → hängt) oder die Doku.
-- **Selbst-Aussperrung ist möglich:** Bei `enforce_admins: true` blockiert ein dauerhaft
-  roter oder nie startender Required Check jeden Merge. Der vorgesehene Ausweg ist das
-  temporäre Deaktivieren der Regel in den Settings, nicht der Force-Push.
-- Jeder Job, der neu in `ci.yml` aufgenommen wird, ist zunächst **kein** Required Check —
-  die Repo-Einstellung muss aktiv nachgezogen werden.
+- The DoD "CI green" is enforced technically for the first time rather than only
+  documented; every change to `main` necessarily goes through a PR.
+- **The rule lives in the repo settings, not in the repo.** It is not versioned, appears in
+  no diff and can be changed silently. Countermeasure: `docs/development/ci.md` describes the
+  target state, and `BranchProtectionDocTests` keeps at least the list of required checks in
+  sync with the job names in `ci.yml` — a renamed job would otherwise silently break either
+  the gate (the check no longer exists → hangs) or the docs.
+- **Self-lockout is possible:** with `enforce_admins: true`, a permanently red or
+  never-starting required check blocks every merge. The intended way out is temporarily
+  disabling the rule in the settings, not a force push.
+- Every job newly added to `ci.yml` is initially **not** a required check — the repo setting
+  must be actively followed up.
 
-## Alternativen
+## Alternatives
 
-- **Repository Rulesets** (die neuere GitHub-Mechanik): mächtiger (mehrere Regeln pro Branch,
-  Bypass-Listen, org-weite Vererbung), aber für ein Solo-Repo mit genau einer geschützten
-  Branch reiner Mehraufwand. Klassische Protection ist per `gh api` in einem Aufruf gesetzt
-  und in jeder GitHub-Doku beschrieben — verworfen zugunsten der einfacheren Variante, ein
-  späterer Umstieg bleibt jederzeit möglich.
-- **`enforce_admins: false`** (Admin darf bypassen): schützt vor Selbst-Aussperrung, macht
-  die Regel aber bei einem einzigen Committer zur Attrappe — verworfen.
-- **Required approving reviews (1)**: würde bei einem Maintainer jeden Merge blockieren —
-  verworfen; ersatzweise der DoD-Punkt „Code-Review durchgeführt" in der PR-Vorlage.
-- **Mindest-Coverage-Gate als zusätzlicher Required Check** (ursprünglich in #3 gefordert):
-  verworfen. Ein nachträglich auf eine fertige Codebasis gesetzter Schwellwert erzeugt vor
-  allem CI-Rauschen; Coverage bleibt als Sichtbarkeit über das CI-Artefakt erhalten.
+- **Repository rulesets** (the newer GitHub mechanism): more powerful (multiple rules per
+  branch, bypass lists, org-wide inheritance), but for a solo repo with exactly one protected
+  branch pure extra effort. Classic protection is set via `gh api` in one call and described
+  in every GitHub doc — rejected in favour of the simpler variant, a later switch stays
+  possible at any time.
+- **`enforce_admins: false`** (admin may bypass): protects against self-lockout, but makes
+  the rule a sham with a single committer — rejected.
+- **Required approving reviews (1)**: would block every merge with a single maintainer —
+  rejected; instead the DoD item "code review performed" in the PR template.
+- **A minimum-coverage gate as an additional required check** (originally required in #3):
+  rejected. A threshold set retroactively on a finished codebase mainly produces CI noise;
+  coverage stays visible via the CI artefact.

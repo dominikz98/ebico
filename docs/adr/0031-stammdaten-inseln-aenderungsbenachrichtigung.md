@@ -1,80 +1,81 @@
-# ADR-0031 — Änderungsbenachrichtigung zwischen den Stammdaten-Inseln der Suite
+# ADR-0031 — Change notification between the Suite's master-data islands
 
 - **Status:** accepted
-- **Datum:** 2026-07-27
-- **Kontext-Issue:** [#126](https://github.com/dominikz98/ebico/issues/126)
+- **Date:** 2026-07-27
+- **Context issue:** [#126](https://github.com/dominikz98/ebico/issues/126)
 
-## Kontext
+## Context
 
-Die Seite `/stammdaten` rendert `BankManager`, `PartnerManager` und `SubscriberManager` als **drei
-getrennte interaktive Inseln** (ADR-0009, „Interaktivität pro Komponente"). Jede Komponente lädt
-ihren Zustand einmal in `OnInitializedAsync` und aktualisiert nach einer Mutation nur sich selbst.
+The `/stammdaten` page renders `BankManager`, `PartnerManager` and `SubscriberManager` as
+**three separate interactive islands** (ADR-0009, "interactivity per component"). Each
+component loads its state once in `OnInitializedAsync` and, after a mutation, updates only
+itself.
 
-Alle drei schreiben aber durch **denselben** `IMasterDataManager`, und die Beziehungen sind
-kaskadierend (Bank → Partner → Teilnehmer, siehe [#30](../server/master-data.md)). Damit entwertete
-jede Mutation in einer Insel den Zustand der anderen beiden, ohne dass diese es erfuhren. Ein
-explorativer Test der laufenden Anwendung (#126) zeigte die Folgen:
+But all three write through the **same** `IMasterDataManager`, and the relationships are
+cascading (bank → partner → subscriber, see [#30](../server/master-data.md)). Thereby every
+mutation in one island invalidated the state of the other two without their knowing it. An
+exploratory test of the running application (#126) showed the consequences:
 
-- Eine neu angelegte Bank fehlte in den Auswahlfeldern von Partner- und Teilnehmer-Formular. Da das
-  Formular auf die **erste** Bank der veralteten Liste vorbelegt, landete ein Partner
-  stillschweigend unter einer fremden Bank — mit grüner Erfolgsmeldung.
-- Eine gelöschte Bank blieb auswählbar; Speichern darauf ergab die widersprüchliche Meldungspaarung
-  „Bank X gelöscht." + „Bank X existiert nicht.".
-- Kaskadierend gelöschte Partner und Teilnehmer blieben als Karteileichen in den Tabellen stehen —
-  mit aktiven „Bearbeiten"/„Löschen"-Buttons — bis zum nächsten vollständigen Seiten-Reload.
+- A newly created bank was missing from the select fields of the partner and subscriber
+  forms. Since the form pre-selects the **first** bank of the stale list, a partner silently
+  ended up under a foreign bank — with a green success message.
+- A deleted bank stayed selectable; saving against it produced the contradictory message pair
+  "Bank X deleted." + "Bank X does not exist.".
+- Cascade-deleted partners and subscribers stayed as dead entries in the tables — with active
+  "Edit"/"Delete" buttons — until the next full page reload.
 
-## Entscheidung
+## Decision
 
-Ein eigener **`IMasterDataChangeNotifier`** (`src/EBICO.Suite/Services/`) als **Singleton**. Jede
-Insel abonniert ihn in `OnInitializedAsync`, gibt das Abo in `Dispose` zurück und ruft nach **jeder**
-erfolgreichen Mutation `NotifyChangedAsync()`.
+A dedicated **`IMasterDataChangeNotifier`** (`src/EBICO.Suite/Services/`) as a **singleton**.
+Each island subscribes to it in `OnInitializedAsync`, returns the subscription in `Dispose`
+and calls `NotifyChangedAsync()` after **every** successful mutation.
 
-Ein Abonnent tut zweierlei:
+A subscriber does two things:
 
-1. seinen Zustand neu laden, und
-2. **transiente UI-Zustände gegen die frischen Daten prüfen** — ein offenes Formular darf keine
-   gelöschte Bank mehr anbieten, eine Löschbestätigung für einen kaskadierten Datensatz ist
-   gegenstandslos, ein Detailbereich ohne Datensatz schließt sich.
+1. reload its state, and
+2. **check transient UI states against the fresh data** — an open form must no longer offer
+   a deleted bank, a delete confirmation for a cascaded record is moot, a detail area without
+   a record closes itself.
 
-Punkt 2 ist der Teil, der leicht übersehen wird: Neuladen allein behebt die Tabellen, nicht die
-bereits geöffneten Formulare.
+Point 2 is the part that is easily overlooked: reloading alone fixes the tables, not the
+already-opened forms.
 
-Weil der Notifier ein Singleton ist, treffen Benachrichtigungen auf dem Thread des **auslösenden**
-Circuits ein. Ein Abonnent muss deshalb über `ComponentBase.InvokeAsync` auf seinen eigenen Renderer
-zurückwechseln, bevor er Komponenten-Zustand anfasst.
+Because the notifier is a singleton, notifications arrive on the thread of the **triggering**
+circuit. A subscriber must therefore switch back to its own renderer via
+`ComponentBase.InvokeAsync` before touching component state.
 
-## Konsequenzen
+## Consequences
 
-- Die Inseln bleiben untereinander konsistent, ohne Seiten-Reload.
-- **Auch über Sitzungen hinweg:** die Stores sind prozessweite Singletons (ADR-0009), der Notifier
-  ist es ebenso — eine Änderung in einem Browser-Tab erreicht die anderen.
-- Der Broadcast ist **best-effort**: ein fehlschlagender Abonnent stoppt die übrigen nicht, die
-  Fehler werden gesammelt als `AggregateException` gemeldet statt stillschweigend verschluckt.
-- Jede neue Komponente, die Stammdaten anzeigt, muss den Notifier abonnieren — sonst veraltet sie
-  wieder still. Das ist die Kehrseite der Insel-Architektur und in
-  [stammdaten.md](../suite/stammdaten.md) sowie im Skill `ebics-suite` festgehalten.
-- Der Notifier trägt **keine** Nutzlast („was hat sich geändert"). Bei drei kleinen In-Memory-Listen
-  ist vollständiges Neuladen billiger als ein differenziertes Ereignismodell; ein
-  Blazor-`StateHasChanged` rendert die Insel ohnehin komplett neu.
+- The islands stay consistent with each other, without a page reload.
+- **Across sessions too:** the stores are process-wide singletons (ADR-0009), the notifier is
+  one as well — a change in one browser tab reaches the others.
+- The broadcast is **best-effort**: a failing subscriber does not stop the rest; the errors
+  are collected and reported as an `AggregateException` instead of being silently swallowed.
+- Every new component that displays master data must subscribe to the notifier — otherwise it
+  goes stale silently again. That is the flip side of the island architecture and is recorded
+  in [stammdaten.md](../suite/stammdaten.md) as well as in the `ebics-suite` skill.
+- The notifier carries **no** payload ("what changed"). With three small in-memory lists a
+  full reload is cheaper than a differentiated event model; a Blazor `StateHasChanged`
+  re-renders the island completely anyway.
 
-## Alternativen
+## Alternatives
 
-- **Die drei Inseln zu einer Komponente zusammenziehen**, die den Zustand hält und an die Manager
-  als Parameter durchgibt. Löst das Problem ebenfalls und braucht keinen neuen Dienst — verwirft aber
-  die bewusst gewählte Granularität aus ADR-0009 und macht aus drei überschaubaren Komponenten eine
-  große. Verworfen.
-- **Scoped statt Singleton.** Pro Circuit isoliert, damit ohne Marshalling-Pflicht und ohne
-  Thread-Sicherheits-Bedarf. Löst die Fälle innerhalb *einer* Sitzung, aber nicht zwischen
-  Sitzungen — obwohl der Zustand dahinter geteilt ist. Verworfen, weil die Inkonsistenz zwischen zwei
-  Tabs derselben Ursache entspringt.
-- **Polling** (Timer je Insel). Kein neuer Kontrakt, aber Latenz, Dauerlast und ein Formular, das
-  unter den Händen springt, ohne dass etwas passiert wäre. Verworfen.
-- **Nichts tun und einen Reload-Knopf anbieten.** Verlagert einen Konsistenzfehler auf die
-  Anwenderin, und der schädlichste Fall (Partner landet stillschweigend unter der falschen Bank)
-  bleibt bestehen. Verworfen.
+- **Merge the three islands into one component** that holds the state and passes it to the
+  managers as parameters. Also solves the problem and needs no new service — but discards the
+  deliberately chosen granularity from ADR-0009 and turns three manageable components into one
+  large one. Rejected.
+- **Scoped instead of singleton.** Isolated per circuit, hence without marshalling obligation
+  and without thread-safety need. Solves the cases within *one* session, but not across
+  sessions — although the state behind it is shared. Rejected, because the inconsistency
+  between two tabs springs from the same cause.
+- **Polling** (a timer per island). No new contract, but latency, constant load and a form
+  that jumps under one's hands without anything having happened. Rejected.
+- **Do nothing and offer a reload button.** Shifts a consistency error onto the user, and the
+  most harmful case (a partner silently ends up under the wrong bank) persists. Rejected.
 
-## Verwandtes
+## Related
 
-- [ADR-0009 — Blazor Render-Modus (In-Process-Zustand)](0009-blazor-render-mode.md)
-- [Suite: Stammdaten-Verwaltung](../suite/stammdaten.md)
-- [Server: Stammdatenverwaltung (#30)](../server/master-data.md) — Kaskaden und Upsert-Semantik
+- [ADR-0009 — Blazor render mode (in-process state)](0009-blazor-render-mode.md)
+- [Suite: master-data management](../suite/stammdaten.md)
+- [Server: master-data management (#30)](../server/master-data.md) — cascades and upsert
+  semantics

@@ -1,61 +1,68 @@
-# 0010 — PDF-Bibliothek für den INI-/HIA-Brief: QuestPDF (Community)
+# 0010 — PDF library for the INI/HIA letter: QuestPDF (Community)
 
 - Status: accepted
-- Datum: 2026-07-09
+- Date: 2026-07-09
 
-## Kontext
+## Context
 
-Mit dem Connector-Onboarding (Issue **#47**, Milestone M6) erzeugt der `EBICO.Connector`
-den **INI-/HIA-Brief** — das Dokument mit den öffentlichen Schlüssel-Fingerprints, das der
-Teilnehmer unterschrieben zur Bank sendet, damit diese die per INI/HIA übertragenen Schlüssel
-gegen den Brief abgleichen kann. Gefordert ist der Brief als **Text und PDF**.
+With connector onboarding (issue **#47**, Milestone M6), `EBICO.Connector` generates
+the **INI/HIA letter** — the document with the public-key fingerprints that the
+subscriber signs and sends to the bank so it can reconcile the keys transferred via
+INI/HIA against the letter. The letter is required as **text and PDF**.
 
-Bisher enthält das Repo **keine** PDF-Bibliothek (`Directory.Packages.props` führt nur Test-,
-DI- und HTTP-Pakete). Für die PDF-Erzeugung ist also eine neue Abhängigkeit nötig. Das Projekt
-ist bei Abhängigkeiten bewusst zurückhaltend (BCL-only bei Krypto — [ADR-0008](0008-krypto-bibliothek.md);
-Verzicht auf das kommerziell lizenzierte FluentAssertions v8 zugunsten von AwesomeAssertions —
-[ADR-0002](0002-test-stack.md)). Die Lizenzlage eines PDF-Pakets ist daher explizit zu prüfen.
+So far the repo contains **no** PDF library (`Directory.Packages.props` lists only
+test, DI and HTTP packages). PDF generation therefore requires a new dependency. The
+project is deliberately restrained about dependencies (BCL-only for crypto —
+[ADR-0008](0008-krypto-bibliothek.md); avoiding the commercially licensed
+FluentAssertions v8 in favour of AwesomeAssertions — [ADR-0002](0002-test-stack.md)).
+The license situation of a PDF package must therefore be checked explicitly.
 
-## Entscheidung
+## Decision
 
-Der INI-/HIA-Brief wird mit **QuestPDF** unter der **Community-Lizenz** erzeugt. Die
-Version wird zentral in `Directory.Packages.props` gepinnt (`PackageVersion`), referenziert wird
-sie ohne Version im `EBICO.Connector.csproj` ([ADR-0001](0001-solution-layout-und-paketverwaltung.md)).
+The INI/HIA letter is generated with **QuestPDF** under the **Community license**.
+The version is pinned centrally in `Directory.Packages.props` (`PackageVersion`) and
+referenced without a version in `EBICO.Connector.csproj`
+([ADR-0001](0001-solution-layout-und-paketverwaltung.md)).
 
-Der Brief ist hinter der Abstraktion `IInitializationLetterRenderer` gekapselt:
+The letter is encapsulated behind the `IInitializationLetterRenderer` abstraction:
 
-- `TextInitializationLetterRenderer` erzeugt den Brief **ohne** jede Abhängigkeit (reiner Text).
-- `PdfInitializationLetterRenderer` erzeugt zusätzlich das PDF (QuestPDF) — es ist die per
-  `AddEbicoOnboarding()` registrierte Standard-Implementierung und liefert Text **und** PDF.
+- `TextInitializationLetterRenderer` produces the letter **without** any dependency
+  (plain text).
+- `PdfInitializationLetterRenderer` additionally produces the PDF (QuestPDF) — it is
+  the default implementation registered via `AddEbicoOnboarding()` and delivers text
+  **and** PDF.
 
-Der geteilte Textkörper (`InitializationLetterTextBuilder`) stellt sicher, dass Text- und
-PDF-Variante inhaltlich identisch sind. Die Community-Lizenz wird einmalig im statischen
-Konstruktor des PDF-Renderers gesetzt (`QuestPDF.Settings.License = LicenseType.Community`).
+The shared body (`InitializationLetterTextBuilder`) ensures that the text and PDF
+variants are identical in content. The Community license is set once in the static
+constructor of the PDF renderer (`QuestPDF.Settings.License = LicenseType.Community`).
 
-## Konsequenzen
+## Consequences
 
-- **Lizenz:** QuestPDF Community ist kostenlos für Organisationen unterhalb der von QuestPDF
-  definierten Umsatzschwelle (aktuell 1 Mio USD Jahresumsatz). Oberhalb ist eine kommerzielle
-  QuestPDF-Lizenz erforderlich. Dies ist vor produktivem Einsatz zu prüfen; der Text-Renderer
-  bleibt als lizenzfreier Fallback jederzeit verfügbar.
-- **Abhängigkeitsgewicht:** QuestPDF wird eine transitive Abhängigkeit des Connector-NuGets
-  (samt gebündeltem SkiaSharp-Renderer). Das steht in Spannung zum „schlanke Abhängigkeitsliste"-
-  Ziel der [Connector-Architektur](../connector/architecture.md); der Text-Renderer ist deshalb
-  dependency-frei gehalten, und die saubere Entkopplung (PDF-Renderer in einem separaten Paket
-  `EBICO.Connector.Pdf`) bleibt als Option für später dokumentiert.
-- **Headless/CI:** QuestPDF rendert über ein gebündeltes SkiaSharp; die PDF-Tests prüfen nur die
-  Gültigkeit (PDF-Magic `%PDF-`, nicht leer), kein Layout, damit sie plattformunabhängig laufen.
-- **Risiko/Revision:** Ändert QuestPDF seine Lizenzbedingungen oder ergeben sich CI-Probleme mit
-  SkiaSharp, wird diese ADR neu bewertet — bevorzugt durch Auslagern des PDF-Renderers in ein
-  optionales Paket oder Wechsel der PDF-Bibliothek; der Text-Brief bleibt unberührt.
+- **License:** QuestPDF Community is free for organisations below the revenue
+  threshold defined by QuestPDF (currently USD 1M annual revenue). Above it, a
+  commercial QuestPDF license is required. This must be checked before production
+  use; the text renderer remains available at all times as a license-free fallback.
+- **Dependency weight:** QuestPDF becomes a transitive dependency of the connector
+  NuGet (including the bundled SkiaSharp renderer). This is in tension with the "lean
+  dependency list" goal of the [connector architecture](../connector/architecture.md);
+  the text renderer is therefore kept dependency-free, and the clean decoupling (PDF
+  renderer in a separate package `EBICO.Connector.Pdf`) is documented as an option
+  for later.
+- **Headless/CI:** QuestPDF renders via a bundled SkiaSharp; the PDF tests check only
+  validity (PDF magic `%PDF-`, non-empty), not layout, so they run
+  platform-independently.
+- **Risk/revision:** if QuestPDF changes its license terms or CI problems arise with
+  SkiaSharp, this ADR is re-evaluated — preferably by moving the PDF renderer into an
+  optional package or switching the PDF library; the text letter stays untouched.
 
-## Alternativen
+## Alternatives
 
-- **Nur Text (kein PDF):** keine neue Abhängigkeit, aber die geforderte PDF-Ausgabe fehlt —
-  verworfen (Anforderung des Issues).
-- **PdfSharp/MigraDoc:** MIT-lizenziert, keine Umsatzschwelle; API weniger fluent, Layout
-  aufwändiger. Bleibt Rückfalloption, falls die QuestPDF-Lizenz zum Hindernis wird.
-- **iText:** AGPL bzw. kommerziell — für ein potenziell öffentliches NuGet ungeeignet, verworfen.
-- **PDF-Renderer in eigenem Paket `EBICO.Connector.Pdf`:** sauberste Entkopplung, hält den
-  Connector-Kern dependency-frei; für dieses Issue zurückgestellt (Solution-/Packaging-Aufwand),
-  als bevorzugte Migration im Risiko-Abschnitt vermerkt.
+- **Text only (no PDF):** no new dependency, but the required PDF output is missing —
+  rejected (requirement of the issue).
+- **PdfSharp/MigraDoc:** MIT-licensed, no revenue threshold; API less fluent, layout
+  more laborious. Remains a fallback option should the QuestPDF license become an
+  obstacle.
+- **iText:** AGPL or commercial — unsuitable for a potentially public NuGet, rejected.
+- **PDF renderer in its own package `EBICO.Connector.Pdf`:** cleanest decoupling,
+  keeps the connector core dependency-free; deferred for this issue (solution/packaging
+  effort), noted as the preferred migration in the risk section.

@@ -1,66 +1,72 @@
-# 0012 — EBICS-Returncode-Katalog (Modellierung & Verortung)
+# 0012 — EBICS return-code catalogue (modelling & placement)
 
 - Status: accepted
-- Datum: 2026-07-13
+- Date: 2026-07-13
 
-## Kontext
+## Context
 
-EBICS-Antworten tragen einen sechsstelligen Returncode (technisch im
-`header/mutable/ReturnCode`, fachlich im `body/ReturnCode`). Bis Issue #36 (M4) existierten dafür
-zwei **bewusst vorläufige** Modelle: ein server-lokaler `EbicsReturnCode` mit neun Codes
-(Grundgerüst #25) und ein `EbicsResult<T>` im Connector (#46). Beide verwiesen im Code auf #36 als
-den Ort, an dem der **zentrale, vollständige** Katalog entsteht. Der ADR-Backlog führte
-„Returncode-Modellierung (`EbicsResult<T>` vs. Exceptions, Katalog)" als offene Entscheidung.
+EBICS responses carry a six-digit return code (technical in
+`header/mutable/ReturnCode`, business in `body/ReturnCode`). Until issue #36 (M4)
+there were two **deliberately provisional** models for it: a server-local
+`EbicsReturnCode` with nine codes (scaffolding #25) and an `EbicsResult<T>` in the
+connector (#46). Both referenced #36 in code as the place where the **central,
+complete** catalogue would come into being. The ADR backlog listed "return-code
+modelling (`EbicsResult<T>` vs. exceptions, catalogue)" as an open decision.
 
-Zu klären waren: (1) Wo lebt der Katalog? (2) Wie wird er modelliert? (3) Wie werden Exceptions
-darauf abgebildet? (4) Wie ist mit den proprietären EBICS-Annexen umzugehen?
+To be clarified: (1) where does the catalogue live? (2) how is it modelled? (3) how
+are exceptions mapped onto it? (4) how are the proprietary EBICS annexes handled?
 
-Randbedingung: `EBICO.Core` darf nicht auf `EBICO.Server` referenzieren (Projektabhängigkeiten
-Connector→Core, Server→Core). Das Mapping muss aber server-seitige Exceptions
-(`EBICO.Server.State.MasterData*`) kennen.
+Constraint: `EBICO.Core` must not reference `EBICO.Server` (project dependencies
+Connector→Core, Server→Core). The mapping, however, must know server-side exceptions
+(`EBICO.Server.State.MasterData*`).
 
-## Entscheidung
+## Decision
 
-- **Katalog nach `EBICO.Core.ReturnCodes`** (geteilte Primitive für Server **und** Connector):
-  - `EbicsReturnCode` als `public readonly record struct` (`Code`, `SymbolicName`, `Kind`) mit
-    statischen Feldern je Code und `const OkCode` — Muster wie [ADR-0007](0007-domaenen-value-objects-record-struct.md);
-  - `EbicsReturnCodeKind` (Enum `Technical`/`Business`) steuert Header- vs. Body-Ablage;
-  - `EbicsReturnCodes` als Registry (`All`/`Get`/`TryFromCode`/`IsSuccess`) — Vorbild
-    `Crypto/KeyVersions`.
-- **Mapping bleibt server-seitig** (`EBICO.Server.ReturnCodes.EbicsErrorMapper` +
-  `IEbicsErrorMapper`), weil es Server-Exceptions kennt und reine Request-Verarbeitung ist; der
-  Connector braucht es nicht (eigenes Exception-/`EbicsResult`-Modell). Der Katalog (Core) ist die
-  zentrale Primitive; das Mapping ist server-lokal.
-- **Zentrale, eindeutige Exception→Code-Abbildung:** Handler machen Order-Data-Fehler über
-  `OrderDataFault.Wrap` als dedizierte `EbicsOrderDataException` sichtbar; der Mapper bildet diesen
-  Typ (und die Low-Level-Crypto-/Format-Fehler) auf `090004`, die Domain-/MasterData-Fehler auf
-  `091002` ab. Blanke `ArgumentException`/`InvalidOperationException` mappen bewusst auf `061099`
-  (Serverfehler), nicht auf einen fachlichen Code.
-- **Umgang mit der Spec:** Codes und symbolische Namen sind Interface-Konstanten und werden
-  aufgenommen; Beschreibungen sind in eigenen Worten formuliert (kein Kopieren des Annex-Texts).
-  Über die neun verifizierten Codes hinausgehende Einträge tragen `⚠️ Spec-Vorbehalt` und sind
-  gegen die offiziellen Annexe zu verifizieren.
+- **Catalogue in `EBICO.Core.ReturnCodes`** (shared primitives for server **and**
+  connector):
+  - `EbicsReturnCode` as a `public readonly record struct` (`Code`, `SymbolicName`,
+    `Kind`) with static fields per code and `const OkCode` — pattern like
+    [ADR-0007](0007-domaenen-value-objects-record-struct.md);
+  - `EbicsReturnCodeKind` (enum `Technical`/`Business`) controls header vs. body
+    placement;
+  - `EbicsReturnCodes` as a registry (`All`/`Get`/`TryFromCode`/`IsSuccess`) —
+    modelled on `Crypto/KeyVersions`.
+- **Mapping stays server-side** (`EBICO.Server.ReturnCodes.EbicsErrorMapper` +
+  `IEbicsErrorMapper`), because it knows server exceptions and is pure request
+  processing; the connector does not need it (its own exception/`EbicsResult`
+  model). The catalogue (Core) is the central primitive; the mapping is server-local.
+- **Central, unambiguous exception→code mapping:** handlers surface order-data errors
+  via `OrderDataFault.Wrap` as a dedicated `EbicsOrderDataException`; the mapper maps
+  this type (and the low-level crypto/format errors) to `090004`, and the
+  domain/master-data errors to `091002`. Bare
+  `ArgumentException`/`InvalidOperationException` deliberately map to `061099`
+  (server error), not to a business code.
+- **Handling the spec:** codes and symbolic names are interface constants and are
+  included; descriptions are phrased in our own words (no copying of the annex text).
+  Entries beyond the nine verified codes carry `⚠️ spec caveat` and must be verified
+  against the official annexes.
 
-## Konsequenzen
+## Consequences
 
-- Ein Ort für alle Returncodes; `EbicsResult.OkReturnCode` bezieht sich auf `EbicsReturnCode.OkCode`
-  statt das Literal `"000000"` zu duplizieren.
-- Die frisch gemergten M3-Handler wurden entkoppelt: die duplizierten `try/catch`-Blöcke (Guard-Liste
-  einmal in `OrderDataFault`) sind weg; Verhalten unverändert (Order-Data → `090004`,
-  Identifier/State → `091002`), abgesichert durch die bestehenden Pipeline-Tests.
-- Der Katalog ist absichtlich umfassender als der laufende Code; unbenutzte Codes sind als
-  Konstanten vorhanden (z. B. TX-Codes für die M4-Transaction-Engine) und klar als unverifiziert
-  markiert.
-- Doku: [protocol/return-codes.md](../protocol/return-codes.md).
+- One place for all return codes; `EbicsResult.OkReturnCode` refers to
+  `EbicsReturnCode.OkCode` instead of duplicating the literal `"000000"`.
+- The freshly merged M3 handlers were decoupled: the duplicated `try/catch` blocks
+  (guard list once in `OrderDataFault`) are gone; behaviour unchanged (order data →
+  `090004`, identifier/state → `091002`), covered by the existing pipeline tests.
+- The catalogue is intentionally more comprehensive than the running code; unused
+  codes exist as constants (e.g. TX codes for the M4 transaction engine) and are
+  clearly marked as unverified.
+- Docs: [protocol/return-codes.md](../protocol/return-codes.md).
 
-## Alternativen
+## Alternatives
 
-- **Katalog in `EBICO.Server` belassen und nur erweitern:** minimaler Eingriff, aber nicht wirklich
-  „zentral" (der Connector behielte sein eigenes Modell) — verworfen.
-- **Auch den Mapper nach `EBICO.Core` ziehen:** scheitert an der Abhängigkeitsrichtung (Core dürfte
-  die Server-`MasterData*`-Exceptions nicht sehen); hätte das Verschieben dieser Exceptions nach
-  Core erzwungen — unnötig große Streuung, verworfen.
-- **Handler-`try/catch` unverändert lassen, nur den Mapper erweitern:** ließe die duplizierte
-  Guard-Liste stehen — verworfen zugunsten der einmaligen `OrderDataFault`-Kapselung.
-- **Kompletten Annex-1-Text mitcommitten:** lizenzrechtlich heikel (proprietär) — verworfen; nur
-  Codes/Namen als Konstanten, eigene Kurzbeschreibungen.
+- **Leave the catalogue in `EBICO.Server` and only extend it:** minimal intervention,
+  but not truly "central" (the connector would keep its own model) — rejected.
+- **Pull the mapper into `EBICO.Core` too:** fails on the dependency direction (Core
+  must not see the server `MasterData*` exceptions); it would have forced moving those
+  exceptions into Core — unnecessarily wide scatter, rejected.
+- **Leave the handler `try/catch` unchanged, only extend the mapper:** would leave the
+  duplicated guard list standing — rejected in favour of the one-off `OrderDataFault`
+  encapsulation.
+- **Commit the complete annex-1 text:** legally delicate (proprietary) — rejected;
+  only codes/names as constants, our own short descriptions.
