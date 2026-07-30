@@ -90,7 +90,7 @@ public class SampleEmulatorStateProviderTests
         var keys = await _sut.GetKeysAsync(TestContext.Current.CancellationToken);
 
         keys.Should().HaveCount(5);
-        keys.Should().Contain(k => k.OwnerLabel.Contains("Teilnehmer"))
+        keys.Should().Contain(k => k.OwnerLabel.Contains("Subscriber"))
             .And.Contain(k => k.OwnerLabel.Contains("Bank"));
         keys.Select(k => k.KeyVersion).Should()
             .Contain("A006").And.Contain("E002").And.Contain("X002");

@@ -17,42 +17,42 @@ public class IniLetterComparisonToolTests
     public void Compare_MatchingFingerprint_ReportsSuccess()
     {
         using var ctx = new BunitContext();
-        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TEST", KeyPurpose.Signature, "A006");
+        var key = FakeEmulatorStateProvider.SampleKey("Subscriber TEST", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<IniLetterComparisonTool>();
         cut.Find("#expected-fingerprint").Change(key.FingerprintText);
         cut.Find("button").Click();
 
-        cut.Find(".alert-success").TextContent.Should().Contain("stimmt überein");
+        cut.Find(".alert-success").TextContent.Should().Contain("matches");
     }
 
     [Fact]
     public void Compare_MismatchingFingerprint_ReportsFailure()
     {
         using var ctx = new BunitContext();
-        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TEST", KeyPurpose.Signature, "A006");
+        var key = FakeEmulatorStateProvider.SampleKey("Subscriber TEST", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<IniLetterComparisonTool>();
         cut.Find("#expected-fingerprint").Change("00 11 22 33 44 55 66 77");
         cut.Find("button").Click();
 
-        cut.Find(".alert-danger").TextContent.Should().Contain("nicht");
+        cut.Find(".alert-danger").TextContent.Should().Contain("does not match");
     }
 
     [Fact]
     public void Compare_InvalidFingerprint_ReportsWarning()
     {
         using var ctx = new BunitContext();
-        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TEST", KeyPurpose.Signature, "A006");
+        var key = FakeEmulatorStateProvider.SampleKey("Subscriber TEST", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<IniLetterComparisonTool>();
         cut.Find("#expected-fingerprint").Change("nicht-hex!");
         cut.Find("button").Click();
 
-        cut.Find(".alert-warning").TextContent.Should().Contain("Hexadezimal");
+        cut.Find(".alert-warning").TextContent.Should().Contain("hexadecimal");
     }
 
     [Theory]
@@ -60,10 +60,10 @@ public class IniLetterComparisonToolTests
     [InlineData("   ")]
     public void Compare_EmptyFingerprint_AsksForInputInsteadOfBlamingTheHex(string expected)
     {
-        // Issue #126: an empty field is „nothing typed yet", not „unreadable hex" — the tool is for
+        // Issue #126: an empty field is "nothing typed yet", not "unreadable hex" — the tool is for
         // transcribing a fingerprint off a letter, so the guidance has to differ.
         using var ctx = new BunitContext();
-        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TEST", KeyPurpose.Signature, "A006");
+        var key = FakeEmulatorStateProvider.SampleKey("Subscriber TEST", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<IniLetterComparisonTool>();
@@ -71,7 +71,7 @@ public class IniLetterComparisonToolTests
         cut.Find("button").Click();
 
         var warning = cut.Find(".alert-warning").TextContent;
-        warning.Should().Contain("Bitte den Fingerprint aus dem INI-Brief eintragen");
-        warning.Should().NotContain("Hexadezimal");
+        warning.Should().Contain("Please enter the fingerprint from the INI letter");
+        warning.Should().NotContain("hexadecimal");
     }
 }

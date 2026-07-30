@@ -1,26 +1,26 @@
 @page "/schluessel"
 @inject IEmulatorStateProvider State
 
-<PageTitle>Schlüssel</PageTitle>
+<PageTitle>Keys</PageTitle>
 
-<h1>Schlüssel &amp; Zertifikate</h1>
+<h1>Keys &amp; Certificates</h1>
 
 <p class="text-muted">
-    Öffentliche Schlüssel der Bank und Teilnehmer (A00x/E002/X002) mit ihren
-    SHA-256-Fingerprints, ein INI-Brief-Vergleich und Werkzeuge zum Erzeugen von
-    Test-Schlüsseln und -Zertifikaten.
+    Public keys of the bank and subscribers (A00x/E002/X002) with their
+    SHA-256 fingerprints, an INI-letter comparison and tools for generating
+    test keys and certificates.
 </p>
 
-<h2>Bekannte Schlüssel &amp; Fingerprints</h2>
+<h2>Known Keys &amp; Fingerprints</h2>
 @if (_loading)
 {
-    <p><em>Lade Schlüssel…</em></p>
+    <p><em>Loading keys…</em></p>
 }
 else
 {
     <table class="table align-middle">
         <thead>
-            <tr><th>Inhaber</th><th>Zweck</th><th>Version</th><th>Fingerprint (SHA-256)</th></tr>
+            <tr><th>Owner</th><th>Purpose</th><th>Version</th><th>Fingerprint (SHA-256)</th></tr>
         </thead>
         <tbody>
             @foreach (var key in _keys)
@@ -36,14 +36,14 @@ else
     </table>
 }
 
-<h2>Schlüsselversionen (Referenz)</h2>
+<h2>Key Versions (Reference)</h2>
 <p class="text-muted">
-    Welche EBICS-Schlüsselversion in welcher Protokollversion (H003/H004/H005) erlaubt ist
-    (Quelle: <code>EBICO.Core.Crypto.KeyVersions</code>).
+    Which EBICS key version is allowed in which protocol version (H003/H004/H005)
+    (source: <code>EBICO.Core.Crypto.KeyVersions</code>).
 </p>
 <table class="table">
     <thead>
-        <tr><th>Code</th><th>Zweck</th><th>Legacy</th><th>Padding</th><th>Erlaubt in</th></tr>
+        <tr><th>Code</th><th>Purpose</th><th>Legacy</th><th>Padding</th><th>Allowed in</th></tr>
     </thead>
     <tbody>
         @foreach (var info in KeyVersions.All)
@@ -51,7 +51,7 @@ else
             <tr>
                 <td>@info.Code</td>
                 <td>@PurposeLabel(info.Purpose)</td>
-                <td>@(info.IsLegacy ? "ja" : "nein")</td>
+                <td>@(info.IsLegacy ? "yes" : "no")</td>
                 <td>@info.PaddingIntent</td>
                 <td>@string.Join(", ", info.PermittedIn)</td>
             </tr>
@@ -59,10 +59,10 @@ else
     </tbody>
 </table>
 
-<h2>INI-Brief-Vergleich</h2>
+<h2>INI-Letter Comparison</h2>
 <IniLetterComparisonTool @rendermode="InteractiveServer" />
 
-<h2>Test-CA &amp; Schlüssel-Werkzeuge</h2>
+<h2>Test CA &amp; Key Tools</h2>
 <TestKeyTool @rendermode="InteractiveServer" />
 
 @code {
@@ -78,9 +78,9 @@ else
 
     private static string PurposeLabel(KeyPurpose purpose) => purpose switch
     {
-        KeyPurpose.Signature => "Signatur (A)",
-        KeyPurpose.Encryption => "Verschlüsselung (E)",
-        KeyPurpose.Authentication => "Authentifikation (X)",
+        KeyPurpose.Signature => "Signature (A)",
+        KeyPurpose.Encryption => "Encryption (E)",
+        KeyPurpose.Authentication => "Authentication (X)",
         _ => purpose.ToString(),
     };
 }

@@ -12,23 +12,23 @@ namespace EBICO.Suite.Services;
 /// <remarks>
 /// This is the sample-data source: <see cref="EmulatorStateSeeder"/> seeds the master data into the
 /// server store from here, and <see cref="KeyStoreSeeder"/> seeds the same key material into the
-/// server key stores. It lets the UI grundgerüst (#52) demonstrate the state binding end-to-end; the
+/// server key stores. It lets the UI scaffold (#52) demonstrate the state binding end-to-end; the
 /// live views bind <see cref="EmulatorStateProvider"/> over the actual stores.
 /// </remarks>
 public sealed class SampleEmulatorStateProvider : IEmulatorStateProvider
 {
     private static readonly IReadOnlyList<Bank> Banks =
     [
-        new Bank(HostId.Create("EBICOHOST"), "EBICO Test-Bank"),
-        new Bank(HostId.Create("BANKB"), "Zweitbank", [EbicsVersion.H004, EbicsVersion.H005]),
+        new Bank(HostId.Create("EBICOHOST"), "EBICO Test Bank"),
+        new Bank(HostId.Create("BANKB"), "Second Bank", [EbicsVersion.H004, EbicsVersion.H005]),
     ];
 
     private static readonly IReadOnlyList<Partner> Partners =
     [
-        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER01"), "Muster GmbH"),
-        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER02"), "Beispiel AG"),
-        // Same PartnerID at a different bank — a distinct customer (Mehr-Mandanten-Fähigkeit).
-        new Partner(HostId.Create("BANKB"), PartnerId.Create("PARTNER02"), "Zweitbank-Kunde"),
+        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER01"), "Example Ltd"),
+        new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("PARTNER02"), "Example Corp"),
+        // Same PartnerID at a different bank — a distinct customer (multi-tenancy).
+        new Partner(HostId.Create("BANKB"), PartnerId.Create("PARTNER02"), "Second Bank Customer"),
     ];
 
     private static readonly IReadOnlyList<Subscriber> Subscribers =
@@ -80,7 +80,7 @@ public sealed class SampleEmulatorStateProvider : IEmulatorStateProvider
         foreach (var (subscriber, key) in KeyStoreSeedData.SubscriberKeys)
         {
             keys.Add(KeyViewFactory.Create(
-                $"Teilnehmer {subscriber.PartnerId.Value} / {subscriber.UserId.Value}", key.Version, key.Key));
+                $"Subscriber {subscriber.PartnerId.Value} / {subscriber.UserId.Value}", key.Version, key.Key));
         }
 
         foreach (var (host, pair) in KeyStoreSeedData.BankKeys)

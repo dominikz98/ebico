@@ -15,7 +15,7 @@ public static class KeyViewFactory
     /// public key. Any private components are dropped (<see cref="RsaKeyMaterial.ToPublicOnly"/>), since
     /// the view — and the DTO contract — only ever expose public material.
     /// </summary>
-    /// <param name="ownerLabel">Human-readable owner label, e.g. <c>"Teilnehmer PARTNER01 / USER0001"</c>.</param>
+    /// <param name="ownerLabel">Human-readable owner label, e.g. <c>"Subscriber PARTNER01 / USER0001"</c>.</param>
     /// <param name="version">The EBICS key version (its <see cref="KeyVersion.Purpose"/> and code drive the view).</param>
     /// <param name="publicKey">The RSA key material; reduced to its public part.</param>
     /// <returns>The populated <see cref="KeyView"/>.</returns>

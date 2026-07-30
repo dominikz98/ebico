@@ -23,12 +23,12 @@ public class PartnerManagerTests
 
         cut.Find("#partner-new").Click();
         cut.Find("#partner-id").Change("CUST01");
-        cut.Find("#partner-name").Change("Muster GmbH");
+        cut.Find("#partner-name").Change("Example Ltd");
         cut.Find("#partner-save").Click();
 
         (await manager.GetPartnerAsync(HostId.Create("EBICOHOST"), PartnerId.Create("CUST01"), _ct))
             .Should().NotBeNull();
-        cut.Markup.Should().Contain("CUST01").And.Contain("Muster GmbH");
+        cut.Markup.Should().Contain("CUST01").And.Contain("Example Ltd");
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class PartnerManagerTests
         var cut = ctx.Render<PartnerManager>();
 
         cut.Find("#partner-new").HasAttribute("disabled").Should().BeTrue();
-        cut.Markup.Should().Contain("Zuerst eine Bank anlegen");
+        cut.Markup.Should().Contain("Create a bank first");
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class PartnerManagerTests
         await manager.SavePartnerAsync(new Partner(HostId.Create("EBICOHOST"), PartnerId.Create("CUST01")), _ct);
         var cut = ctx.Render<PartnerManager>();
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        cut.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         cut.Find("#partner-delete-confirm").Click();
 
         (await manager.GetPartnersAsync(HostId.Create("EBICOHOST"), _ct)).Should().BeEmpty();

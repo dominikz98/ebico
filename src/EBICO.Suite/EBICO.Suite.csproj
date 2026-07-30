@@ -7,8 +7,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\EBICO.Core\EBICO.Core.csproj" />
-    <!-- In-Process-Zugriff auf den Server-Zustand (Store + Stammdaten-Manager) gemäß ADR-0009:
-         die Suite ruft IMasterDataManager direkt statt über eine eigene HTTP-API. -->
+    <!-- In-process access to the server state (store + master-data manager) per ADR-0009:
+         the Suite calls IMasterDataManager directly instead of via its own HTTP API. -->
     <ProjectReference Include="..\EBICO.Server\EBICO.Server.csproj" />
   </ItemGroup>
 

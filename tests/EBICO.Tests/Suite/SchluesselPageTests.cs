@@ -17,12 +17,12 @@ public class SchluesselPageTests
     public void Page_RendersKnownKeyFingerprints()
     {
         using var ctx = new BunitContext();
-        var key = FakeEmulatorStateProvider.SampleKey("Teilnehmer TESTKEY", KeyPurpose.Signature, "A006");
+        var key = FakeEmulatorStateProvider.SampleKey("Subscriber TESTKEY", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<Schluessel>();
 
-        cut.Markup.Should().Contain("Teilnehmer TESTKEY");
+        cut.Markup.Should().Contain("Subscriber TESTKEY");
         cut.Markup.Should().Contain(key.FingerprintText.Split('\n')[0]);
     }
 

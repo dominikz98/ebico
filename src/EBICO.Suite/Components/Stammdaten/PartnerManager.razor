@@ -3,19 +3,19 @@
 @inject IMasterDataManager Manager
 @inject IMasterDataChangeNotifier Changes
 
-@* Interactive island (issue #53): manage partners (Kunden). A partner is scoped to a bank, so its
+@* Interactive island (issue #53): manage partners (customers). A partner is scoped to a bank, so its
    identity is the (HostID, PartnerID) pair (multi-tenant). Listens for master-data changes from the
    sibling islands so the bank dropdown and the table never go stale (issue #126). *@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
-        <h2 id="partners-heading">Partner</h2>
-        <button class="btn btn-primary btn-sm" id="partner-new" @onclick="BeginCreate" disabled="@(_banks.Count == 0)">Neuer Partner</button>
+        <h2 id="partners-heading">Partners</h2>
+        <button class="btn btn-primary btn-sm" id="partner-new" @onclick="BeginCreate" disabled="@(_banks.Count == 0)">New partner</button>
     </div>
 
     @if (_banks.Count == 0)
     {
-        <p class="text-muted"><em>Zuerst eine Bank anlegen — Partner gehören zu einer Bank.</em></p>
+        <p class="text-muted"><em>Create a bank first — partners belong to a bank.</em></p>
     }
 
     @if (_alert is { } alert)
@@ -25,7 +25,7 @@
 
     <table class="table">
         <thead>
-            <tr><th>HostID</th><th>PartnerID</th><th>Name</th><th class="text-end">Aktionen</th></tr>
+            <tr><th>HostID</th><th>PartnerID</th><th>Name</th><th class="text-end">Actions</th></tr>
         </thead>
         <tbody>
             @foreach (var partner in _partners)
@@ -35,25 +35,25 @@
                     <td>@partner.PartnerId.Value</td>
                     <td>@(partner.Name ?? "—")</td>
                     <td class="text-end">
-                        <button class="btn btn-sm btn-outline-primary" @onclick="() => BeginEdit(partner)">Bearbeiten</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(partner)">Löschen</button>
+                        <button class="btn btn-sm btn-outline-primary" @onclick="() => BeginEdit(partner)">Edit</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(partner)">Delete</button>
                     </td>
                 </tr>
                 @if (IsDeleteTarget(partner))
                 {
                     <tr class="table-warning">
                         <td colspan="4">
-                            Partner <strong>@partner.PartnerId.Value</strong> (@partner.HostId.Value) löschen?
-                            Dies entfernt <em>kaskadierend</em> alle zugehörigen Teilnehmer.
-                            <button class="btn btn-sm btn-danger ms-2" id="partner-delete-confirm" @onclick="ConfirmDeleteAsync">Endgültig löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Abbrechen</button>
+                            Delete partner <strong>@partner.PartnerId.Value</strong> (@partner.HostId.Value)?
+                            This <em>cascades</em> and removes all associated subscribers.
+                            <button class="btn btn-sm btn-danger ms-2" id="partner-delete-confirm" @onclick="ConfirmDeleteAsync">Delete permanently</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Cancel</button>
                         </td>
                     </tr>
                 }
             }
             @if (_partners.Count == 0)
             {
-                <tr><td colspan="4"><em>Keine Partner registriert.</em></td></tr>
+                <tr><td colspan="4"><em>No partners registered.</em></td></tr>
             }
         </tbody>
     </table>
@@ -62,7 +62,7 @@
     {
         <div class="card">
             <div class="card-body">
-                <h3 class="h5">@(_mode == FormMode.Create ? "Neuen Partner anlegen" : $"Partner {_partnerId} bearbeiten")</h3>
+                <h3 class="h5">@(_mode == FormMode.Create ? "Create new partner" : $"Edit partner {_partnerId}")</h3>
 
                 @if (_formError is { } err)
                 {
@@ -87,8 +87,8 @@
                     <input class="form-control" id="partner-name" @bind="_name" />
                 </div>
 
-                <button class="btn btn-primary" id="partner-save" @onclick="SaveAsync">Speichern</button>
-                <button class="btn btn-outline-secondary" @onclick="Cancel">Abbrechen</button>
+                <button class="btn btn-primary" id="partner-save" @onclick="SaveAsync">Save</button>
+                <button class="btn btn-outline-secondary" @onclick="Cancel">Cancel</button>
             </div>
         </div>
     }
@@ -161,15 +161,15 @@
         if (_mode == FormMode.Edit)
         {
             _mode = FormMode.None;
-            _alert = ($"Partner {_partnerId} wurde zwischenzeitlich gelöscht.", "alert-warning");
+            _alert = ($"Partner {_partnerId} was deleted in the meantime.", "alert-warning");
             return;
         }
 
         // Create: fall back to a bank that exists rather than posting against a deleted one.
         _hostId = _banks.Count > 0 ? _banks[0].HostId.Value : string.Empty;
         _formError = _banks.Count > 0
-            ? "Die gewählte Bank wurde zwischenzeitlich gelöscht — bitte die Auswahl prüfen."
-            : "Es existiert keine Bank mehr.";
+            ? "The selected bank was deleted in the meantime — please review the selection."
+            : "No bank exists any more.";
     }
 
     private bool IsDeleteTarget(Partner partner)
@@ -208,7 +208,7 @@
         if (_deleteTarget is { } t)
         {
             await Manager.DeletePartnerAsync(t.Host, t.Partner);
-            _alert = ($"Partner {t.Partner.Value} gelöscht.", "alert-success");
+            _alert = ($"Partner {t.Partner.Value} deleted.", "alert-success");
             _deleteTarget = null;
             await ReloadAsync();
 
@@ -223,13 +223,13 @@
 
         if (!HostId.TryCreate(_hostId, out var hostId))
         {
-            _formError = "Bitte eine Bank auswählen.";
+            _formError = "Please select a bank.";
             return;
         }
 
         if (!PartnerId.TryCreate(_partnerId, out var partnerId))
         {
-            _formError = "Ungültige PartnerID (1–35 Zeichen, nur A–Z, a–z, 0–9, ',' oder '=').";
+            _formError = "Invalid PartnerID (1–35 characters, only A–Z, a–z, 0–9, ',' or '=').";
             return;
         }
 
@@ -238,7 +238,7 @@
         if (_mode == FormMode.Create && await Manager.GetPartnerAsync(hostId, partnerId) is not null)
         {
             _formError =
-                $"Partner {partnerId.Value} existiert bei {hostId.Value} bereits — zum Ändern »Bearbeiten« verwenden.";
+                $"Partner {partnerId.Value} already exists at {hostId.Value} — use 'Edit' to change it.";
             return;
         }
 
@@ -249,11 +249,11 @@
         }
         catch (UnknownBankException)
         {
-            _formError = $"Bank {hostId.Value} existiert nicht.";
+            _formError = $"Bank {hostId.Value} does not exist.";
             return;
         }
 
-        _alert = ($"Partner {partnerId.Value} gespeichert.", "alert-success");
+        _alert = ($"Partner {partnerId.Value} saved.", "alert-success");
         _mode = FormMode.None;
         await ReloadAsync();
 

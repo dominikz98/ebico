@@ -19,7 +19,7 @@ public class TestKeyToolTests
         var cut = ctx.Render<TestKeyTool>();
         cut.Find("#generate-key").Click();
 
-        cut.Markup.Should().Contain("Erzeugter Schlüssel");
+        cut.Markup.Should().Contain("Generated key");
         cut.Find("#public-pem").TextContent.Should().Contain("BEGIN PUBLIC KEY");
     }
 
@@ -31,7 +31,7 @@ public class TestKeyToolTests
         var cut = ctx.Render<TestKeyTool>();
         cut.Find("#create-cert").Click();
 
-        cut.Find(".alert-success").TextContent.Should().Contain("gültig");
+        cut.Find(".alert-success").TextContent.Should().Contain("valid");
         cut.Markup.Should().Contain("Thumbprint");
     }
 

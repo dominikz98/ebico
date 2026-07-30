@@ -18,11 +18,11 @@ public class BankManagerTests
     {
         using var ctx = new BunitContext();
         var manager = MasterDataTestServices.Configure(ctx);
-        await manager.SaveBankAsync(new Bank(HostId.Create("EBICOHOST"), "EBICO Test-Bank"), _ct);
+        await manager.SaveBankAsync(new Bank(HostId.Create("EBICOHOST"), "EBICO Test Bank"), _ct);
 
         var cut = ctx.Render<BankManager>();
 
-        cut.Markup.Should().Contain("EBICOHOST").And.Contain("EBICO Test-Bank");
+        cut.Markup.Should().Contain("EBICOHOST").And.Contain("EBICO Test Bank");
     }
 
     [Fact]
@@ -52,7 +52,7 @@ public class BankManagerTests
         cut.Find("#bank-hostid").Change("bad id!");
         cut.Find("#bank-save").Click();
 
-        cut.Find(".alert-warning").TextContent.Should().Contain("Ungültige HostID");
+        cut.Find(".alert-warning").TextContent.Should().Contain("Invalid HostID");
     }
 
     [Fact]
@@ -63,7 +63,7 @@ public class BankManagerTests
         await manager.SaveBankAsync(new Bank(HostId.Create("EBICOHOST")), _ct);
         var cut = ctx.Render<BankManager>();
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        cut.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         cut.Find("#bank-delete-confirm").Click();
 
         (await manager.GetBanksAsync(_ct)).Should().BeEmpty();

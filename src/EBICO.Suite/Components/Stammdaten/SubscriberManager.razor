@@ -3,20 +3,20 @@
 @inject IMasterDataManager Manager
 @inject IMasterDataChangeNotifier Changes
 
-@* Interactive island (issue #53): manage subscribers (Teilnehmer) — create, delete, lifecycle
+@* Interactive island (issue #53): manage subscribers — create, delete, lifecycle
    transitions and per-OrderType permissions. Identity is the (HostID, PartnerID, UserID) triple.
    Listens for master-data changes from the sibling islands, whose bank/partner deletions cascade into
    this table and whose new banks/partners must show up in the create form (issue #126). *@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
-        <h2 id="subscribers-heading">Teilnehmer</h2>
-        <button class="btn btn-primary btn-sm" id="subscriber-new" @onclick="BeginCreateAsync" disabled="@(_partnersExist is false)">Neuer Teilnehmer</button>
+        <h2 id="subscribers-heading">Subscribers</h2>
+        <button class="btn btn-primary btn-sm" id="subscriber-new" @onclick="BeginCreateAsync" disabled="@(_partnersExist is false)">New subscriber</button>
     </div>
 
     @if (_partnersExist is false)
     {
-        <p class="text-muted"><em>Zuerst Bank und Partner anlegen — Teilnehmer gehören zu einem Partner.</em></p>
+        <p class="text-muted"><em>Create a bank and partner first — subscribers belong to a partner.</em></p>
     }
 
     @if (_alert is { } alert)
@@ -26,7 +26,7 @@
 
     <table class="table">
         <thead>
-            <tr><th>HostID</th><th>PartnerID</th><th>UserID</th><th>Status</th><th>Typ</th><th class="text-end">Aktionen</th></tr>
+            <tr><th>HostID</th><th>PartnerID</th><th>UserID</th><th>Status</th><th>Type</th><th class="text-end">Actions</th></tr>
         </thead>
         <tbody>
             @foreach (var sub in _subscribers)
@@ -36,19 +36,19 @@
                     <td>@sub.PartnerId.Value</td>
                     <td>@sub.UserId.Value</td>
                     <td><span class="badge bg-secondary">@sub.State</span></td>
-                    <td>@(sub.IsTechnicalSubscriber ? "Technisch" : "Standard")</td>
+                    <td>@(sub.IsTechnicalSubscriber ? "Technical" : "Standard")</td>
                     <td class="text-end">
                         <button class="btn btn-sm btn-outline-primary" @onclick="() => SelectAsync(sub)">Details</button>
-                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(sub)">Löschen</button>
+                        <button class="btn btn-sm btn-outline-danger" @onclick="() => AskDelete(sub)">Delete</button>
                     </td>
                 </tr>
                 @if (IsDeleteTarget(sub))
                 {
                     <tr class="table-warning">
                         <td colspan="6">
-                            Teilnehmer <strong>@sub.UserId.Value</strong> (@sub.HostId.Value / @sub.PartnerId.Value) löschen?
-                            <button class="btn btn-sm btn-danger ms-2" id="subscriber-delete-confirm" @onclick="ConfirmDeleteAsync">Endgültig löschen</button>
-                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Abbrechen</button>
+                            Delete subscriber <strong>@sub.UserId.Value</strong> (@sub.HostId.Value / @sub.PartnerId.Value)?
+                            <button class="btn btn-sm btn-danger ms-2" id="subscriber-delete-confirm" @onclick="ConfirmDeleteAsync">Delete permanently</button>
+                            <button class="btn btn-sm btn-outline-secondary" @onclick="() => _deleteTarget = null">Cancel</button>
                         </td>
                     </tr>
                 }
@@ -72,10 +72,10 @@
                                         }
                                     </div>
 
-                                    <h3 class="h6">Berechtigungen</h3>
+                                    <h3 class="h6">Permissions</h3>
                                     <table class="table table-sm">
                                         <thead>
-                                            <tr><th>OrderType / BTF</th><th>Signaturklasse</th><th></th></tr>
+                                            <tr><th>OrderType / BTF</th><th>Signature class</th><th></th></tr>
                                         </thead>
                                         <tbody>
                                             @foreach (var row in _permRows)
@@ -90,17 +90,17 @@
                                                             }
                                                         </select>
                                                     </td>
-                                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => RemovePermissionRow(row)">Entfernen</button></td>
+                                                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => RemovePermissionRow(row)">Remove</button></td>
                                                 </tr>
                                             }
                                             @if (_permRows.Count == 0)
                                             {
-                                                <tr><td colspan="3"><em>Keine Berechtigungen.</em></td></tr>
+                                                <tr><td colspan="3"><em>No permissions.</em></td></tr>
                                             }
                                         </tbody>
                                     </table>
-                                    <button class="btn btn-sm btn-outline-secondary" id="perm-add" @onclick="AddPermissionRow">Berechtigung hinzufügen</button>
-                                    <button class="btn btn-sm btn-primary" id="perm-save" @onclick="() => SavePermissionsAsync(sub)">Berechtigungen speichern</button>
+                                    <button class="btn btn-sm btn-outline-secondary" id="perm-add" @onclick="AddPermissionRow">Add permission</button>
+                                    <button class="btn btn-sm btn-primary" id="perm-save" @onclick="() => SavePermissionsAsync(sub)">Save permissions</button>
                                 </div>
                             </div>
                         </td>
@@ -109,7 +109,7 @@
             }
             @if (_subscribers.Count == 0)
             {
-                <tr><td colspan="6"><em>Keine Teilnehmer registriert.</em></td></tr>
+                <tr><td colspan="6"><em>No subscribers registered.</em></td></tr>
             }
         </tbody>
     </table>
@@ -118,7 +118,7 @@
     {
         <div class="card">
             <div class="card-body">
-                <h3 class="h5">Neuen Teilnehmer anlegen</h3>
+                <h3 class="h5">Create new subscriber</h3>
 
                 @if (_formError is { } err)
                 {
@@ -148,12 +148,12 @@
                     <input class="form-control" id="sub-user" @bind="_cUser" />
                 </div>
                 <div class="mb-3">
-                    <label class="form-label" for="sub-system">SystemID (optional, technischer Teilnehmer)</label>
+                    <label class="form-label" for="sub-system">SystemID (optional, technical subscriber)</label>
                     <input class="form-control" id="sub-system" @bind="_cSystem" />
                 </div>
 
-                <button class="btn btn-primary" id="subscriber-save" @onclick="SaveAsync">Speichern</button>
-                <button class="btn btn-outline-secondary" @onclick="() => _mode = FormMode.None">Abbrechen</button>
+                <button class="btn btn-primary" id="subscriber-save" @onclick="SaveAsync">Save</button>
+                <button class="btn btn-outline-secondary" @onclick="() => _mode = FormMode.None">Cancel</button>
             </div>
         </div>
     }
@@ -243,8 +243,8 @@
         {
             _cHost = _banks.Count > 0 ? _banks[0].HostId.Value : string.Empty;
             _formError = _banks.Count > 0
-                ? "Die gewählte Bank wurde zwischenzeitlich gelöscht — bitte die Auswahl prüfen."
-                : "Es existiert keine Bank mehr.";
+                ? "The selected bank was deleted in the meantime — please review the selection."
+                : "No bank exists any more.";
         }
 
         await LoadCreatePartnersAsync();
@@ -278,7 +278,7 @@
         try
         {
             await Manager.TransitionSubscriberAsync(sub.HostId, sub.PartnerId, sub.UserId, target);
-            _alert = ($"Teilnehmer {sub.UserId.Value} ist jetzt {target}.", "alert-success");
+            _alert = ($"Subscriber {sub.UserId.Value} is now {target}.", "alert-success");
             await ReloadAsync();
             await Changes.NotifyChangedAsync();
         }
@@ -298,7 +298,7 @@
 
         if (_permRows.Any(r => string.IsNullOrWhiteSpace(r.OrderType)))
         {
-            _detailError = "Jede Berechtigung braucht einen OrderType.";
+            _detailError = "Every permission needs an OrderType.";
             return;
         }
 
@@ -307,7 +307,7 @@
             .ToArray();
 
         await Manager.SetPermissionsAsync(sub.HostId, sub.PartnerId, sub.UserId, permissions);
-        _alert = ($"Berechtigungen von {sub.UserId.Value} gespeichert.", "alert-success");
+        _alert = ($"Permissions of {sub.UserId.Value} saved.", "alert-success");
         await ReloadAsync();
         await Changes.NotifyChangedAsync();
     }
@@ -354,19 +354,19 @@
 
         if (!HostId.TryCreate(_cHost, out var host))
         {
-            _formError = "Bitte eine Bank auswählen.";
+            _formError = "Please select a bank.";
             return;
         }
 
         if (!PartnerId.TryCreate(_cPartner, out var partner))
         {
-            _formError = "Bitte einen Partner auswählen.";
+            _formError = "Please select a partner.";
             return;
         }
 
         if (!UserId.TryCreate(_cUser, out var user))
         {
-            _formError = "Ungültige UserID (1–35 Zeichen, nur A–Z, a–z, 0–9, ',' oder '=').";
+            _formError = "Invalid UserID (1–35 characters, only A–Z, a–z, 0–9, ',' or '=').";
             return;
         }
 
@@ -375,7 +375,7 @@
         {
             if (!SystemId.TryCreate(_cSystem, out var sys))
             {
-                _formError = "Ungültige SystemID.";
+                _formError = "Invalid SystemID.";
                 return;
             }
             systemId = sys;
@@ -387,8 +387,8 @@
         if (await Manager.GetSubscriberAsync(host, partner, user) is not null)
         {
             _formError =
-                $"Teilnehmer {user.Value} existiert bei {host.Value}/{partner.Value} bereits — "
-                + "zum Ändern »Details« verwenden.";
+                $"Subscriber {user.Value} already exists at {host.Value}/{partner.Value} — "
+                + "use 'Details' to change it.";
             return;
         }
 
@@ -402,7 +402,7 @@
             return;
         }
 
-        _alert = ($"Teilnehmer {user.Value} gespeichert.", "alert-success");
+        _alert = ($"Subscriber {user.Value} saved.", "alert-success");
         _mode = FormMode.None;
         await ReloadAsync();
         await Changes.NotifyChangedAsync();
@@ -424,7 +424,7 @@
         if (_deleteTarget is { } t)
         {
             await Manager.DeleteSubscriberAsync(t.Host, t.Partner, t.User);
-            _alert = ($"Teilnehmer {t.User.Value} gelöscht.", "alert-success");
+            _alert = ($"Subscriber {t.User.Value} deleted.", "alert-success");
             _deleteTarget = null;
             await ReloadAsync();
             await Changes.NotifyChangedAsync();
@@ -433,10 +433,10 @@
 
     private static IReadOnlyList<(string Label, SubscriberState Target)> AllowedTransitions(SubscriberState state) => state switch
     {
-        SubscriberState.New => [("Initialisieren", SubscriberState.Initialized), ("Sperren", SubscriberState.Suspended)],
-        SubscriberState.Initialized => [("Aktivieren", SubscriberState.Ready), ("Sperren", SubscriberState.Suspended)],
-        SubscriberState.Ready => [("Sperren", SubscriberState.Suspended)],
-        SubscriberState.Suspended => [("Reaktivieren", SubscriberState.Ready)],
+        SubscriberState.New => [("Initialize", SubscriberState.Initialized), ("Suspend", SubscriberState.Suspended)],
+        SubscriberState.Initialized => [("Activate", SubscriberState.Ready), ("Suspend", SubscriberState.Suspended)],
+        SubscriberState.Ready => [("Suspend", SubscriberState.Suspended)],
+        SubscriberState.Suspended => [("Reactivate", SubscriberState.Ready)],
         _ => [],
     };
 

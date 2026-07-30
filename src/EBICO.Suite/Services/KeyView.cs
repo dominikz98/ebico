@@ -14,7 +14,7 @@ namespace EBICO.Suite.Services;
 /// </remarks>
 public sealed record KeyView
 {
-    /// <summary>Human-readable owner label, e.g. <c>"Teilnehmer PARTNER01 / USER0001"</c> or <c>"Bank EBICOHOST"</c>.</summary>
+    /// <summary>Human-readable owner label, e.g. <c>"Subscriber PARTNER01 / USER0001"</c> or <c>"Bank EBICOHOST"</c>.</summary>
     public required string OwnerLabel { get; init; }
 
     /// <summary>The EBICS key purpose (signature <c>A</c>, encryption <c>E</c>, authentication <c>X</c>).</summary>

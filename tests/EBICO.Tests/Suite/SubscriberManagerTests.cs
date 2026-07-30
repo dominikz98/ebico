@@ -54,7 +54,7 @@ public class SubscriberManagerTests
         var cut = ctx.Render<SubscriberManager>();
 
         cut.FindAll("button").First(b => b.TextContent.Trim() == "Details").Click();
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Initialisieren").Click();
+        cut.FindAll("button").First(b => b.TextContent.Trim() == "Initialize").Click();
 
         var updated = await manager.GetSubscriberAsync(
             HostId.Create("EBICOHOST"), PartnerId.Create("CUST01"), UserId.Create("USER01"), _ct);
@@ -87,7 +87,7 @@ public class SubscriberManagerTests
         await SeedSubscriberAsync(manager);
         var cut = ctx.Render<SubscriberManager>();
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        cut.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         cut.Find("#subscriber-delete-confirm").Click();
 
         (await manager.GetSubscriberAsync(

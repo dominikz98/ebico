@@ -30,9 +30,9 @@ public class NavMenuTests
 
         cut.Markup.Should()
             .Contain("Dashboard")
-            .And.Contain("Stammdaten")
-            .And.Contain("Transaktionen")
-            .And.Contain("Schlüssel");
+            .And.Contain("Master Data")
+            .And.Contain("Transactions")
+            .And.Contain("Keys");
     }
 
     [Fact]
