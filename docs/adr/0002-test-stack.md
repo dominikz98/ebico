@@ -1,35 +1,35 @@
-# 0002 — Test-Stack: xUnit v3 + AwesomeAssertions
+# 0002 — Test stack: xUnit v3 + AwesomeAssertions
 
 - Status: accepted
-- Datum: 2026-06-21
+- Date: 2026-06-21
 
-## Kontext
+## Context
 
-Die projektweite Definition of Done verlangt Unit-Tests pro Feature (Happy Path +
-Negativ-/Grenzfälle). Es wird ein Testframework und eine Assertion-Bibliothek für
-.NET 10 benötigt. Issue #8 nannte ursprünglich „xUnit + FluentAssertions".
+The project-wide Definition of Done requires unit tests per feature (happy path +
+negative/edge cases). A test framework and an assertion library for .NET 10 are
+needed. Issue #8 originally mentioned "xUnit + FluentAssertions".
 
-## Entscheidung
+## Decision
 
 - **xUnit v3** (`xunit.v3` + `xunit.runner.visualstudio` + `Microsoft.NET.Test.Sdk`)
-  als Testframework. Das Testprojekt ist ausführbar (`OutputType=Exe`, von
-  xUnit v3 verlangt).
-- **AwesomeAssertions** statt FluentAssertions als Assertion-Bibliothek.
+  as the test framework. The test project is executable (`OutputType=Exe`, required
+  by xUnit v3).
+- **AwesomeAssertions** instead of FluentAssertions as the assertion library.
 
-## Konsequenzen
+## Consequences
 
-- xUnit v3 ist die aktuelle, für .NET 10 ausgelegte Linie.
-- AwesomeAssertions ist ein **MIT-lizenzierter Fork** der FluentAssertions-v7-API
-  (gleiche `Should()`-Syntax) — wichtig, weil **FluentAssertions seit v8 (Jan 2025)
-  kommerziell** lizenziert ist (Xceed) und damit für ein öffentliches OSS-Repo
-  nicht geeignet ist.
-- **Achtung:** Der Root-Namespace ist `AwesomeAssertions` (nicht `FluentAssertions`).
+- xUnit v3 is the current line, designed for .NET 10.
+- AwesomeAssertions is an **MIT-licensed fork** of the FluentAssertions v7 API
+  (same `Should()` syntax) — important because **FluentAssertions has been
+  commercially licensed since v8 (Jan 2025)** (Xceed) and is therefore unsuitable
+  for a public OSS repo.
+- **Note:** the root namespace is `AwesomeAssertions` (not `FluentAssertions`).
 
 Details: [../development/testing.md](../development/testing.md).
 
-## Alternativen
+## Alternatives
 
-- **FluentAssertions v8:** funktional top, aber kommerzielle Lizenz — verworfen.
-- **FluentAssertions v7 (letzte freie):** frei, aber eingefroren — verworfen
-  zugunsten des aktiv gepflegten Forks.
-- **Shouldly:** frei, aber andere API als die im Issue gewünschte — verworfen.
+- **FluentAssertions v8:** functionally excellent, but commercially licensed — rejected.
+- **FluentAssertions v7 (last free one):** free, but frozen — rejected in favour of
+  the actively maintained fork.
+- **Shouldly:** free, but a different API than the one requested in the issue — rejected.

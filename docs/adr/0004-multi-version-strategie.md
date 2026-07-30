@@ -1,43 +1,43 @@
-# 0004 — Multi-Version-Strategie (H003/H004/H005)
+# 0004 — Multi-version strategy (H003/H004/H005)
 
 - Status: accepted
-- Datum: 2026-06-21 (in M1 gegen die echten Schemas verifiziert)
+- Date: 2026-06-21 (verified against the real schemas in M1)
 
-## Kontext
+## Context
 
-EBICO unterstützt drei EBICS-Protokollversionen — **H003** (2.4), **H004** (2.5),
-**H005** (3.0). Sie unterscheiden sich in Schemas, Order-/BTF-Modell und teils im
-Transaktionsablauf. Core, Server und Connector müssen versionsabhängig arbeiten,
-ohne die Logik dreifach zu duplizieren. Der konkrete Entwurf wird in M1 gegen die
-echten Schemas verifiziert (siehe Randbedingung in `CLAUDE.md`).
+EBICO supports three EBICS protocol versions — **H003** (2.4), **H004** (2.5),
+**H005** (3.0). They differ in schemas, order/BTF model and partly in the
+transaction flow. Core, server and connector must work version-dependently without
+duplicating the logic threefold. The concrete design is verified against the real
+schemas in M1 (see the constraint in `CLAUDE.md`).
 
-## Entscheidung (vorgeschlagen)
+## Decision (proposed)
 
-- Eine zentrale **`EbicsVersion`**-Abstraktion in `EBICO.Core` (Enum bereits
-  vorhanden: `H003`/`H004`/`H005`) als Dreh- und Angelpunkt.
-- **Versions-Dispatch in Core** (Issue #14): gemeinsame Abläufe einmal, nur die
-  versionsspezifischen Teile (Schema-Bindings, Order-/BTF-Mapping, evtl.
-  Segment-/Krypto-Details) hinter versionsselektierten Implementierungen.
-- **Pro Version getrennte XSD-Bindings** (Issues #11–#13) in eigenen
-  Namespaces/Ordnern, hinter gemeinsamen Schnittstellen.
+- A central **`EbicsVersion`** abstraction in `EBICO.Core` (enum already present:
+  `H003`/`H004`/`H005`) as the pivot point.
+- **Version dispatch in Core** (issue #14): shared flows once, only the
+  version-specific parts (schema bindings, order/BTF mapping, possibly
+  segment/crypto details) behind version-selected implementations.
+- **Separate XSD bindings per version** (issues #11–#13) in their own
+  namespaces/folders, behind shared interfaces.
 
-## Konsequenzen
+## Consequences
 
-- Eine Stelle, an der die Zielversion gewählt wird (vgl. Connector-DI:
+- One place where the target version is chosen (cf. connector DI:
   `o.Version = EbicsVersion.H005`).
-- Gemeinsame Logik bleibt versionsunabhängig testbar; Unterschiede sind lokal.
-- **In M1 verifiziert (`accepted`):** Die XSD-Bindings (#11–#13) sind pro Version in
-  eigenen Namespaces realisiert — `EBICO.Core.Schema.{H003,H004,H005}` —, während
-  die echt geteilten Schemas (xmldsig, HEV/H000, Signatur S001/S002) **einmal**
-  unter `EBICO.Core.Schema.{XmlDsig,Hev,Signature.S001,Signature.S002}` liegen
-  (Layout-Details: [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md)).
-  Offene Detailpunkte zum Ablauf (Reihenfolge E002/A00x/X002, Segmentschleife je
-  Version) werden mit der Krypto-/Transport-Arbeit (M2 ff.) gegen die Annexe
-  konkretisiert.
+- Shared logic stays testable version-independently; differences are local.
+- **Verified in M1 (`accepted`):** the XSD bindings (#11–#13) are realised per
+  version in their own namespaces — `EBICO.Core.Schema.{H003,H004,H005}` — while
+  the genuinely shared schemas (xmldsig, HEV/H000, signature S001/S002) live
+  **once** under `EBICO.Core.Schema.{XmlDsig,Hev,Signature.S001,Signature.S002}`
+  (layout details: [../protocol/xsd-bindings.md](../protocol/xsd-bindings.md)).
+  Open detail points about the flow (order of E002/A00x/X002, segment loop per
+  version) are concretised together with the crypto/transport work (M2 onwards)
+  against the annexes.
 
-## Alternativen
+## Alternatives
 
-- **Pro Version komplett getrennte Stacks:** maximale Klarheit, aber massive
-  Duplikation — verworfen.
-- **Nur Neueste (H005) zuerst, ältere später:** schneller Start, widerspricht aber
-  dem Ziel breiter Versionsabdeckung — als Reihenfolge denkbar, nicht als Architektur.
+- **Completely separate stacks per version:** maximum clarity, but massive
+  duplication — rejected.
+- **Newest only (H005) first, older ones later:** faster start, but contradicts the
+  goal of broad version coverage — conceivable as a sequence, not as an architecture.

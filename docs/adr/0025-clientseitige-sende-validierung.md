@@ -1,74 +1,84 @@
-# 0025 — Clientseitige Sende-Validierung (Berechtigung/BTF) im Connector
+# 0025 — Client-side send validation (authorisation/BTF) in the connector
 
 - Status: accepted
-- Datum: 2026-07-20
+- Date: 2026-07-20
 
-## Kontext
+## Context
 
-Die Send-Pipeline des `EBICO.Connector` (siehe [Connector-Architektur](../connector/architecture.md))
-sieht als **Stufe 1** eine Validierung *„Berechtigung, BTF"* vor. Sie war als Einzige noch nicht als
-eigener Baustein umgesetzt: die Prüfungen lagen verstreut und liefen *spät* in den Executoren (`UploadExecutor`/
-`DownloadExecutor`) — leere Payload, Segmentgröße und die Order-Identitäts-Auflösung (`NormalizeOrderIdentity`)
-wurden erst **nach** dem Laden der Schlüssel erreicht, und eine Berechtigungsprüfung gab es clientseitig gar
-nicht (jede Abweisung kostete einen Server-Roundtrip). Issue #44 (Connector-Epic, M6) schließt diese Lücke.
+The send pipeline of `EBICO.Connector` (see
+[connector architecture](../connector/architecture.md)) provides for a validation
+*"authorisation, BTF"* as **stage 1**. It was the only one not yet implemented as its own
+building block: the checks lay scattered and ran *late* in the executors
+(`UploadExecutor`/`DownloadExecutor`) — empty payload, segment size and the order-identity
+resolution (`NormalizeOrderIdentity`) were reached only **after** loading the keys, and an
+authorisation check did not exist client-side at all (every rejection cost a server
+round-trip). Issue #44 (connector epic, M6) closes this gap.
 
-Zu entscheiden war: (a) wo die Stufe verankert wird, (b) wie Fehler ausgedrückt werden, (c) ob und wie eine
-clientseitige „Berechtigung" konfiguriert wird — und in welchem Verhältnis das zur **serverseitigen**
-Berechtigungsprüfung aus [ADR-0016](0016-btf-framework-und-berechtigung.md) steht.
+To be decided: (a) where the stage is anchored, (b) how errors are expressed, (c) whether
+and how a client-side "authorisation" is configured — and how that relates to the
+**server-side** authorisation check from [ADR-0016](0016-btf-framework-und-berechtigung.md).
 
-## Entscheidung
+## Decision
 
-1. **Statischer Helfer `RequestValidator` (`EBICO.Connector.Validation`), kein DI-Service.** Er wird als
-   erste Anweisung in `UploadExecutor.ExecuteAsync`/`DownloadExecutor.ExecuteAsync` aufgerufen — vor jeder
-   Key-I/O, Krypto, Serialisierung und Transport. Bewusst dasselbe Muster wie serverseitig
-   ([ADR-0016](0016-btf-framework-und-berechtigung.md), Punkt 4: statische Prüf-Logik statt
-   `IOrderAuthorizationService`) und konsistent mit den vorhandenen statischen Helfern (`UploadSupport`,
-   `EncryptionE002`). Die Executoren sind der einzige Choke-Point für den generischen **und** alle
-   Convenience-Handler; das vermeidet Duplikation über die Handler-Typen. Die früher verstreuten Checks und
-   die `NormalizeOrderIdentity`-Logik wurden dorthin **verschoben** (nicht dupliziert) — der Validator ist
-   damit die alleinige Autorität für Order-Identität + Header-Tupel.
+1. **Static helper `RequestValidator` (`EBICO.Connector.Validation`), no DI service.** It
+   is called as the first statement in `UploadExecutor.ExecuteAsync`/
+   `DownloadExecutor.ExecuteAsync` — before any key I/O, crypto, serialisation and
+   transport. Deliberately the same pattern as server-side
+   ([ADR-0016](0016-btf-framework-und-berechtigung.md), point 4: static check logic instead
+   of an `IOrderAuthorizationService`) and consistent with the existing static helpers
+   (`UploadSupport`, `EncryptionE002`). The executors are the only choke point for the
+   generic **and** all convenience handlers; that avoids duplication across the handler
+   types. The formerly scattered checks and the `NormalizeOrderIdentity` logic were
+   **moved** there (not duplicated) — the validator is thereby the sole authority for order
+   identity + header tuple.
 
-2. **Asymmetrische Fehlersemantik.** Struktur-/BTF-Verstöße (Order-Identität nicht auflösbar, im Katalog
-   bekannter Code in falscher Richtung, leere Upload-Payload, nicht-positive Segmentgröße) sind Programmier-/
-   Konfigfehler → **`EbicsConfigurationException`** (konsistent mit dem bisherigen `NormalizeOrderIdentity`).
-   Eine Berechtigungs-Verweigerung ist ein fachliches Ergebnis → **`EbicsResult<T>.Failure("090003", …)`**
-   (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`), exakt der Code, den die Bank zurückgäbe. Der Validator wirft
-   Struktur-Fehler direkt und liefert sonst ein kleines Outcome (`RequestValidation<TIdentity>`), das der
-   Executor in `Failure` bzw. die weiterverwendete Identität übersetzt.
+2. **Asymmetric error semantics.** Structural/BTF violations (order identity not
+   resolvable, a code known in the catalogue in the wrong direction, empty upload payload,
+   non-positive segment size) are programming/config errors →
+   **`EbicsConfigurationException`** (consistent with the previous `NormalizeOrderIdentity`).
+   An authorisation denial is a business result →
+   **`EbicsResult<T>.Failure("090003", …)`** (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`),
+   exactly the code the bank would return. The validator throws structural errors directly
+   and otherwise returns a small outcome (`RequestValidation<TIdentity>`) which the executor
+   translates into `Failure` or the identity used downstream.
 
-3. **Opt-in Allow-List, Default aus.** `EbicsConnectionOptions.AllowedOrderTypes` (normalisiert zu einem
-   Ordinal-`IReadOnlySet<string>` auf `EbicsConnection`) listet die erlaubten **klassischen** OrderType-Codes.
-   Ist sie gesetzt, weist der Connector einen Request mit nicht gelistetem **effektiven klassischen** Code
-   lokal ab (fail-fast, kein Roundtrip). Der Schlüssel ist der effektive klassische Code — konsistent mit
-   ADR-0016 (H005 `CCT` matcht `"CCT"`, nicht den Draht-Code `"BTU"`); administrative Codes (HTD/…) unterliegen
-   der Liste ebenfalls. Eine **leere** Liste (Default) überspringt die Prüfung.
+3. **Opt-in allow-list, default off.** `EbicsConnectionOptions.AllowedOrderTypes`
+   (normalised to an ordinal `IReadOnlySet<string>` on `EbicsConnection`) lists the allowed
+   **classic** order-type codes. If set, the connector rejects a request with a non-listed
+   **effective classic** code locally (fail-fast, no round-trip). The key is the effective
+   classic code — consistent with ADR-0016 (H005 `CCT` matches `"CCT"`, not the wire code
+   `"BTU"`); administrative codes (HTD/…) are subject to the list too. An **empty** list
+   (default) skips the check.
 
-4. **Bewusste Divergenz zur Server-Seite.** Der Server erzwingt **strikt** und lehnt „leere Berechtigungsmenge
-   = alles erlaubt" ausdrücklich ab (ADR-0016, Punkt 3), weil er echtes Bankverhalten abbildet. Der Client ist
-   umgekehrt **opt-in/lenient by default**: er kennt die Teilnehmer-Berechtigungen nicht von sich aus, und die
-   Bank bleibt die Autorität. Die Allow-List ist eine reine Vorab-Optimierung (Roundtrip sparen, klarer
-   Fehler), keine Durchsetzungsinstanz.
+4. **Deliberate divergence from the server side.** The server enforces **strictly** and
+   explicitly rejects "empty permission set = everything allowed" (ADR-0016, point 3),
+   because it reflects real bank behaviour. The client, conversely, is **opt-in/lenient by
+   default**: it does not know the subscriber authorisations by itself, and the bank remains
+   the authority. The allow-list is a pure up-front optimisation (save a round-trip, a clear
+   error), not an enforcement instance.
 
-## Konsequenzen
+## Consequences
 
-- Malformte oder (opt-in) unautorisierte Requests scheitern **vor** jeder Key-I/O/Krypto/Transport — schneller
-  und ohne Nebenwirkungen. Bestehende E2E-/Tier-A-Tests bleiben unverändert grün (Allow-List Default leer;
-  serverseitige 090003-Abweisung weiterhin separat E2E-abgedeckt).
-- Onboarding (INI/HIA/HPB) läuft nicht über die Executoren und wird daher nie hier validiert — die Allow-List
-  kann Onboarding nicht blockieren.
-- Die Divergenz (strikt server-seitig vs. opt-in client-seitig) ist dokumentiert; wer clientseitige
-  Absicherung will, opted per Konfiguration ein.
-- `AllowedOrderTypes` ist als get-only, initialisierte Collection modelliert (Options-Konvention; vermeidet
-  CA2227/CA1819 unter `TreatWarningsAsErrors`).
+- Malformed or (opt-in) unauthorised requests fail **before** any key I/O/crypto/transport
+  — faster and without side effects. Existing E2E/tier-A tests stay green unchanged
+  (allow-list default empty; the server-side 090003 rejection is still covered separately
+  by E2E).
+- Onboarding (INI/HIA/HPB) does not go through the executors and is therefore never
+  validated here — the allow-list cannot block onboarding.
+- The divergence (strict server-side vs. opt-in client-side) is documented; whoever wants
+  client-side safeguarding opts in via configuration.
+- `AllowedOrderTypes` is modelled as a get-only, initialised collection (options
+  convention; avoids CA2227/CA1819 under `TreatWarningsAsErrors`).
 
-## Alternativen
+## Alternatives
 
-- **DI-Service `IEbicsRequestValidator`** — verworfen: keine Laufzeit-Substituierbarkeit nötig, unnötige
-  Kopplung/Ctor-Ripple (dieselbe Begründung wie ADR-0016).
-- **Validierung in den Handlern** statt in den Executoren — verworfen: Duplikation über alle Convenience-
-  Handler und ohne die Identitäts-Auflösung (BTU/FUL/BTD/FDL).
-- **Striktes Enforcement wie server-seitig** (leere Liste = nichts erlaubt) — verworfen: der Client ist nicht
-  die Autorisierungsautorität und darf ohne explizite Konfiguration nichts blockieren.
-- **`SubscriberPermission`-Liste statt String-Codes** — verworfen: SignatureClass hat clientseitig keine
-  Durchsetzungsbedeutung; String-Codes binden sauber aus der Konfiguration und sind direkt mit dem
-  effektiven Auflösungs-Output vergleichbar.
+- **DI service `IEbicsRequestValidator`** — rejected: no runtime substitutability needed,
+  unnecessary coupling/ctor ripple (the same rationale as ADR-0016).
+- **Validation in the handlers** instead of in the executors — rejected: duplication across
+  all convenience handlers and without the identity resolution (BTU/FUL/BTD/FDL).
+- **Strict enforcement like server-side** (empty list = nothing allowed) — rejected: the
+  client is not the authorisation authority and must not block anything without explicit
+  configuration.
+- **A `SubscriberPermission` list instead of string codes** — rejected: SignatureClass has
+  no enforcement meaning client-side; string codes bind cleanly from configuration and are
+  directly comparable with the effective resolution output.

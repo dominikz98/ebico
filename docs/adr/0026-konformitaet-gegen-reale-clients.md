@@ -1,78 +1,84 @@
-# 0026 — Konformität gegen reale Clients (Vendor-Captures, Test-Ebenen, Abweichungs-Politik)
+# 0026 — Conformance against real clients (vendor captures, test tiers, deviation policy)
 
 - Status: accepted
-- Datum: 2026-07-20
+- Date: 2026-07-20
 
-## Kontext
+## Context
 
-Milestone M8 verlangt in Issue **#59** den Nachweis der Konformität **gegen reale, fremde EBICS-Clients**
-— nicht nur gegen die eigene Gegenstelle (#57/#58). Zwei harte Randbedingungen kollidieren dabei:
+Milestone M8 requires, in issue **#59**, proof of conformance **against real, foreign
+EBICS clients** — not just against our own counterpart (#57/#58). Two hard constraints
+collide here:
 
-1. Die **CI läuft offline** und kann keinen Java-/Node-/Python-Fremd-Client ausführen.
-2. Die offiziellen EBICS-**XSDs und Beispiel-XML sind proprietär** (EBICS SC) und werden nicht committet
-   (`.gitignore`: `schemas/**/*.xsd`, `tests/**/Fixtures/Xml/**/*.xml`, siehe
+1. **CI runs offline** and cannot execute a Java/Node/Python foreign client.
+2. The official EBICS **XSDs and sample XML are proprietary** (EBICS SC) and are not
+   committed (`.gitignore`: `schemas/**/*.xsd`, `tests/**/Fixtures/Xml/**/*.xml`, see
    [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)).
 
-Eine reine „skip-if-missing"-Lösung (wie bei den proprietären Beispielen) liefe in der CI nie und würde
-den Kern von #59 — der Beleg gegen *echte* Fremd-Bytes — nie erbringen.
+A pure "skip-if-missing" solution (as with the proprietary samples) would never run in CI
+and would never deliver the core of #59 — the proof against *real* foreign bytes.
 
-## Entscheidung
+## Decision
 
-Ein neuer Testtier `tests/EBICO.Tests/Conformance/` mit mehreren Ebenen, dazu eine klare Politik für
-Captures und für den Umgang mit gefundenen Abweichungen.
+A new test tier `tests/EBICO.Tests/Conformance/` with several layers, plus a clear policy
+for captures and for handling found deviations.
 
-**1. Committete Vendor-Captures als tragende Ebene.** Der *Output* eines permissiv lizenzierten
-OSS-Clients (MIT/Apache) ist **weder Eigentum der EBICS SC noch ein Derivat einer proprietären
-XSD/Beispieldatei** — es sind mit Wegwerf-Schlüsseln erzeugte Daten. Solche Captures **dürfen committet**
-werden, unter dem **nicht** ge-`.gitignore`-ten Pfad
-`tests/EBICO.Tests/Conformance/Vendor/<client>/<version>/request/*.xml` (+ `PROVENANCE.md`). Sie laufen
-damit **permanent in der CI**. Konkret erfasst: `ebics-client` (node-ebics-client, MIT, H004), erzeugt
-mit dem einmaligen, lokalen Werkzeug `tools/vendor-capture/` (nicht Teil von Build/CI). Offizielle
-ebics.org-Beispiele bleiben davon getrennt und weiterhin skip-if-missing.
+**1. Committed vendor captures as the load-bearing layer.** The *output* of a permissively
+licensed OSS client (MIT/Apache) is **neither the property of the EBICS SC nor a
+derivative of a proprietary XSD/sample file** — it is data generated with throwaway keys.
+Such captures **may be committed**, under the path **not** `.gitignore`-d
+`tests/EBICO.Tests/Conformance/Vendor/<client>/<version>/request/*.xml` (+ `PROVENANCE.md`).
+They thus run **permanently in CI**. Concretely captured: `ebics-client`
+(node-ebics-client, MIT, H004), generated with the one-off, local tool
+`tools/vendor-capture/` (not part of build/CI). Official ebics.org samples stay separate
+from this and remain skip-if-missing.
 
-**2. Wire-Shape-Toleranz bewusst als Parser-Proxy.** Zusätzliche Tier-A-Tests formen EBICOs *eigenes*
-Request-XML in legitime Fremd-Formen um (Namespace-Präfix statt Default inkl. `xsi:type`-Umschreibung,
-Whitespace, Kommentare). Sie sind CI-grün und prüfen echte Parser-Robustheit, sind aber **kein** Beleg
-gegen einen fremden Emittenten — diese Ehrlichkeitsgrenze ist dokumentiert.
+**2. Wire-shape tolerance deliberately as a parser proxy.** Additional tier-A tests reshape
+EBICO's *own* request XML into legitimate foreign forms (namespace prefix instead of the
+default incl. `xsi:type` rewriting, whitespace, comments). They are CI-green and check real
+parser robustness, but are **not** proof against a foreign emitter — this honesty boundary
+is documented.
 
-**3. Abweichungen dokumentieren statt Protokoll fixen.** #59 **findet und dokumentiert** Abweichungen;
-es **ändert nicht** das Protokoll-/Binding-Verhalten. Änderungen an den generierten Bindings oder an
-Krypto-/Serialisierungsdetails erfordern die offiziellen XSDs/Annexe (proprietär, nicht im Repo) und
-folgen dem Grundsatz „Evidence > assumptions". Gefundene Abweichungen werden charakterisiert (Tests, die
-das *aktuelle* Verhalten festhalten) und in
-[docs/development/conformance-real-clients.md](../development/conformance-real-clients.md) samt
-Folgearbeit beschrieben.
+**3. Document deviations instead of fixing the protocol.** #59 **finds and documents**
+deviations; it does **not change** the protocol/binding behaviour. Changes to the generated
+bindings or to crypto/serialisation details require the official XSDs/annexes (proprietary,
+not in the repo) and follow the principle "Evidence > assumptions". Found deviations are
+characterised (tests that capture the *current* behaviour) and described, along with
+follow-up work, in
+[docs/development/conformance-real-clients.md](../development/conformance-real-clients.md).
 
-## Konsequenzen
+## Consequences
 
-- Der Vendor-Replay findet sofort die **wichtigste Interop-Abweichung**, die EBICO↔EBICO-Tests
-  bauartbedingt nicht sehen können: EBICOs generiertes H004-Binding typisiert `OrderDetails` **abstrakt**
-  und verlangt einen `xsi:type`-Diskriminator, den EBICOs eigener Connector emittiert, ein realer Client
-  (node-ebics-client) aber weglässt. Folge: **alle** Onboarding-Requests des realen Clients werden
-  abgelehnt (damals als `061099`, also fälschlich als Server- statt Client-Fehler). Das war als
-  Charakterisierungstest festgehalten und als Folgearbeit benannt (Binding konkret typisieren; und
-  nicht-deserialisierbares Client-XML auf einen Client-Fehlercode mappen) — **erledigt in
-  [ADR-0029](0029-interop-fixes-reale-clients.md) / Issue #117**, zusammen mit zwei weiteren Defekten,
-  die erst dahinter sichtbar wurden (`A006` auf H004, Modulus mit ASN.1-Vorzeichen-Byte).
-- Der Corpus ist **erweiterbar**: weitere Clients/Versionen werden per Verzeichnis + `PROVENANCE.md` +
-  Replay ergänzt; fehlt der Corpus, skippen die Replays und die CI bleibt grün.
-- Der Doku-Guard `ConformanceMatrixTests` hält die Kompatibilitätsmatrix-Seite mit ihren Pflicht-
-  Abschnitten synchron (Muster wie `OrderCoverageMatrixTests`).
-- Der M8-Epic ([#56](../ticket-overview.md)) ist mit #59 abgeschlossen; die drei Sub-Issues (#57/#58/#59)
-  sind erledigt.
+- The vendor replay immediately finds the **most important interop deviation** that the
+  EBICO↔EBICO tests cannot see by design: EBICO's generated H004 binding types
+  `OrderDetails` **abstractly** and demands an `xsi:type` discriminator that EBICO's own
+  connector emits but a real client (node-ebics-client) omits. Consequence: **all**
+  onboarding requests of the real client are rejected (then as `061099`, i.e. wrongly as a
+  server rather than a client error). This was captured as a characterisation test and named
+  as follow-up work (type the binding concretely; and map non-deserialisable client XML to a
+  client error code) — **done in
+  [ADR-0029](0029-interop-fixes-reale-clients.md) / issue #117**, together with two further
+  defects that only became visible behind it (`A006` on H004, modulus with an ASN.1 sign
+  byte).
+- The corpus is **extensible**: further clients/versions are added via a directory +
+  `PROVENANCE.md` + replay; if the corpus is missing, the replays skip and CI stays green.
+- The docs guard `ConformanceMatrixTests` keeps the compatibility-matrix page with its
+  mandatory sections in sync (pattern like `OrderCoverageMatrixTests`).
+- The M8 epic ([#56](../ticket-overview.md)) is completed with #59; the three sub-issues
+  (#57/#58/#59) are done.
 
-## Alternativen
+## Alternatives
 
-- **Nur skip-if-missing (proprietäre Beispiele lokal ablegen):** verworfen — läuft nie in der CI, erfüllt
-  den Kern von #59 (echte Fremd-Bytes) nicht.
-- **Fremd-Client live in der CI ausführen (Node/Java):** verworfen — die CI ist offline; ein
-  Cross-Runtime-Handshake im Build ist fragil und netzabhängig. Die Capture-Erzeugung bleibt einmalig
-  und lokal, die CI *replayt* nur.
-- **Die gefundene `OrderDetails`/`xsi:type`-Abweichung sofort im Binding fixen:** verworfen für #59 —
-  betrifft generierte Bindings und EBICOs eigenes Wire-Format (breiter Blast-Radius) und ist ohne die
-  offiziellen XSDs nicht verifizierbar. Gehört als eigene, spec-gestützte Folgearbeit dokumentiert.
-  → Nachgeholt in **[ADR-0029](0029-interop-fixes-reale-clients.md)** (Issue #117): Binding konkret,
-  Fehlklassifikation behoben, `A006` auf H004, Modulus-Normalisierung — der Vendor-Replay ist damit
-  vom Charakterisierungs- zum Konformitätstest geworden.
-- **Nur EBICO-eigenes XML umformen (keine Vendor-Captures):** verworfen — beweist nur Parser-Toleranz,
-  nicht Konformität gegen einen fremden Emittenten.
+- **Only skip-if-missing (store proprietary samples locally):** rejected — never runs in
+  CI, does not fulfil the core of #59 (real foreign bytes).
+- **Run a foreign client live in CI (Node/Java):** rejected — CI is offline; a cross-runtime
+  handshake in the build is fragile and network-dependent. Capture generation stays one-off
+  and local, CI only *replays*.
+- **Fix the found `OrderDetails`/`xsi:type` deviation in the binding right away:** rejected
+  for #59 — affects generated bindings and EBICO's own wire format (broad blast radius) and
+  is not verifiable without the official XSDs. Belongs documented as its own,
+  spec-supported follow-up work. → Caught up in
+  **[ADR-0029](0029-interop-fixes-reale-clients.md)** (issue #117): binding concrete,
+  misclassification fixed, `A006` on H004, modulus normalisation — the vendor replay thereby
+  turned from a characterisation into a conformance test.
+- **Only reshape EBICO's own XML (no vendor captures):** rejected — proves only parser
+  tolerance, not conformance against a foreign emitter.

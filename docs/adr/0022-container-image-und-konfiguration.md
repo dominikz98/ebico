@@ -1,76 +1,82 @@
-# 0022 — Container-Image & ENV-Konfiguration
+# 0022 — Container image & ENV configuration
 
 - Status: accepted
-- Datum: 2026-07-16
+- Date: 2026-07-16
 
-## Kontext
+## Context
 
-M9 ([#61](../deployment/container.md)) verlangt, den EBICS-Emulator (`EBICO.Server`) als
-Docker-Container lauffähig zu machen: **Dockerfile**, **Konfiguration via ENV** und ein
-**Beispiel-`docker-compose`** (Server + Suite). Ausgangslage: keinerlei Docker-Infrastruktur; Server
-und Suite sind zwei eigenständige `Microsoft.NET.Sdk.Web`/net10.0-Hosts auf getrennten Ports. Der
-Server braucht kein HTTPS zum Start und kein NuGet-Paket außer der Core-Referenz.
+M9 ([#61](../deployment/container.md)) requires making the EBICS emulator
+(`EBICO.Server`) runnable as a Docker container: a **Dockerfile**, **configuration via
+ENV** and a **sample `docker-compose`** (server + Suite). Starting point: no Docker
+infrastructure at all; server and Suite are two independent
+`Microsoft.NET.Sdk.Web`/net10.0 hosts on separate ports. The server needs no HTTPS to
+start and no NuGet package other than the Core reference.
 
-Zwei Entscheidungen waren nötig: (a) **wie** das Image gebaut wird (Base-Images, ein oder mehrere
-Dockerfiles, Startkommando für zwei Projekte) und (b) **wie** der Emulator im Container konfiguriert
-wird — denn `EbicoServerOptions` wurde bis dahin **nicht** aus der Konfiguration gebunden (nur
-Defaults + optionaler Code-Delegate an `AddEbicoServer`), sodass ENV-Overrides der Emulator-Optionen
-gar nicht griffen.
+Two decisions were needed: (a) **how** the image is built (base images, one or several
+Dockerfiles, start command for two projects) and (b) **how** the emulator is configured
+in the container — because `EbicoServerOptions` had until then **not** been bound from
+configuration (only defaults + an optional code delegate to `AddEbicoServer`), so ENV
+overrides of the emulator options did not take effect at all.
 
-## Entscheidung
+## Decision
 
-1. **Multi-Stage-Build, offizielle .NET-Images.** Build-Stage `mcr.microsoft.com/dotnet/sdk:10.0`,
-   Runtime-Stage `mcr.microsoft.com/dotnet/aspnet:10.0`. Das Floating-Tag `10.0` erfüllt den
-   `global.json`-Pin (damals `10.0.300`, seit #124 `10.0.100` — je `latestFeature`; das Floating-Tag
-   liefert ohnehin das neueste 10.0.x). Kein `--locked-mode` (keine Lockfiles, zentrale
-   Paketverwaltung). Runtime läuft als **nicht-root** (`USER $APP_UID`), Port **8080**.
-2. **Ein einziges, parametrisiertes Dockerfile im Repo-Root** mit Build-Arg **`PROJECT`** (Default
-   `EBICO.Server`). `docker build .` baut den Server (das Headline-Artefakt); `--build-arg
-   PROJECT=EBICO.Suite` baut die Suite. `ENTRYPOINT ["dotnet"]` + `CMD ["EBICO.Server.dll"]` — der
-   `suite`-Service im compose überschreibt nur das Kommando (`EBICO.Suite.dll`). Begründung: beide
-   Projekte sind nahezu identisch aufgebaut; ein zweites, dupliziertes Dockerfile bringt keinen
-   Mehrwert.
-3. **ENV-Konfiguration über zwei Ebenen.** (a) Standard-ASP.NET-Host-Variablen greifen bereits über
-   `WebApplication.CreateBuilder(args)` (`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_URLS`,
-   `ASPNETCORE_ENVIRONMENT`, `Logging__*`). (b) `EbicoServerOptions` wird neu aus der
-   Config-Section **`Ebico`** gebunden (`Ebico__EndpointPath`, `Ebico__MaxRequestBodyBytes`, …). Die
-   Bindung erfolgt in `AddEbicoServer` **null-sicher** über eine eigene
-   `IConfigureOptions<EbicoServerOptions>`-Registrierung, die `IConfiguration` per `GetService` (nicht
-   `GetRequiredService`) auflöst — so bleiben Unit-Tests, die eine nackte `ServiceCollection` ohne
-   `IConfiguration` bauen, unverändert lauffähig. Registriert **vor** dem optionalen `configure`-
-   Delegate, damit expliziter Code die Konfiguration überschreibt (Defaults < ENV/Config < Code).
-4. **`docker-compose.yml` startet Server + Suite als zwei eigenständige Container** ohne HTTP-Kopplung
-   und ohne geteilten Zustand (siehe Konsequenzen). Zusätzlich: ein Liveness-Endpoint **`/health`** am
-   Server für Orchestrator-Probes; ein CI-Job **`container-build`** (build-only, kein Push) hält das
-   Dockerfile grün.
+1. **Multi-stage build, official .NET images.** Build stage
+   `mcr.microsoft.com/dotnet/sdk:10.0`, runtime stage
+   `mcr.microsoft.com/dotnet/aspnet:10.0`. The floating tag `10.0` satisfies the
+   `global.json` pin (then `10.0.300`, since #124 `10.0.100` — each `latestFeature`; the
+   floating tag delivers the newest 10.0.x anyway). No `--locked-mode` (no lockfiles,
+   central package management). The runtime runs as **non-root** (`USER $APP_UID`), port
+   **8080**.
+2. **A single, parameterised Dockerfile at the repo root** with a build arg **`PROJECT`**
+   (default `EBICO.Server`). `docker build .` builds the server (the headline artefact);
+   `--build-arg PROJECT=EBICO.Suite` builds the Suite. `ENTRYPOINT ["dotnet"]` + `CMD
+   ["EBICO.Server.dll"]` — the `suite` service in the compose only overrides the command
+   (`EBICO.Suite.dll`). Rationale: both projects are set up almost identically; a second,
+   duplicated Dockerfile brings no benefit.
+3. **ENV configuration over two levels.** (a) Standard ASP.NET host variables already take
+   effect via `WebApplication.CreateBuilder(args)`
+   (`ASPNETCORE_HTTP_PORTS`/`ASPNETCORE_URLS`, `ASPNETCORE_ENVIRONMENT`, `Logging__*`).
+   (b) `EbicoServerOptions` is newly bound from the config section **`Ebico`**
+   (`Ebico__EndpointPath`, `Ebico__MaxRequestBodyBytes`, …). The binding happens in
+   `AddEbicoServer` **null-safely** via a dedicated
+   `IConfigureOptions<EbicoServerOptions>` registration that resolves `IConfiguration` via
+   `GetService` (not `GetRequiredService`) — so unit tests that build a bare
+   `ServiceCollection` without `IConfiguration` stay runnable unchanged. Registered
+   **before** the optional `configure` delegate, so explicit code overrides the
+   configuration (defaults < ENV/config < code).
+4. **`docker-compose.yml` starts server + Suite as two independent containers** without
+   HTTP coupling and without shared state (see consequences). Additionally: a liveness
+   endpoint **`/health`** on the server for orchestrator probes; a CI job
+   **`container-build`** (build-only, no push) keeps the Dockerfile green.
 
-## Konsequenzen
+## Consequences
 
-- Der Server ist ohne lokales .NET-SDK startbar; die Emulator-Optionen sind vollständig per ENV
-  überschreibbar. Bestehende Options-Overrides in Integrationstests
-  (`ConfigureTestServices(...Configure...)`) laufen zuletzt und gewinnen weiterhin.
-- **Suite und Server teilen keinen Live-Zustand:** Die Suite hat einen eigenen In-Memory-Store mit
-  Beispieldaten und spricht den Server nicht über HTTP an ([ADR-0009](0009-blazor-render-mode.md)). Das
-  compose zeigt „beide laufen", nicht „gekoppelt"; die prozessübergreifende Live-Inspektion bleibt
-  Folge-Arbeit ([ADR-0015](0015-ereignis-protokollspeicher.md)).
-- **Sicherheit bleibt Emulator-Niveau:** unsignierter EBICS-Endpoint, unauthentifizierte Admin-API. Das
-  Image darf nicht ungeschützt in ein nicht vertrauenswürdiges Netz exponiert werden (dokumentiert in
+- The server is startable without a local .NET SDK; the emulator options are fully
+  overridable via ENV. Existing options overrides in integration tests
+  (`ConfigureTestServices(...Configure...)`) run last and still win.
+- **Suite and server share no live state:** the Suite has its own in-memory store with
+  sample data and does not talk to the server over HTTP
+  ([ADR-0009](0009-blazor-render-mode.md)). The compose shows "both run", not "coupled";
+  cross-process live inspection remains follow-up work
+  ([ADR-0015](0015-ereignis-protokollspeicher.md)).
+- **Security stays at emulator level:** unsigned EBICS endpoint, unauthenticated admin
+  API. The image must not be exposed unprotected on an untrusted network (documented in
   [container.md](../deployment/container.md)).
-- Kein Registry-Push in dieser Stufe (gehört zur Publish-Pipeline #62); das compose enthält keinen
-  `healthcheck`, weil das `aspnet`-Image keinen HTTP-Client mitbringt.
+- No registry push at this stage (belongs to the publish pipeline #62); the compose
+  contains no `healthcheck` because the `aspnet` image ships no HTTP client.
 
-## Alternativen
+## Alternatives
 
-- **Getrennte Dockerfiles je Projekt** (`src/EBICO.Server/Dockerfile`, `src/EBICO.Suite/Dockerfile`,
-  VS-Konvention). Verworfen: nahezu identischer Inhalt, doppelte Pflege; der `PROJECT`-Build-Arg deckt
-  beide mit einer Quelle ab.
-- **`optionsBuilder.BindConfiguration("Ebico")`** statt der manuellen null-sicheren Registrierung.
-  Verworfen: löst `IConfiguration` intern per `GetRequiredService` auf und würde Unit-Tests mit einer
-  nackten `ServiceCollection` (ohne `IConfiguration`) beim Auflösen von `IOptions<EbicoServerOptions>`
-  brechen.
-- **Konfiguration nur über die ASP.NET-Host-Variablen** (kein `Ebico`-Binding). Verworfen: die
-  Emulator-Optionen (Endpoint-Pfad, Limits, Timeouts) wären im Container gar nicht überschreibbar —
-  „Konfiguration via ENV" wäre nur halb erfüllt.
-- **Self-contained/Trimmed oder AOT-Publish** für ein noch kleineres Image. Verworfen (vorerst):
-  Mehrgewicht bei Build/Debug ohne klaren Nutzen für einen lokalen Emulator; das
-  Framework-abhängige `aspnet`-Image genügt.
+- **Separate Dockerfiles per project** (`src/EBICO.Server/Dockerfile`,
+  `src/EBICO.Suite/Dockerfile`, the VS convention). Rejected: almost identical content,
+  double maintenance; the `PROJECT` build arg covers both from one source.
+- **`optionsBuilder.BindConfiguration("Ebico")`** instead of the manual null-safe
+  registration. Rejected: it resolves `IConfiguration` internally via
+  `GetRequiredService` and would break unit tests with a bare `ServiceCollection`
+  (without `IConfiguration`) when resolving `IOptions<EbicoServerOptions>`.
+- **Configuration only via the ASP.NET host variables** (no `Ebico` binding). Rejected:
+  the emulator options (endpoint path, limits, timeouts) would not be overridable in the
+  container at all — "configuration via ENV" would only be half fulfilled.
+- **Self-contained/trimmed or AOT publish** for an even smaller image. Rejected (for
+  now): extra weight in build/debug without a clear benefit for a local emulator; the
+  framework-dependent `aspnet` image suffices.

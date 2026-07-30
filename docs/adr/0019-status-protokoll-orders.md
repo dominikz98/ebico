@@ -1,69 +1,83 @@
-# 0019 — Status- & Protokoll-Orders (Domänen-Erweiterung, HAC/PTK als IEventLog-Projektion)
+# 0019 — Status & protocol orders (domain extension, HAC/PTK as IEventLog projection)
 
 - Status: accepted
-- Datum: 2026-07-15
+- Date: 2026-07-15
 
-## Kontext
+## Context
 
-Issue #41 (Milestone M5) fordert die **administrativen/technischen Order-Typen**: HTD (Teilnehmerdaten),
-HKD (Kundendaten), HAA (verfügbare Order-Typen), HPD (Bankparameter) sowie HAC/PTK (Customer Protocol,
-maschinen- bzw. menschenlesbar). Diese bleiben in H005 **AdminOrderTypes** (kein BTF-Service, siehe
-[ADR-0016](0016-btf-framework-und-berechtigung.md)) und sind bank→client-**Downloads**.
+Issue #41 (Milestone M5) requires the **administrative/technical order types**: HTD
+(subscriber data), HKD (customer data), HAA (available order types), HPD (bank
+parameters) as well as HAC/PTK (customer protocol, machine- and human-readable
+respectively). These stay **AdminOrderTypes** in H005 (no BTF service, see
+[ADR-0016](0016-btf-framework-und-berechtigung.md)) and are bank→client **downloads**.
 
-Vorhanden waren: die generische [Download-Transaktion](../server/download-transaction.md) (#33), das
-Generate-on-Demand-Muster `IDownloadOrderProcessor` (#40, [ADR-0018](0018-kontoauszug-download-orders.md))
-und der append-only [`IEventLog`](../server/event-log.md) (#69, [ADR-0015](0015-ereignis-protokollspeicher.md)),
-der ausdrücklich als Quelle für die HAC-Projektion vorgesehen ist. Ebenfalls vorhanden: generierte Bindings
-`HTD/HKD/HAA/HPDResponseOrderData` je Version — **nicht** aber für HAC/PTK (proprietäres/kein Schema).
+Already present: the generic [download transaction](../server/download-transaction.md)
+(#33), the generate-on-demand pattern `IDownloadOrderProcessor` (#40,
+[ADR-0018](0018-kontoauszug-download-orders.md)) and the append-only
+[`IEventLog`](../server/event-log.md) (#69, [ADR-0015](0015-ereignis-protokollspeicher.md)),
+which is explicitly intended as the source for the HAC projection. Also present:
+generated bindings `HTD/HKD/HAA/HPDResponseOrderData` per version — but **not** for
+HAC/PTK (proprietary/no schema).
 
-Zu entscheiden war: (1) woher die Stammdaten für HTD/HKD/HPD stammen, (2) ob diese Orders eine explizite
-Berechtigung erfordern, (3) in welchem Format HAC ausgeliefert wird, (4) wie das Routing/die Erzeugung
-angebunden wird.
+To be decided: (1) where the master data for HTD/HKD/HPD comes from, (2) whether these
+orders require an explicit authorisation, (3) in which format HAC is delivered, (4) how
+the routing/generation is wired up.
 
-## Entscheidung
+## Decision
 
-1. **Domänenmodell erweitern** statt synthetisch zu befüllen: neue Value-Types `Address` und `BankAccount`
-   in `EBICO.Core.Domain`; `Partner` trägt nun `Address?` + `IReadOnlyCollection<BankAccount>`, `Bank` ein
-   optionales `Url` (HPD-Zugang, `Institute`=`Name`), `Subscriber` einen optionalen `Name`. Die Admin-API
-   (`MapEbicoAdminApi`) und ihre DTOs wurden entsprechend erweitert; `Name` wird durch alle immutablen
-   Subscriber-Kopieroperationen (`Transition`/`WithPermission(s)`/`WithoutPermissionsFor`) durchgereicht.
+1. **Extend the domain model** instead of populating it synthetically: new value types
+   `Address` and `BankAccount` in `EBICO.Core.Domain`; `Partner` now carries `Address?`
+   + `IReadOnlyCollection<BankAccount>`, `Bank` an optional `Url` (HPD access,
+   `Institute`=`Name`), `Subscriber` an optional `Name`. The admin API
+   (`MapEbicoAdminApi`) and its DTOs were extended accordingly; `Name` is threaded
+   through all immutable subscriber copy operations
+   (`Transition`/`WithPermission(s)`/`WithoutPermissionsFor`).
 
-2. **Berechtigung erforderlich**: die Orders laufen unverändert durch das strikte `HasPermissionFor`-Gate
-   der Download-Engine (fehlt die Permission → `090003`). Kein Auto-Grant, keine Ausnahme für Admin-Orders —
-   konsistent mit den BTF-Orders (ADR-0016). Der Teilnehmer wird über die Admin-API für HTD/HAC/… berechtigt.
+2. **Authorisation required**: the orders run unchanged through the strict
+   `HasPermissionFor` gate of the download engine (permission missing → `090003`). No
+   auto-grant, no exception for admin orders — consistent with the BTF orders (ADR-0016).
+   The subscriber is authorised for HTD/HAC/… via the admin API.
 
-3. **HAC als eigene, spec-plausible XML-Projektion** über `IEventLog`
-   (`QueryAsync { PartnerId, Visibility = CustomerVisible }`, optional zeitraum-gefiltert): ein
-   `HACResponseOrderData` mit je einem `ProtocolEntry` pro kundensichtbarem Ereignis (handgebaut wie die
-   camt/pain-Builder). **PTK** rendert dieselbe Projektion als Text. Die Erzeugung selbst wird nur als
-   `Internal`-Ereignis geloggt (nicht als zusätzliches kundensichtbares `OrderAccepted`); die
-   `DownloadStarted`/`DownloadCompleted`-Lifecycle-Ereignisse der Transaktion bleiben — wie bei jedem
-   Download — kundensichtbar, ein Protokoll-Abruf ist also in späteren Protokollen selbst sichtbar.
+3. **HAC as its own, spec-plausible XML projection** over `IEventLog`
+   (`QueryAsync { PartnerId, Visibility = CustomerVisible }`, optionally date-range
+   filtered): an `HACResponseOrderData` with one `ProtocolEntry` per customer-visible
+   event (hand-built like the camt/pain builders). **PTK** renders the same projection
+   as text. The generation itself is logged only as an `Internal` event (not as an
+   additional customer-visible `OrderAccepted`); the `DownloadStarted`/`DownloadCompleted`
+   lifecycle events of the transaction stay — as with every download — customer-visible,
+   so a protocol retrieval is itself visible in later protocols.
 
-4. **Anbindung als Download** über zwei neue `IDownloadOrderProcessor`: `SubscriberInfoDownloadProcessor`
-   (HTD/HKD/HAA/HPD, aus dem `IMasterDataManager` via `SubscriberInfoContentBuilder`) und
-   `CustomerProtocolDownloadProcessor` (HAC/PTK). `DownloadTransactionEngine.IsDownloadOrderType` erkennt die
-   Codes zusätzlich (`StatusProtocolOrderTypes`); die Engine nimmt jetzt `IEnumerable<IDownloadOrderProcessor>`
-   und wählt den ersten passenden `CanProcess` (statt genau eines Prozessors).
+4. **Wiring as a download** via two new `IDownloadOrderProcessor`:
+   `SubscriberInfoDownloadProcessor` (HTD/HKD/HAA/HPD, from the `IMasterDataManager` via
+   `SubscriberInfoContentBuilder`) and `CustomerProtocolDownloadProcessor` (HAC/PTK).
+   `DownloadTransactionEngine.IsDownloadOrderType` additionally recognises the codes
+   (`StatusProtocolOrderTypes`); the engine now takes
+   `IEnumerable<IDownloadOrderProcessor>` and picks the first matching `CanProcess`
+   (instead of exactly one processor).
 
-## Konsequenzen
+## Consequences
 
-- Der Emulator beantwortet alle sechs Orders über alle drei Versionen; HTD/HKD/HAA/HPD sind durch Round-Trip
-  gegen die Bindings testbar, HAC/PTK gegen die projizierten Ereignisse — ohne proprietäre Fixtures.
-- Die Umstellung auf mehrere `IDownloadOrderProcessor` ist additiv (der Statement-Processor #40 bleibt
-  registriert); Fremd-Prozessoren lassen sich weiterhin via `AddSingleton` ergänzen.
-- **Spec-Vorbehalte:** HAC/PTK sind plausible Eigenformate (das offizielle camt.086/pain.002-Layout ist nicht
-  verifiziert); die versionsspezifische HTD/HKD/HAA/HPD-Feldabbildung lässt nicht modellierte Felder
-  (Order-/Transfer-Format, Betragslimits, Autorisierungsstufe, X.509-Parameter, Konto-Nutzungsrestriktionen)
-  aus. Der EBICS-User-`Status` ist heuristisch aus dem Lebenszyklus abgeleitet.
+- The emulator answers all six orders across all three versions; HTD/HKD/HAA/HPD are
+  testable via round-trip against the bindings, HAC/PTK against the projected events —
+  without proprietary fixtures.
+- The switch to multiple `IDownloadOrderProcessor` is additive (the statement processor
+  #40 stays registered); third-party processors can still be added via `AddSingleton`.
+- **Spec caveats:** HAC/PTK are plausible in-house formats (the official
+  camt.086/pain.002 layout is not verified); the version-specific HTD/HKD/HAA/HPD field
+  mapping omits unmodelled fields (order/transfer format, amount limits, authorisation
+  level, X.509 parameters, account usage restrictions). The EBICS user `Status` is
+  heuristically derived from the lifecycle.
 
-## Alternativen
+## Alternatives
 
-- **Synthetische Stammdaten** (kein Domänenmodell) — schneller, aber HTD/HKD/HPD blieben inhaltsleer;
-  verworfen zugunsten echter, über die Admin-API/Suite pflegbarer Konten/Adressen/Bankparameter.
-- **Admin-Orders ohne Berechtigung** (für jeden `Ready`-Teilnehmer) — bequemer, weicht aber vom strikten
-  Berechtigungsmodell (ADR-0016) ab; verworfen zugunsten der Konsistenz.
-- **HAC an pain.002 anlehnen** (`PainStatusReportBuilder` wiederverwenden) — semantisch nur für Auftragsstatus
-  passend, nicht für ein vollständiges Ereignisprotokoll; verworfen zugunsten der eigenen Projektion.
-- **Eigener Order-Handler statt Download-Processor** — hätte Verschlüsselung/Segmentierung dupliziert;
-  verworfen zugunsten der bestehenden Download-Transaktion.
+- **Synthetic master data** (no domain model) — faster, but HTD/HKD/HPD would stay
+  content-empty; rejected in favour of real accounts/addresses/bank parameters
+  maintainable via the admin API/Suite.
+- **Admin orders without authorisation** (for every `Ready` subscriber) — more
+  convenient, but deviates from the strict authorisation model (ADR-0016); rejected in
+  favour of consistency.
+- **Base HAC on pain.002** (reuse `PainStatusReportBuilder`) — semantically fitting only
+  for order status, not for a complete event protocol; rejected in favour of its own
+  projection.
+- **A dedicated order handler instead of a download processor** — would have duplicated
+  encryption/segmentation; rejected in favour of the existing download transaction.

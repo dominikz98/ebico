@@ -1,115 +1,123 @@
-# 0029 — Interop-Fixes für reale Clients (`OrderDetails` ohne `xsi:type`, `A006` auf H004, Modulus-Normalisierung)
+# 0029 — Interop fixes for real clients (`OrderDetails` without `xsi:type`, `A006` on H004, modulus normalisation)
 
 - Status: accepted
-- Datum: 2026-07-22
+- Date: 2026-07-22
 
-## Kontext
+## Context
 
-[ADR-0026](0026-konformitaet-gegen-reale-clients.md) hat den Vendor-Capture-Tier eingeführt und dabei
-bewusst **nur dokumentiert statt gefixt** (dort Entscheidung 3, „Abweichungen dokumentieren statt
-Protokoll fixen"). Der Replay der node-ebics-client-Captures zeigte: EBICO nimmt **keinen einzigen**
-Onboarding-Request eines realen Fremd-Clients an. Issue **#117** holt den Fix nach.
+[ADR-0026](0026-konformitaet-gegen-reale-clients.md) introduced the vendor-capture tier and
+deliberately **only documented rather than fixed** (decision 3 there, "document deviations
+instead of fixing the protocol"). The replay of the node-ebics-client captures showed: EBICO
+accepts **not a single** onboarding request from a real foreign client. Issue **#117**
+catches up on the fix.
 
-Drei ursächlich unabhängige Defekte lagen hintereinander auf demselben Pfad — jeder verdeckte den
-nächsten, weshalb sie nur nacheinander sichtbar wurden:
+Three causally independent defects lay one behind another on the same path — each masked the
+next, which is why they only became visible one after another:
 
-1. **`OrderDetails` verlangt `xsi:type`.** `xscgen` übersetzt eine XSD-`<restriction>`, die ein Element
-   konkreter typisiert, nicht: `OrderDetails` bleibt im Static-Header von `ebicsUnsecuredRequest` /
-   `ebicsNoPubKeyDigestsRequest` auf dem **abstrakten** `OrderDetailsType` stehen. Der `XmlSerializer`
-   verlangt dann einen `xsi:type`-Diskriminator. EBICOs eigener Connector emittierte ihn — deshalb war
-   EBICO↔EBICO grün —, ein realer Client folgt dem konkreten Schematyp und lässt ihn weg.
-2. **Fehlklassifikation.** Das daraus resultierende, nicht abbildbare Client-XML wurde mit
-   `061099 EBICS_INTERNAL_ERROR` beantwortet: EBICO gab **sich selbst** die Schuld an einem fremden
-   Dokument. Der `EbicsErrorMapper` fing nur `InvalidOperationException { InnerException: XmlException }`;
-   die XmlSerializer-Typausnahme trägt einen anderen Inner-Typ.
-3. **`A006`/PSS nur auf H005** — node-ebics-client signiert seine H004-INI-Order-Data per Default mit
-   `A006`.
-4. **Modulus mit ASN.1-Vorzeichen-Byte** (erst nach 1.–3. sichtbar). `ds:Modulus` ist per XML-DSig ein
-   `CryptoBinary` ohne führende Null; reale Clients senden bei gesetztem höchsten Bit trotzdem die
-   257-Byte-INTEGER-Form. `RsaKeyMaterial` normalisierte zwar die **nach außen** sichtbaren Bytes
-   (Fingerprint, `KeySizeBits`), importierte aber die **rohen** Parameter — das ergab einen 2056-Bit-
-   Schlüssel, dessen OAEP-Operationen scheiterten. HPB konnte die Bankschlüssel deshalb nicht
-   verschlüsseln (`090004`).
+1. **`OrderDetails` demands `xsi:type`.** `xscgen` does not translate an XSD `<restriction>`
+   that types an element more concretely: `OrderDetails` stays on the **abstract**
+   `OrderDetailsType` in the static header of `ebicsUnsecuredRequest` /
+   `ebicsNoPubKeyDigestsRequest`. The `XmlSerializer` then demands an `xsi:type`
+   discriminator. EBICO's own connector emitted it — which is why EBICO↔EBICO was green — but
+   a real client follows the concrete schema type and omits it.
+2. **Misclassification.** The resulting, non-mappable client XML was answered with
+   `061099 EBICS_INTERNAL_ERROR`: EBICO blamed **itself** for a foreign document. The
+   `EbicsErrorMapper` only caught `InvalidOperationException { InnerException: XmlException }`;
+   the XmlSerializer type exception carries a different inner type.
+3. **`A006`/PSS only on H005** — node-ebics-client signs its H004 INI order data by default
+   with `A006`.
+4. **Modulus with an ASN.1 sign byte** (only visible after 1.–3.). `ds:Modulus` is per
+   XML-DSig a `CryptoBinary` without a leading zero; real clients nonetheless send the
+   257-byte INTEGER form when the highest bit is set. `RsaKeyMaterial` did normalise the bytes
+   visible **to the outside** (fingerprint, `KeySizeBits`), but imported the **raw**
+   parameters — which yielded a 2056-bit key whose OAEP operations failed. HPB could therefore
+   not encrypt the bank keys (`090004`).
 
-## Entscheidung
+## Decision
 
-**1. `OrderDetailsType` wird konkret (Basistyp statt XSD-treuer Abflachung).** In den generierten
-Bindings aller drei Versionen entfällt das `abstract`. Die `[XmlInclude]`-Attribute und die konkreten
-Sub-Typen bleiben stehen: `xsi:type` wird weiterhin **akzeptiert**, aber nicht mehr **verlangt**. Die
-Sub-Typen (`UnsecuredReqOrderDetailsType`, `NoPubKeyDigestsReqOrderDetailsType`,
-`UnsignedReqOrderDetailsType`) tragen in H003/H004/H005 **keine eigenen Member** — es geht kein
-Informationsgehalt verloren.
+**1. `OrderDetailsType` becomes concrete (base type instead of an XSD-faithful flattening).**
+In the generated bindings of all three versions the `abstract` is dropped. The `[XmlInclude]`
+attributes and the concrete sub-types stay in place: `xsi:type` is still **accepted**, but no
+longer **demanded**. The sub-types (`UnsecuredReqOrderDetailsType`,
+`NoPubKeyDigestsReqOrderDetailsType`, `UnsignedReqOrderDetailsType`) carry **no own members**
+in H003/H004/H005 — no information content is lost.
 
-**2. Der Eingriff lebt im Generator-Skript, nicht nur im committeten `.cs`.**
-`scripts/generate-bindings.sh` wendet nach jedem Lauf `apply_binding_fixups()` an (awk, CRLF-erhaltend)
-und **bricht hart ab**, wenn das erwartete Muster fehlt. Dazu ein Guard-Test
-(`OrderDetailsBindingTests`), der `IsAbstract == false` prüft — ein verlorener Fixup fällt damit sofort
-auf und nicht erst beim nächsten Fremd-Client.
+**2. The intervention lives in the generator script, not just in the committed `.cs`.**
+`scripts/generate-bindings.sh` applies `apply_binding_fixups()` after each run (awk,
+CRLF-preserving) and **aborts hard** if the expected pattern is missing. Plus a guard test
+(`OrderDetailsBindingTests`) that checks `IsAbstract == false` — a lost fixup thereby shows up
+immediately and not only at the next foreign client.
 
-**3. Der Connector emittiert den Basistyp.** Eine Sub-Klassen-Instanz würde weiter `xsi:type` (und die
-`xmlns:xsi`-Deklaration) erzeugen. EBICOs Onboarding-Requests sehen damit aus wie die eines realen
-Clients — Toleranz in beide Richtungen, nicht nur beim Empfang.
+**3. The connector emits the base type.** A sub-class instance would still produce `xsi:type`
+(and the `xmlns:xsi` declaration). EBICO's onboarding requests thereby look like those of a
+real client — tolerance in both directions, not only on receipt.
 
-**4. Fehlklassifikation an der Envelope-Grenze lösen, nicht im Error-Mapper.**
-`EbicsXmlSerializer.DeserializeEnvelope` übersetzt `XmlSerializer`-Abbildungsfehler in
-`EbicsEnvelopeFormatException` (→ `091010 EBICS_INVALID_XML`). Das ist die einzige Stelle, die *weiß*,
-dass die Bytes vom Client stammen. Bewusst **nicht** in `DeserializeCore`: die generischen
-`Deserialize<T>`-Überladungen dekodieren auch Order-Data, wo `OrderDataFault` bereits gezielt auf
-`090004` mappt — eine Übersetzung dort würde dieses Mapping überschreiben.
+**4. Resolve the misclassification at the envelope boundary, not in the error mapper.**
+`EbicsXmlSerializer.DeserializeEnvelope` translates `XmlSerializer` mapping errors into
+`EbicsEnvelopeFormatException` (→ `091010 EBICS_INVALID_XML`). This is the only place that
+*knows* the bytes come from the client. Deliberately **not** in `DeserializeCore`: the generic
+`Deserialize<T>` overloads also decode order data, where `OrderDataFault` already maps
+specifically to `090004` — a translation there would override that mapping.
 
-**5. `A006` gilt für H004 **und** H005.** H003 (EBICS 2.4) bleibt ausgeschlossen.
+**5. `A006` applies to H004 **and** H005.** H003 (EBICS 2.4) stays excluded.
 
-**6. `RsaKeyMaterial` importiert aus der kanonischen Form.** Modulus/Exponent werden getrimmt, *bevor*
-sie in die für `CreateRsa()` gehaltenen `RSAParameters` gehen. Damit stimmen die drei Sichten auf
-denselben Schlüssel (exponierte Bytes, `KeySizeBits`, importierte RSA-Instanz) wieder überein.
+**6. `RsaKeyMaterial` imports from the canonical form.** Modulus/exponent are trimmed *before*
+they go into the `RSAParameters` held for `CreateRsa()`. The three views of the same key
+(exposed bytes, `KeySizeBits`, imported RSA instance) thereby agree again.
 
-**7. Der Vendor-Replay wird vom Charakterisierungs- zum Konformitätstest.**
-`VendorCaptureConformanceTests` seedet die Stammdaten und treibt die drei Captures als **eine
-sequenzielle Kette** INI → HIA → HPB bis `SubscriberState.Ready` samt verschlüsselter HPB-Antwort.
+**7. The vendor replay turns from a characterisation into a conformance test.**
+`VendorCaptureConformanceTests` seeds the master data and drives the three captures as **one
+sequential chain** INI → HIA → HPB up to `SubscriberState.Ready` including the encrypted HPB
+response.
 
-## Konsequenzen
+## Consequences
 
-- **Reale Clients funktionieren.** Die Kompatibilitätsmatrix in
-  [Konformität gegen reale Clients](../development/conformance-real-clients.md) steht für
-  node-ebics-client 5.0.0 / H004 auf ✅ ✅ ✅. Abweichung 1 und 2 aus #59 sind geschlossen.
-- **EBICOs eigenes Wire-Format ändert sich** (Onboarding-Requests ohne `xsi:type`/`xmlns:xsi`). Das ist
-  durch die E2E-Suite (#57) über H003/H004/H005 abgesichert und macht die Ausgabe strikter konform zur
-  in [Serialisierung & C14N](../protocol/serialization-c14n.md) zugesagten xsi-freien Form.
-- **Das Binding ist an dieser Stelle laxer als die XSD** — es akzeptiert `OrderDetails` auch dort, wo die
-  XSD einen bestimmten konkreten Typ vorschreibt. Praktisch kostenlos: der `XmlSerializer` validiert
-  ohnehin nicht gegen die XSD; echte Schema-Validierung bleibt der Tier-B-Test
+- **Real clients work.** The compatibility matrix in
+  [conformance against real clients](../development/conformance-real-clients.md) stands at
+  ✅ ✅ ✅ for node-ebics-client 5.0.0 / H004. Deviations 1 and 2 from #59 are closed.
+- **EBICO's own wire format changes** (onboarding requests without `xsi:type`/`xmlns:xsi`).
+  This is secured by the E2E suite (#57) across H003/H004/H005 and makes the output more
+  strictly conformant to the xsi-free form promised in
+  [serialisation & C14N](../protocol/serialization-c14n.md).
+- **The binding is laxer than the XSD at this point** — it accepts `OrderDetails` even where
+  the XSD prescribes a particular concrete type. Practically free: the `XmlSerializer` does
+  not validate against the XSD anyway; real schema validation stays the tier-B test
   `SchemaValidationConformanceTests` (skip-if-missing).
-- **Spec-Vorbehalt bleibt.** Weder die Konkretisierung von `OrderDetails` noch `A006` auf H004 sind gegen
-  die offiziellen XSDs/Annexe verifiziert (proprietär, nicht im Repo — [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)).
-  Die Evidenz ist ein realer Client plus die verbreitete Lesart (EBICS 2.5 Annex 1 kennt A005 **und**
-  A006). Beides ist an genau einer Stelle zentralisiert (`apply_binding_fixups()` bzw. `KeyVersions`) und
-  bei besserer Faktenlage in einem Schritt revidierbar.
-- **Der Generator ist kein reiner Generator mehr.** Wer die Bindings neu erzeugt, muss den Fixup-Schritt
-  kennen; siehe [XSD-Bindings](../protocol/xsd-bindings.md), Abschnitt „Manuelle Fixups".
+- **The spec caveat remains.** Neither the concretisation of `OrderDetails` nor `A006` on H004
+  is verified against the official XSDs/annexes (proprietary, not in the repo —
+  [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)). The evidence is a real client plus
+  the common reading (EBICS 2.5 Annex 1 knows A005 **and** A006). Both are centralised in
+  exactly one place (`apply_binding_fixups()` and `KeyVersions` respectively) and revisable in
+  one step given better facts.
+- **The generator is no longer a pure generator.** Whoever regenerates the bindings must know
+  the fixup step; see [XSD bindings](../protocol/xsd-bindings.md), section "Manual fixups".
 
-## Alternativen
+## Alternatives
 
-- **Header-Klassen XSD-treu abflachen** (`OrderDetails` + `SecurityMedium` aus `StaticHeaderBaseType` in
-  die drei abgeleiteten Header-Typen ziehen, dort konkret typisiert): verworfen — bildet die
-  XSD-`restriction` zwar korrekt ab, betrifft aber 12 generierte Dateien statt 3, und die
-  Serialisierungsreihenfolge (Basis-Member vor abgeleiteten) sowie die Position der
-  `xs:any`-Collection müssten von Hand stimmen. Deutlich mehr Risiko für denselben Wire-Effekt.
-- **`XmlAttributeOverrides` pro Envelope-Wurzeltyp:** verworfen — die Bindings blieben unberührt, aber
-  die Übersteuerung eines geerbten Members ist im `XmlReflectionImporter` nicht klar spezifiziert, und
-  jede Version × Wurzel bräuchte einen eigenen Override-Satz plus eigenen Serializer-Cache.
-- **Nur empfangsseitig tolerant sein (weiter `xsi:type` emittieren):** verworfen — löst nur die Hälfte.
-  Ein strikter Fremd-Parser auf der Gegenseite (echte Bank) bekäme weiter EBICOs Diskriminator.
-- **Den `EbicsErrorMapper` um `InvalidOperationException` erweitern:** verworfen — zu breit. Ein
-  `InvalidOperationException` aus dem Server-Inneren ist ein echter Serverfehler und muss `061099`
-  bleiben; nur an der Envelope-Grenze ist die Zuordnung eindeutig.
-- **`A006` auf H004 offen lassen:** verworfen — die INI eines realen Clients wäre weiter abgelehnt, und
-  der Vendor-Replay hätte den nachgelagerten Modulus-Defekt nie aufgedeckt.
+- **Flatten the header classes XSD-faithfully** (pull `OrderDetails` + `SecurityMedium` out of
+  `StaticHeaderBaseType` into the three derived header types, typed concretely there): rejected
+  — it maps the XSD `restriction` correctly, but affects 12 generated files instead of 3, and
+  the serialisation order (base members before derived) as well as the position of the
+  `xs:any` collection would have to be correct by hand. Significantly more risk for the same
+  wire effect.
+- **`XmlAttributeOverrides` per envelope root type:** rejected — the bindings would stay
+  untouched, but overriding an inherited member is not clearly specified in the
+  `XmlReflectionImporter`, and each version × root would need its own override set plus its own
+  serializer cache.
+- **Be tolerant only on the receiving side (keep emitting `xsi:type`):** rejected — solves only
+  half. A strict foreign parser on the other side (a real bank) would still get EBICO's
+  discriminator.
+- **Extend the `EbicsErrorMapper` with `InvalidOperationException`:** rejected — too broad. An
+  `InvalidOperationException` from inside the server is a genuine server error and must stay
+  `061099`; only at the envelope boundary is the attribution unambiguous.
+- **Leave `A006` on H004 open:** rejected — a real client's INI would still be rejected, and
+  the vendor replay would never have uncovered the downstream modulus defect.
 
-## Verwandte Entscheidungen
+## Related decisions
 
-- [ADR-0026 — Konformität gegen reale Clients](0026-konformitaet-gegen-reale-clients.md) — hat diese
-  Funde erzeugt und den Fix ausdrücklich als Folgearbeit zurückgestellt.
-- [ADR-0006 — Generierte XSD-Bindings committen](0006-generierte-xsd-bindings-committen.md) — warum die
-  Bindings überhaupt im Repo liegen und ein Fixup-Schritt nötig ist.
-- [ADR-0003 — Umgang mit proprietären Schemas](0003-umgang-mit-proprietaeren-schemas.md) — warum die
-  Verifikation gegen XSD/Annexe hier nicht möglich ist.
+- [ADR-0026 — Conformance against real clients](0026-konformitaet-gegen-reale-clients.md) —
+  produced these findings and explicitly deferred the fix as follow-up work.
+- [ADR-0006 — Commit generated XSD bindings](0006-generierte-xsd-bindings-committen.md) — why
+  the bindings are in the repo at all and a fixup step is needed.
+- [ADR-0003 — Handling proprietary schemas](0003-umgang-mit-proprietaeren-schemas.md) — why
+  verification against the XSDs/annexes is not possible here.

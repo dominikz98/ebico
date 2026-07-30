@@ -1,63 +1,73 @@
-# 0015 — Ereignis-/Protokollspeicher (`IEventLog`)
+# 0015 — Event/audit log store (`IEventLog`)
 
 - Status: accepted
-- Datum: 2026-07-14
+- Date: 2026-07-14
 
-## Kontext
+## Context
 
-Zwei geplante Features lesen denselben serverseitigen Ereignisstrom, erzeugen ihn aber nicht: die
-kundenseitige **HAC**-Protokoll-Order (M5) und der **Suite-Inspektor** (M7). Ohne eine gemeinsame
-Quelle hätte HAC nichts zurückzugeben und die Suite nichts anzuzeigen; jede Sicht würde sonst ihr
-eigenes, divergierendes Log aufbauen. Gebraucht wird **eine** append-only Ablage, in die alle
-Server-Komponenten relevante Ereignisse schreiben (Auftrag eingegangen, Returncode vergeben,
-Transaktion abgeschlossen, Key-Mgmt-Aktion …), mit genug Struktur für beide Projektionen.
+Two planned features read the same server-side event stream but do not produce it:
+the customer-side **HAC** protocol order (M5) and the **Suite inspector** (M7).
+Without a shared source, HAC would have nothing to return and the Suite nothing to
+display; each view would otherwise build up its own, diverging log. What is needed is
+**one** append-only store into which all server components write relevant events
+(order received, return code assigned, transaction completed, key-mgmt action …),
+with enough structure for both projections.
 
-Zu entscheiden war: (a) die Modellierung des Ereignisses und die Store-Abstraktion, (b) der
-Persistenz-Ansatz, und (c) wo Ereignisse geschrieben werden.
+To be decided: (a) the modelling of the event and the store abstraction, (b) the
+persistence approach, and (c) where events are written.
 
-## Entscheidung
+## Decision
 
-1. **Ein append-only Ereignismodell** `EbicsEvent` (immutables `sealed record`, ADR-0007-Stil) mit:
-   store-vergebener monotoner `Sequence` + gestempeltem `Timestamp`, `Type`/`Severity`/`Visibility`
-   (Enums), nullbaren Subscriber-Koordinaten (`HostId`/`PartnerId`/`UserId` aus `EBICO.Core.Domain`),
-   `OrderType`, `TransactionId` (Hex), vollem `EbicsReturnCode` (ADR-0012, trägt `Code`+`SymbolicName`)
-   und `Message`. **Sichtbarkeit** (`CustomerVisible` vs. `Internal`) ist das Feld, an dem sich die
-   beiden Projektionen trennen.
-2. **`IEventLog` = Append + Query**, asynchron, pluggbar via `TryAddSingleton` — **exakt der Store-Weg**
-   aus [ADR-0011](0011-server-stammdatenverwaltung.md). Query filtert nach Kunde/Zeitraum/Typ/
-   Sichtbarkeit (`EbicsEventQuery`, `From` inklusive / `To` exklusiv, optionales `Limit`).
-3. **In-Memory-Default (`InMemoryEventLog`), Persistenz zurückgestellt.** Das ist „derselbe
-   Persistenz-Ansatz wie der übrige Server-Zustand": In-Memory, thread-sicher, mit **Ring-Puffer**
-   (`EbicoServerOptions.MaxEventLogEntries`, Default 10 000) als Speicher-Obergrenze. Das async
-   Interface ist so gebaut, dass ein persistenter Store (SQLite o. ä.) später **nur die Implementierung
-   ersetzt**, ohne Aufrufer zu ändern.
-4. **Schreibpunkte: zentral + Lifecycle.** Ein **zentraler** Punkt in der
-   [`EbicsRequestPipeline`](../server/host.md) schreibt je Anfrage ein `RequestReceived`-Ereignis
-   (Subscriber/OrderType/Phase/Returncode) — das deckt auch das Key-Management ab. Die
-   Transaktions-Engines ([#32](0013-upload-transaktions-engine.md)/[#33](0014-download-transaktions-engine.md))
-   ergänzen **semantische Lifecycle-Ereignisse** (Upload/Download gestartet/abgeschlossen, negative
-   Quittung, Eviction im Hintergrund-Sweep), da diese eine Transaktion über mehrere Requests spannen
-   bzw. requestlos im Cleanup entstehen.
+1. **One append-only event model** `EbicsEvent` (immutable `sealed record`,
+   ADR-0007 style) with: a store-assigned monotonic `Sequence` + stamped `Timestamp`,
+   `Type`/`Severity`/`Visibility` (enums), nullable subscriber coordinates
+   (`HostId`/`PartnerId`/`UserId` from `EBICO.Core.Domain`), `OrderType`,
+   `TransactionId` (hex), full `EbicsReturnCode` (ADR-0012, carries `Code`+`SymbolicName`)
+   and `Message`. **Visibility** (`CustomerVisible` vs. `Internal`) is the field on
+   which the two projections separate.
+2. **`IEventLog` = append + query**, asynchronous, pluggable via `TryAddSingleton` —
+   **exactly the store path** from [ADR-0011](0011-server-stammdatenverwaltung.md).
+   Query filters by customer/time range/type/visibility (`EbicsEventQuery`, `From`
+   inclusive / `To` exclusive, optional `Limit`).
+3. **In-memory default (`InMemoryEventLog`), persistence deferred.** This is "the same
+   persistence approach as the rest of the server state": in-memory, thread-safe, with
+   a **ring buffer** (`EbicoServerOptions.MaxEventLogEntries`, default 10,000) as a
+   memory upper bound. The async interface is built so that a persistent store (SQLite
+   or similar) later **only replaces the implementation**, without changing callers.
+4. **Write points: central + lifecycle.** A **central** point in the
+   [`EbicsRequestPipeline`](../server/host.md) writes a `RequestReceived` event per
+   request (subscriber/order type/phase/return code) — this also covers key
+   management. The transaction engines
+   ([#32](0013-upload-transaktions-engine.md)/[#33](0014-download-transaktions-engine.md))
+   add **semantic lifecycle events** (upload/download started/completed, negative
+   acknowledgement, eviction in the background sweep), since these span a transaction
+   across multiple requests or arise request-less in cleanup.
 
-## Konsequenzen
+## Consequences
 
-- HAC und Suite werden reine **Projektionen** über `QueryAsync` — HAC mit
-  `{ PartnerId, Visibility = CustomerVisible }`, die Suite roh/global. Kein paralleles Logsystem.
-- Der EventLog ist der **erste** Baustein mit echter Persistenz-Perspektive; bis ein SQLite-Store
-  existiert, geht der Log wie der übrige Server-Zustand beim Neustart verloren — für den Emulator
-  akzeptabel. Ein konkreter persistenter Store ist Folge-Arbeit (siehe Backlog im ADR-Index).
-- Segmentweise Transfer-/Receipt-Schritte sind als `Internal` markiert, damit die HAC-Sicht nicht mit
-  Protokoll-Rauschen zuläuft; interne Fehler (`EBICS_INTERNAL_ERROR`) sind nie kundensichtbar.
-- **VEU/ES- und X002-Signaturprüfung** sind noch nicht verdrahtet (Verify-Stage ist ein No-Op, VEU
-  existiert serverseitig nicht) — entsprechende Ereignisse folgen, sobald diese Schritte real werden.
+- HAC and the Suite become pure **projections** over `QueryAsync` — HAC with
+  `{ PartnerId, Visibility = CustomerVisible }`, the Suite raw/global. No parallel log
+  system.
+- The event log is the **first** building block with a real persistence perspective;
+  until a SQLite store exists, the log is lost on restart like the rest of the server
+  state — acceptable for the emulator. A concrete persistent store is follow-up work
+  (see the backlog in the ADR index).
+- Segment-wise transfer/receipt steps are marked `Internal` so the HAC view does not
+  clog with protocol noise; internal errors (`EBICS_INTERNAL_ERROR`) are never
+  customer-visible.
+- **VEU/ES and X002 signature verification** are not yet wired up (the verify stage is
+  a no-op, VEU does not exist server-side) — corresponding events follow once these
+  steps become real.
 
-## Alternativen
+## Alternatives
 
-- **`ILogger`/strukturiertes Logging** als Ereignisquelle. Verworfen: Logs sind für Menschen/Sinks,
-  nicht abfragbar je Kunde/Zeitraum und tragen keine Sichtbarkeits-/Returncode-Semantik, die HAC braucht.
-- **Sofort SQLite** implementieren. Verworfen für diesen PR: macht den EventLog zum einzigen
-  persistenten Store (Asymmetrie zum sonst flüchtigen Zustand) und zieht eine neue Abhängigkeit + eigene
-  Persistenz-ADR nach sich. Das async Interface hält den Weg offen, ohne ihn jetzt zu gehen.
-- **Granulare Schreibpunkte in jedem Key-Mgmt-Handler.** Verworfen: der zentrale Pipeline-Punkt trägt
-  bereits Subscriber + OrderType + Returncode; verstreute Aufrufe über ~15 Handler wären redundant und
-  fehleranfällig.
+- **`ILogger`/structured logging** as the event source. Rejected: logs are for
+  humans/sinks, not queryable per customer/time range and carry no
+  visibility/return-code semantics that HAC needs.
+- **Implement SQLite right away.** Rejected for this PR: it makes the event log the
+  only persistent store (asymmetry to the otherwise volatile state) and pulls in a new
+  dependency + its own persistence ADR. The async interface keeps the path open
+  without going down it now.
+- **Granular write points in every key-mgmt handler.** Rejected: the central pipeline
+  point already carries subscriber + order type + return code; scattered calls across
+  ~15 handlers would be redundant and error-prone.

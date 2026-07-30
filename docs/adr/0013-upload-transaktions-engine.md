@@ -1,61 +1,66 @@
-# 0013 — Upload-Transaktions-Engine & -Speicher
+# 0013 — Upload transaction engine & store
 
 - Status: accepted
-- Datum: 2026-07-13
+- Date: 2026-07-13
 
-## Kontext
+## Context
 
-Bis M4 verarbeitete der Server EBICS-Requests **single-shot**: die
-[`EbicsRequestPipeline`](../server/host.md) löst genau **einen** Handler pro Request über den
-`(Version, OrderType)`-Resolver auf. Der EBICS-**Upload** (Issue #32) ist dagegen die erste
-**mehrphasige** Transaktion: eine **Initialisation** (Transaction-ID-Vergabe, Zustandsaufbau) und
-eine Folge von **Transfer**-Nachrichten (segmentweise Order-Data). Das kollidiert mit dem
-bestehenden Dispatch, weil ein Transfer-Request **keinen** Order-Typ trägt — nur die
-`TransactionID` — und mehrere Nachrichten **gemeinsamen Zustand** teilen (Transaktionsschlüssel,
-Segmentpuffer, Teilnehmerbindung, Phase).
+Until M4 the server processed EBICS requests **single-shot**: the
+[`EbicsRequestPipeline`](../server/host.md) resolves exactly **one** handler per
+request via the `(Version, OrderType)` resolver. The EBICS **upload** (issue #32),
+by contrast, is the first **multi-phase** transaction: an **initialisation**
+(transaction ID assignment, state build-up) and a sequence of **transfer** messages
+(segment-wise order data). This collides with the existing dispatch, because a
+transfer request carries **no** order type — only the `TransactionID` — and multiple
+messages share **common state** (transaction key, segment buffer, subscriber binding,
+phase).
 
-Zu entscheiden war: (a) wie die Transaktionsphasen an die Pipeline andocken, und (b) wo/wie der
-transaktionsübergreifende Zustand gehalten wird.
+To be decided: (a) how the transaction phases dock onto the pipeline, and (b)
+where/how the cross-transaction state is held.
 
-## Entscheidung
+## Decision
 
-1. **Dedizierte Engine für beide Phasen** statt Aufteilung auf Resolver-Handler (Init) und einen
-   separaten Transfer-Pfad: `IUploadTransactionEngine`/`UploadTransactionEngine` besitzt **Init und
-   Transfer** und kapselt die Zustandsmaschine. Sie hat einen eigenen Ergebnistyp
-   (`UploadTransactionResult`), sodass der Handler-Vertrag (`EbicsOrderResult`) und die Single-Shot-
-   Handler (INI/HIA/HPB/HCA/HCS/SPR/HSA) unangetastet bleiben.
-2. **Phasen-Routing in der Pipeline vor dem Resolver:** ein signierter `ebicsRequest` mit
-   `TransactionID` (bzw. `phase=Transfer`) geht an `ContinueUploadAsync`; ein `ebicsRequest` mit
-   `phase=Initialisation` und Order-Typ **FUL** (H003/H004) bzw. **BTU** (H005) an
-   `BeginUploadAsync`. Alles andere fällt unverändert auf den `(Version, OrderType)`-Resolver
-   zurück — HCA/HCS/SPR (ebenfalls signierte `ebicsRequest`) bleiben Single-Shot.
-3. **In-Memory-Transaktionsspeicher** `IUploadTransactionStore` (Default
-   `InMemoryUploadTransactionStore`), analog zum Stammdaten-Store aus
-   [ADR-0011](0011-server-stammdatenverwaltung.md): thread-sicher, pluggbar via `TryAddSingleton`,
-   **keyed auf `Convert.ToHexString(TransactionID)`** (ein `byte[]` taugt nicht als Dictionary-Key).
-4. **Transaktions-/Segment-Fehler als Kontrollfluss** (direkt als Returncode zurückgegeben), nicht
-   als Exceptions; nur die Dekodier-Fehler (Entschlüsselung/Dekompression) laufen über
-   `OrderDataFault` → `EbicsErrorMapper` (`090004`). Es waren **keine** neuen Returncodes nötig — der
-   Katalog aus [ADR-0012](0012-returncode-katalog.md) enthält sie bereits.
+1. **Dedicated engine for both phases** instead of splitting across a resolver
+   handler (init) and a separate transfer path: `IUploadTransactionEngine`/
+   `UploadTransactionEngine` owns **init and transfer** and encapsulates the state
+   machine. It has its own result type (`UploadTransactionResult`), so the handler
+   contract (`EbicsOrderResult`) and the single-shot handlers
+   (INI/HIA/HPB/HCA/HCS/SPR/HSA) stay untouched.
+2. **Phase routing in the pipeline before the resolver:** a signed `ebicsRequest`
+   with a `TransactionID` (i.e. `phase=Transfer`) goes to `ContinueUploadAsync`; an
+   `ebicsRequest` with `phase=Initialisation` and order type **FUL** (H003/H004) or
+   **BTU** (H005) goes to `BeginUploadAsync`. Everything else falls back unchanged to
+   the `(Version, OrderType)` resolver — HCA/HCS/SPR (also signed `ebicsRequest`)
+   stay single-shot.
+3. **In-memory transaction store** `IUploadTransactionStore` (default
+   `InMemoryUploadTransactionStore`), analogous to the master-data store from
+   [ADR-0011](0011-server-stammdatenverwaltung.md): thread-safe, pluggable via
+   `TryAddSingleton`, **keyed on `Convert.ToHexString(TransactionID)`** (a `byte[]` is
+   unsuitable as a dictionary key).
+4. **Transaction/segment errors as control flow** (returned directly as a return
+   code), not as exceptions; only the decode errors (decryption/decompression) run
+   via `OrderDataFault` → `EbicsErrorMapper` (`090004`). **No** new return codes were
+   needed — the catalogue from [ADR-0012](0012-returncode-katalog.md) already contains
+   them.
 
-## Konsequenzen
+## Consequences
 
-- Der Resolver-Dispatch bleibt einfach und für die Key-Management-Handler unverändert; die
-  Transaktionslogik ist an **einer** Stelle gebündelt (hohe Kohäsion, kein impliziter geteilter
-  Zustand über zwei Klassen).
-- Neue Order-Typen mit Upload-Semantik können später an dieselbe Engine angebunden werden
-  (`IsUploadOrderType`), ohne die Pipeline erneut anzufassen.
-- Der In-Memory-Store hält verwaiste (nach Init abgebrochene) und abgeschlossene Transaktionen bis
-  zum Neustart — **Eviction/TTL/Recovery ist Issue #35**. Für den Emulator akzeptabel.
-- Die **ES-Verifikation** ist bewusst zurückgestellt (Order-Data entschlüsselt, nicht
-  authentifiziert) — konsistent mit HCA/HCS; Details und Folge-Arbeit in
+- The resolver dispatch stays simple and unchanged for the key-management handlers;
+  the transaction logic is bundled in **one** place (high cohesion, no implicit shared
+  state across two classes).
+- New order types with upload semantics can later be attached to the same engine
+  (`IsUploadOrderType`) without touching the pipeline again.
+- The in-memory store keeps orphaned (aborted after init) and completed transactions
+  until restart — **eviction/TTL/recovery is issue #35**. Acceptable for the emulator.
+- **ES verification** is deliberately deferred (order data decrypted, not
+  authenticated) — consistent with HCA/HCS; details and follow-up work in
   [docs/server/upload-transaction.md](../server/upload-transaction.md).
 
-## Alternativen
+## Alternatives
 
-- **Init über den Resolver, Transfer über einen Sonderpfad.** Verworfen: der geteilte
-  Transaktionszustand hätte zwei Klassen implizit gekoppelt, und `EbicsOrderResult` hätte um
-  Transaktions-Felder erweitert werden müssen.
-- **Generischer Interceptor für jeden Upload-`ebicsRequest`** (statt fester FUL/BTU-Bindung).
-  Verworfen: müsste eine Init von den einphasigen HCA/HCS/SPR unterscheiden — fehleranfällig; die
-  Order-Typ-Whitelist ist eindeutig.
+- **Init via the resolver, transfer via a special path.** Rejected: the shared
+  transaction state would have implicitly coupled two classes, and `EbicsOrderResult`
+  would have had to be extended with transaction fields.
+- **Generic interceptor for every upload `ebicsRequest`** (instead of the fixed
+  FUL/BTU binding). Rejected: it would have to distinguish an init from the
+  single-phase HCA/HCS/SPR — error-prone; the order-type whitelist is unambiguous.

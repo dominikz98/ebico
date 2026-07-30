@@ -1,60 +1,68 @@
-# 0021 — Message-Capture-Store (`IMessageCaptureStore`)
+# 0021 — Message-capture store (`IMessageCaptureStore`)
 
 - Status: accepted
-- Datum: 2026-07-16
+- Date: 2026-07-16
 
-## Kontext
+## Context
 
-Der Transaktions-Inspektor der Suite (M7, [#54](../suite/transaktions-inspektor.md)) soll pro
-Transaktion die **Roh-XML** von Request und Response je Phase anzeigen. Diese XML entsteht nur
-**transient** im Pipeline-Durchlauf: der Request liegt in `EbicsRequestContext.RequestXml`, die
-Response in den serialisierten Antwort-Bytes; danach wird beides verworfen. Weder der
-[`IEventLog`](0015-ereignis-protokollspeicher.md) (der trägt strukturierte Ereignisse, keine
-Envelopes) noch die Transaktions-Stores (die tragen entschlüsseltes OrderData, keine XML) halten die
-rohe Nachricht. Es fehlt eine Ablage für die verbatim Envelopes.
+The Suite's transaction inspector (M7, [#54](../suite/transaktions-inspektor.md)) is to
+display the **raw XML** of request and response per phase for each transaction. This XML
+arises only **transiently** during the pipeline run: the request lives in
+`EbicsRequestContext.RequestXml`, the response in the serialised response bytes; both are
+discarded afterwards. Neither the [`IEventLog`](0015-ereignis-protokollspeicher.md)
+(which carries structured events, not envelopes) nor the transaction stores (which carry
+decrypted order data, not XML) hold the raw message. A store for the verbatim envelopes
+is missing.
 
-Zu entscheiden war: (a) wo die Roh-XML gehalten wird, (b) das Modell und die Store-Abstraktion, und
-(c) wie der Speicher begrenzt wird.
+To be decided: (a) where the raw XML is held, (b) the model and the store abstraction,
+and (c) how the store is bounded.
 
-## Entscheidung
+## Decision
 
-1. **Eigener, transaktions-scoped Store** `IMessageCaptureStore` (Append + Get-by-TransactionId),
-   **nicht** ein neues Feld am `EbicsEvent`. Begründung: das Event-Modell bleibt schlank (die
-   HAC-Projektion würde die XML nie brauchen), und die Captures sind rein betreiberseitig
-   (nur der Suite-Inspektor liest sie). Das Modell `CapturedMessage` ist ein immutables `sealed record`
-   (ADR-0007-Stil) mit store-vergebener `Sequence`/`Timestamp`, `TransactionIdHex` (Key), `Phase`,
-   optionaler `SegmentNumber`, Subscriber-Koordinaten, `RequestXml`/`ResponseXml` (als **Text**, nicht
-   `byte[]`) und vollem `EbicsReturnCode`.
-2. **Ein zentraler Schreibpunkt in der [`EbicsRequestPipeline`](../server/host.md)** — genau nach der
-   Serialisierung der Antwort, dem einzigen Punkt, an dem Request-XML, Response-XML, die aufgelöste
-   Transaktions-ID/Phase und der finale Returncode gleichzeitig vorliegen. Erfasst wird **nur**, wenn
-   eine Transaktions-ID auflösbar ist. **Key-Management-Orders** (INI/HIA/HPB) tragen keine
-   Transaktions-ID und werden bewusst **nicht** erfasst — sie erscheinen weiter im Event-Log, nur
-   ohne Roh-XML.
-3. **In-Memory-Default (`InMemoryMessageCaptureStore`), pluggbar via `TryAddSingleton`** — exakt der
-   Store-Weg aus [ADR-0011](0011-server-stammdatenverwaltung.md)/[ADR-0015](0015-ereignis-protokollspeicher.md).
-   Speicherbegrenzung auf zwei Achsen: **Ring-Puffer** über alle Captures
-   (`EbicoServerOptions.MaxMessageCaptureEntries`, Default 200) und **Kürzung** je XML-Dokument
-   (`EbicoServerOptions.MaxCapturedMessageBytes`, Default 256 KiB). Das async Interface hält den Weg
-   zu einem persistenten Store (SQLite o. ä.) offen, ohne einen Aufrufer zu ändern.
+1. **A dedicated, transaction-scoped store** `IMessageCaptureStore` (append +
+   get-by-TransactionId), **not** a new field on `EbicsEvent`. Rationale: the event model
+   stays lean (the HAC projection would never need the XML), and the captures are purely
+   operator-side (only the Suite inspector reads them). The model `CapturedMessage` is an
+   immutable `sealed record` (ADR-0007 style) with a store-assigned `Sequence`/`Timestamp`,
+   `TransactionIdHex` (key), `Phase`, optional `SegmentNumber`, subscriber coordinates,
+   `RequestXml`/`ResponseXml` (as **text**, not `byte[]`) and full `EbicsReturnCode`.
+2. **One central write point in the [`EbicsRequestPipeline`](../server/host.md)** — right
+   after the serialisation of the response, the only point where request XML, response
+   XML, the resolved transaction ID/phase and the final return code are present
+   simultaneously. Capture happens **only** when a transaction ID is resolvable.
+   **Key-management orders** (INI/HIA/HPB) carry no transaction ID and are deliberately
+   **not** captured — they still appear in the event log, just without raw XML.
+3. **In-memory default (`InMemoryMessageCaptureStore`), pluggable via `TryAddSingleton`**
+   — exactly the store path from
+   [ADR-0011](0011-server-stammdatenverwaltung.md)/[ADR-0015](0015-ereignis-protokollspeicher.md).
+   Memory bounding on two axes: a **ring buffer** across all captures
+   (`EbicoServerOptions.MaxMessageCaptureEntries`, default 200) and **truncation** per XML
+   document (`EbicoServerOptions.MaxCapturedMessageBytes`, default 256 KiB). The async
+   interface keeps the path to a persistent store (SQLite or similar) open without
+   changing any caller.
 
-## Konsequenzen
+## Consequences
 
-- Der Inspektor bekommt die Roh-XML als reine **Projektion** über `GetAsync(transactionIdHex)`;
-  parallel zum Event-Log entsteht kein zweites Logsystem, nur eine transaktions-scoped Beilage.
-- Die Kürzung ist eine reine **Anzeige**-Verkürzung (mit `*Truncated`-Flag); das autoritative,
-  entschlüsselte OrderData kommt aus dem Transaktions-Store, nicht aus einem gekürzten Capture.
-- Roh-XML für Key-Management ist damit **nicht** abgedeckt — falls später gewünscht, braucht es einen
-  eigenen (nicht transaktions-scoped) Schlüssel; bewusst zurückgestellt.
-- Wie der übrige Server-Zustand geht der In-Memory-Store beim Neustart verloren; ein persistenter
-  Store ist Folge-Arbeit (derselbe Backlog-Punkt wie beim `IEventLog`, ADR-0015).
+- The inspector gets the raw XML as a pure **projection** via `GetAsync(transactionIdHex)`;
+  no second log system arises alongside the event log, only a transaction-scoped
+  appendix.
+- Truncation is a pure **display** shortening (with a `*Truncated` flag); the
+  authoritative, decrypted order data comes from the transaction store, not from a
+  truncated capture.
+- Raw XML for key management is thereby **not** covered — if wanted later, it needs its
+  own (non-transaction-scoped) key; deliberately deferred.
+- Like the rest of the server state, the in-memory store is lost on restart; a persistent
+  store is follow-up work (the same backlog item as for the `IEventLog`, ADR-0015).
 
-## Alternativen
+## Alternatives
 
-- **Roh-XML als Felder am `EbicsEvent`.** Verworfen: bläht jedes Ereignis auf (auch die vielen ohne
-  Transaktionsbezug), belastet die HAC-Projektion und mischt strukturierte Ereignisse mit Envelopes.
-- **Roh-XML an der Transaktion (`UploadTransaction`/`DownloadTransaction`).** Verworfen: die Engines
-  sehen die Envelope-XML nicht (nur die Pipeline), und die Transaktionsobjekte werden nach dem
-  Idle-Timeout evictet — die Roh-XML soll die Transaktion überdauern (bis zum Ring-Puffer-Limit).
-- **Kein persistenter Speicher, Roh-XML nur zur Laufzeit „durchreichen".** Verworfen: der Inspektor
-  liest asynchron, lange nach dem Request; ohne Ablage gäbe es nichts anzuzeigen.
+- **Raw XML as fields on `EbicsEvent`.** Rejected: bloats every event (including the many
+  without a transaction reference), burdens the HAC projection and mixes structured events
+  with envelopes.
+- **Raw XML on the transaction (`UploadTransaction`/`DownloadTransaction`).** Rejected: the
+  engines do not see the envelope XML (only the pipeline does), and the transaction objects
+  are evicted after the idle timeout — the raw XML should outlive the transaction (up to
+  the ring-buffer limit).
+- **No persistent store, just "pass through" the raw XML at runtime.** Rejected: the
+  inspector reads asynchronously, long after the request; without a store there would be
+  nothing to display.

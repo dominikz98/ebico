@@ -1,69 +1,77 @@
-# 0017 — Zahlungsverkehr-Order-Verarbeitung (Validierung & Statusreport-Ablage)
+# 0017 — Payment order processing (validation & status-report storage)
 
 - Status: accepted
-- Datum: 2026-07-14
+- Date: 2026-07-14
 
-## Kontext
+## Context
 
-Nach dem [BTF-Framework (#38)](0016-btf-framework-und-berechtigung.md) und der
-[Upload-Transaktions-Engine (#32)](0013-upload-transaktions-engine.md) endete ein Upload damit, dass
-die reassemblierte, entschlüsselte, dekomprimierte Klartext-Order-Data auf der `UploadTransaction`
-festgehalten wurde — ohne **fachliche** Verarbeitung. Issue #39 liefert die erste konkrete
-Order-Verarbeitung: SEPA-Zahlungsverkehr (CCT/CIP → `pain.001`, CDD/CDB → `pain.008`) soll
-**validiert** und ein **Statusreport (pain.002) zur späteren Auslieferung abgelegt** werden. Dabei
-waren drei Entscheidungen zu treffen: (a) wie tief die pain-Payload validiert wird, (b) was „Ablage zur
-späteren Auslieferung (Statusreports)" konkret erzeugt und (c) welche Einreichungs-Konventionen der
-Emulator akzeptiert.
+After the [BTF framework (#38)](0016-btf-framework-und-berechtigung.md) and the
+[upload transaction engine (#32)](0013-upload-transaktions-engine.md), an upload ended
+with the reassembled, decrypted, decompressed plaintext order data being held on the
+`UploadTransaction` — without **business** processing. Issue #39 delivers the first
+concrete order processing: SEPA payments (CCT/CIP → `pain.001`, CDD/CDB → `pain.008`)
+are to be **validated** and a **status report (pain.002) stored for later delivery**.
+Three decisions were to be made here: (a) how deeply the pain payload is validated, (b)
+what "storage for later delivery (status reports)" concretely produces, and (c) which
+submission conventions the emulator accepts.
 
-## Entscheidung
+## Decision
 
-1. **Strukturelle/semantische Validierung statt XSD.** `EBICO.Core.Payments.SepaPaymentValidator`
-   prüft Wohlgeformtheit, den `Document`-Root in der erwarteten ISO-Namespace-Familie
-   (`urn:iso:std:iso:20022:tech:xsd:pain.001`/`pain.008`), den Initiation-Root, die Pflichtfelder
-   `GrpHdr/MsgId`/`CreDtTm`/`NbOfTxs`, ≥1 `PmtInf` + Transaktion und die zwei Cross-Checks
-   (`NbOfTxs` = Anzahl Transaktionen, `CtrlSum` = Summe der `InstdAmt`). **Keine** ISO-20022-XSDs im
-   Repo — konsistent mit dem Umgang mit proprietären/externen Schemas
+1. **Structural/semantic validation instead of XSD.**
+   `EBICO.Core.Payments.SepaPaymentValidator` checks well-formedness, the `Document`
+   root in the expected ISO namespace family
+   (`urn:iso:std:iso:20022:tech:xsd:pain.001`/`pain.008`), the initiation root, the
+   mandatory fields `GrpHdr/MsgId`/`CreDtTm`/`NbOfTxs`, ≥1 `PmtInf` + transaction and
+   the two cross-checks (`NbOfTxs` = number of transactions, `CtrlSum` = sum of the
+   `InstdAmt`). **No** ISO 20022 XSDs in the repo — consistent with the handling of
+   proprietary/external schemas
    ([ADR-0003](0003-umgang-mit-proprietaeren-schemas.md), [ADR-0006](0006-generierte-xsd-bindings-committen.md)).
-   Elemente werden über **Local Names** gematcht, sodass jede `pain.00x.001.NN`-Revision akzeptiert
-   wird. (Verworfen: volle XSD-Validierung — Schema-Beschaffungs-Infrastruktur + CI-Abhängigkeit ohne
-   Mehrwert für den Emulator; die pluggbare Prozessor-Abstraktion lässt echtes XSD später nachrüsten.)
+   Elements are matched via **local names**, so every `pain.00x.001.NN` revision is
+   accepted. (Rejected: full XSD validation — schema-acquisition infrastructure + CI
+   dependency with no benefit for the emulator; the pluggable processor abstraction
+   lets real XSD be retrofitted later.)
 
-2. **pain.002 generieren und via `IDownloadDataProvider` ablegen.** Bei erfolgreicher Validierung baut
-   `PainStatusReportBuilder` einen positiven **pain.002** (Group-Status `ACCP`, Echo von
-   `OrgnlMsgId`/`OrgnlMsgNmId`) und der `SepaPaymentUploadProcessor` legt ihn über
-   `IDownloadDataProvider.EnqueueAsync` unter `EbicoServerOptions.PaymentStatusReportOrderType`
-   (Default `"PSR"`) für den einreichenden Teilnehmer ab. Damit ist die Upload→Statusreport-Schleife
-   geschlossen und über Provider/Admin-API beobachtbar. (Verworfen: nur die Roh-Payload ablegen — der
-   Statusreport ist der eigentliche fachliche Mehrwert.)
+2. **Generate pain.002 and store it via `IDownloadDataProvider`.** On successful
+   validation, `PainStatusReportBuilder` builds a positive **pain.002** (group status
+   `ACCP`, echo of `OrgnlMsgId`/`OrgnlMsgNmId`) and the `SepaPaymentUploadProcessor`
+   stores it via `IDownloadDataProvider.EnqueueAsync` under
+   `EbicoServerOptions.PaymentStatusReportOrderType` (default `"PSR"`) for the
+   submitting subscriber. This closes the upload→status-report loop and makes it
+   observable via the provider/admin API. (Rejected: store only the raw payload — the
+   status report is the actual business value.)
 
-3. **Alle drei Einreichungs-Konventionen akzeptieren.** H005 `BTU` + BTF, H003/H004 klassischer
-   Order-Code **direkt** (`OrderType="CCT"`), und H003/H004 generisches `FUL` +
-   `FULOrderParams/FileFormat`. Der effektive Order-Code wird zentral über
-   `BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, btf, fileFormat)` aufgelöst und **vor** der
-   Berechtigungsprüfung verwendet (Fix: FUL wird gegen `CCT`, nicht gegen `FUL` autorisiert).
+3. **Accept all three submission conventions.** H005 `BTU` + BTF, H003/H004 classic
+   order code **directly** (`OrderType="CCT"`), and H003/H004 generic `FUL` +
+   `FULOrderParams/FileFormat`. The effective order code is resolved centrally via
+   `BtfOrderTypeCatalog.ResolveUploadOrderType(orderType, btf, fileFormat)` and used
+   **before** the authorisation check (fix: FUL is authorised against `CCT`, not against
+   `FUL`).
 
-4. **Pluggbarer `IUploadOrderProcessor` statt Inline-Logik.** Die Engine ruft nach dem Dekodieren einen
-   per DI registrierten Prozessor (Default `SepaPaymentUploadProcessor`, `TryAddSingleton`). Order-Typen,
-   die der Prozessor nicht kennt, behalten das bisherige Verhalten (nur Klartext festhalten). Der
-   aufgelöste Order-Code wird bei der Init auf der `UploadTransaction` mitgespeichert, weil die
-   Transfer-Phase keinen Order-Typ mehr trägt.
+4. **Pluggable `IUploadOrderProcessor` instead of inline logic.** After decoding, the
+   engine calls a processor registered via DI (default `SepaPaymentUploadProcessor`,
+   `TryAddSingleton`). Order types the processor does not know keep the previous
+   behaviour (only hold the plaintext). The resolved order code is stored alongside on
+   the `UploadTransaction` at init, because the transfer phase no longer carries an
+   order type.
 
-## Konsequenzen
+## Consequences
 
-- Ein ungültiger Payload → `EBICS_INVALID_ORDER_DATA_FORMAT` (`090004`), **keine** Ablage, `OrderRejected`-Event.
-  Ein gültiger → `000000`, pain.002 abgelegt, `OrderAccepted`-Event.
-- `PaymentStatusReportOrderType` (`"PSR"`) ist ein **Best-Effort-Platzhalter** bis zur offiziellen
-  External Code List; das **End-to-End-Herunterladen** des Statusreports (Mapping FDL-`FileFormat`/
-  BTD-BTF → PSR-Queue) folgt mit den [Download-Orders (#40)](../server/download-transaction.md), da die
-  Download-Engine heute nach dem rohen Order-Typ (FDL/BTD) entnimmt.
-- Die ES/`SignatureFlag`-Prüfung bleibt weiterhin offen (konsistent mit #32).
-- `CIP` wurde dem `BtfOrderTypeCatalog` ergänzt (SCT/`INST`/pain.001), eindeutig von CCT über die
-  Service-Option unterscheidbar.
+- An invalid payload → `EBICS_INVALID_ORDER_DATA_FORMAT` (`090004`), **no** storage,
+  `OrderRejected` event. A valid one → `000000`, pain.002 stored, `OrderAccepted` event.
+- `PaymentStatusReportOrderType` (`"PSR"`) is a **best-effort placeholder** until the
+  official External Code List; the **end-to-end downloading** of the status report
+  (mapping FDL `FileFormat`/BTD BTF → PSR queue) follows with the
+  [download orders (#40)](../server/download-transaction.md), since the download engine
+  today dequeues by the raw order type (FDL/BTD).
+- The ES/`SignatureFlag` check remains open (consistent with #32).
+- `CIP` was added to the `BtfOrderTypeCatalog` (SCT/`INST`/pain.001), unambiguously
+  distinguishable from CCT via the service option.
 
-## Alternativen
+## Alternatives
 
-- **Volle ISO-20022-XSD-Validierung** — abgelehnt (s. o.), aber durch die pluggbare Validierung nachrüstbar.
-- **Nur Roh-Payload ablegen** statt pain.002 zu erzeugen — abgelehnt (s. o.).
-- **Order-spezifische einphasige Handler** (wie INI/HIA) statt eines Prozessors auf der Engine —
-  abgelehnt: Zahlungsverkehr ist ein mehrphasiger, segmentierter Upload; der Andockpunkt ist der
-  Abschluss der Transaktion, nicht der Single-Shot-Resolver.
+- **Full ISO 20022 XSD validation** — rejected (see above), but retrofittable via the
+  pluggable validation.
+- **Store only the raw payload** instead of generating pain.002 — rejected (see above).
+- **Order-specific single-phase handlers** (like INI/HIA) instead of a processor on the
+  engine — rejected: payments are a multi-phase, segmented upload; the docking point is
+  the completion of the transaction, not the single-shot resolver.

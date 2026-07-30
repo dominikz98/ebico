@@ -1,46 +1,46 @@
-# 0007 — Domänen-Value-Objects als `readonly record struct`
+# 0007 — Domain value objects as `readonly record struct`
 
 - Status: accepted
-- Datum: 2026-06-22
+- Date: 2026-06-22
 
-## Kontext
+## Context
 
-Mit Issue #16 entsteht die erste handgeschriebene Domänenschicht in `EBICO.Core`
-(`Domain/`): Identifikatoren (`HostId`, `PartnerId`, `UserId`, `SystemId`) und kleine
-Wertobjekte (`SubscriberPermission`). Diese Werte sind unveränderlich, durch ihren
-Inhalt definiert (Werte-Gleichheit) und sollen typsicher sein — eine `UserId` darf nicht
-versehentlich als `PartnerId` durchgehen, obwohl beide nur einen String kapseln.
+Issue #16 introduces the first hand-written domain layer in `EBICO.Core`
+(`Domain/`): identifiers (`HostId`, `PartnerId`, `UserId`, `SystemId`) and small
+value objects (`SubscriberPermission`). These values are immutable, defined by their
+content (value equality) and should be type-safe — a `UserId` must not accidentally
+pass as a `PartnerId`, even though both only wrap a string.
 
-Bisher nutzt der handgeschriebene Core ausschließlich `sealed class` mit explizitem
-Konstruktor (z. B. `EbicsVersionInfo`); Records kamen noch nicht vor. Für die neuen,
-zahlreichen kleinen Wertobjekte ist eine Konvention festzulegen.
+So far the hand-written core uses `sealed class` exclusively with an explicit
+constructor (e.g. `EbicsVersionInfo`); records have not appeared yet. A convention
+must be set for the new, numerous small value objects.
 
-## Entscheidung
+## Decision
 
-Domänen-**Value-Objects** werden als `public readonly record struct` umgesetzt:
+Domain **value objects** are implemented as `public readonly record struct`:
 
-- privater Konstruktor + statische Factory `Create` (wirft) / `TryCreate` (nicht-werfend),
-  damit nur validierte Instanzen entstehen;
-- Werte-Gleichheit und `GetHashCode` vom Record automatisch, kein Boilerplate;
-- `struct` (allokationsfrei) für die typischerweise kleinen, kurzlebigen IDs.
+- private constructor + static factory `Create` (throwing) / `TryCreate`
+  (non-throwing), so that only validated instances come into being;
+- value equality and `GetHashCode` automatically from the record, no boilerplate;
+- `struct` (allocation-free) for the typically small, short-lived IDs.
 
-Größere **Aggregate mit Identität** (`Bank`, `Partner`, `Subscriber`) bleiben bei der
-bestehenden Konvention `sealed class` (unveränderlich, Get-only-Properties).
+Larger **aggregates with identity** (`Bank`, `Partner`, `Subscriber`) stay with the
+existing convention `sealed class` (immutable, get-only properties).
 
-## Konsequenzen
+## Consequences
 
-- Typsicherheit und Werte-Semantik ohne manuelles `Equals`/`==`.
-- **Caveat:** Ein `struct` hat stets einen impliziten parameterlosen Konstruktor;
-  `default(HostId)` / `new HostId()` umgeht damit die Validierung und trägt
-  `Value == null`. Konvention: Instanzen nur über `Create`/`TryCreate` erzeugen; der
-  `default`-Fall ist dokumentiert und durch Tests abgedeckt.
-- Neue Konvention im Projekt — Records sind ab hier für Value-Objects erlaubt und werden
-  in der Doku ([domain-model.md](../protocol/domain-model.md)) referenziert.
+- Type safety and value semantics without manual `Equals`/`==`.
+- **Caveat:** a `struct` always has an implicit parameterless constructor;
+  `default(HostId)` / `new HostId()` thereby bypasses validation and carries
+  `Value == null`. Convention: create instances only via `Create`/`TryCreate`; the
+  `default` case is documented and covered by tests.
+- New convention in the project — records are allowed for value objects from here on
+  and are referenced in the docs ([domain-model.md](../protocol/domain-model.md)).
 
-## Alternativen
+## Alternatives
 
-- **`sealed class` auch für IDs:** konsistent mit dem bestehenden Code, aber viel
-  Boilerplate (`Equals`/`GetHashCode`/`==`/`!=` von Hand) und eine Heap-Allokation je ID.
-- **Ein generischer `EbicsId`-Typ:** weniger Code, aber keine Typsicherheit zwischen den
-  vier ID-Arten — verworfen.
-- **Roher `string`:** keine Validierung an der Quelle, keine Typsicherheit — verworfen.
+- **`sealed class` for IDs too:** consistent with the existing code, but a lot of
+  boilerplate (`Equals`/`GetHashCode`/`==`/`!=` by hand) and a heap allocation per ID.
+- **A generic `EbicsId` type:** less code, but no type safety between the four ID
+  kinds — rejected.
+- **Raw `string`:** no validation at the source, no type safety — rejected.
