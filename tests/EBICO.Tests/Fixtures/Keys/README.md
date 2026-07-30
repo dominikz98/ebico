@@ -1,21 +1,21 @@
-# Schlüssel-/Zertifikat-Fixtures
+# Key/certificate fixtures
 
-Test-Schlüsselmaterial wird **in-process generiert** statt eingecheckt — es gibt
-keine echten oder proprietären Schlüssel im Repo. Bereitgestellt über den Helfer
+Test key material is **generated in-process** instead of being checked in — there are
+no real or proprietary keys in the repo. Provided via the helper
 [`TestCertificates`](../../Infrastructure/TestCertificates.cs):
 
 ```csharp
-using var cert = TestCertificates.CreateSelfSigned("CN=EBICO Test");  // self-signed X.509 + Private Key
-using var rsa  = TestCertificates.CreateRsaKey();                     // frisches RSA-Schlüsselpaar
+using var cert = TestCertificates.CreateSelfSigned("CN=EBICO Test");  // self-signed X.509 + private key
+using var rsa  = TestCertificates.CreateRsaKey();                     // fresh RSA key pair
 ```
 
-Das deckt die Krypto-/Onboarding-Tests ab M2/M3 ab (A00x/E002/X002, INI/HIA/HPB,
-X.509-Verifizierung).
+That covers the crypto/onboarding tests from M2/M3 onwards (A00x/E002/X002, INI/HIA/HPB,
+X.509 verification).
 
-## Reproduzierbare Testvektoren (später)
+## Reproducible test vectors (later)
 
-Sobald reproduzierbare Vektoren nötig sind (feste Hashes/Signaturen über
-mehrere Läufe), können hier **fixe**, selbst erzeugte PEM-Schlüssel als
-Fixtures abgelegt werden. Diese sind nicht geheim und nicht proprietär und
-dürfen committet werden — im Gegensatz zu den EBICS-Beispiel-XML (siehe
+As soon as reproducible vectors are needed (fixed hashes/signatures across
+several runs), **fixed**, self-generated PEM keys can be placed here as
+fixtures. Those are neither secret nor proprietary and
+may be committed — unlike the EBICS sample XML (see
 `../Xml/README.md`).

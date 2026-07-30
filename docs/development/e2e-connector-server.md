@@ -65,7 +65,7 @@ The wiring at its core (from `EbicsE2EHarness.CreateAsync`):
 var services = new ServiceCollection();
 services.AddEbicoConnector(o =>
     {
-        // HttpClientTransport postet gegen die absolute Url, nicht gegen BaseAddress:
+        // HttpClientTransport posts against the absolute Url, not against BaseAddress:
         // Testhost-Origin + EbicoServerOptions.EndpointPath.
         o.Url = "http://localhost/ebics";
         o.HostId = hostId.Value;
@@ -73,7 +73,7 @@ services.AddEbicoConnector(o =>
         o.UserId = userId.Value;
         o.Version = version; // H003 | H004 | H005
     })
-    // Der echte HttpClientTransport bleibt im Spiel — nur der unterste Handler zeigt auf den Testhost.
+    // The real HttpClientTransport stays in play — only the innermost handler points at the test host.
     .ConfigurePrimaryHttpMessageHandler(() => factory.Server.CreateHandler());
 services.AddEbicoOnboarding();
 services.AddEbicoUpload();
@@ -194,7 +194,7 @@ CCT upload (simplified fragments; signature, `DataEncryptionInfo` and namespaces
 ```
 
 ```xml
-<!-- H005: generischer BTU-Upload, die BTF (SCT/pain.001) trägt die Geschäftsidentität -->
+<!-- H005: generic BTU upload, the BTF (SCT/pain.001) carries the business identity -->
 <static>
   <OrderDetails>
     <AdminOrderType>BTU</AdminOrderType>

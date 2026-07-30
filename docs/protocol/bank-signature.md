@@ -48,7 +48,7 @@ var hash = BankSignature.ComputeOrderHash(orderData);          // 32-Byte SHA-25
 var sig  = BankSignature.Sign(orderData, signerKey, KeyVersion.Create("A005"));
 bool ok  = BankSignature.Verify(orderData, sig, signerPubKey, KeyVersion.Create("A005"));
 
-// Hash explizit (z. B. wenn der Hash anderswo schon vorliegt):
+// Hash explicitly (e.g. when the hash is already available elsewhere):
 var sig2 = BankSignature.SignHash(hash, signerKey, KeyVersion.Create("A006"));
 bool ok2 = BankSignature.VerifyHash(hash, sig2, signerPubKey, KeyVersion.Create("A006"));
 ```

@@ -99,6 +99,6 @@ all three versions are present.
 ## Verification
 
 ```bash
-dotnet build EBICO.sln -c Release   # ohne Warnungen/Fehler
-dotnet test                         # Smoke-Test grün
+dotnet build EBICO.sln -c Release   # without warnings/errors
+dotnet test                         # smoke test green
 ```

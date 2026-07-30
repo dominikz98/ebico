@@ -49,7 +49,7 @@ well-formed but unknown code (`"A999"`) is accepted, but does not resolve via
 ```csharp
 var v = KeyVersion.Create("A005");      // v.Purpose == KeyPurpose.Signature
 KeyVersion.Create("a005");              // InvalidKeyVersionException (Kleinbuchstabe)
-KeyVersion.TryCreate("E002", out var e);// nicht-werfende Variante
+KeyVersion.TryCreate("E002", out var e);// non-throwing variant
 default(KeyVersion).Value;              // null — struct-Caveat (vgl. ADR-0007)
 ```
 
@@ -122,7 +122,7 @@ is uniformly translated into `KeyMaterialException`.
 ```csharp
 var material = RsaKeyImportExport.ImportPkcs8(pkcs8Der);   // HasPrivateKey == true
 var (modulus, exponent) = RsaKeyImportExport.ExportRsaKeyValue(material);
-RsaKeyImportExport.ExportPkcs8(material.ToPublicOnly());   // KeyMaterialException (kein privater Schlüssel)
+RsaKeyImportExport.ExportPkcs8(material.ToPublicOnly());   // KeyMaterialException (no private key)
 ```
 
 ## EBICS version relation

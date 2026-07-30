@@ -158,7 +158,7 @@ The captures are produced **once, locally, offline** with the tool under [`tools
 
 ```bash
 cd tools/vendor-capture
-npm install        # ebics-client (MIT) — nur lokal, nie in der CI
+npm install        # ebics-client (MIT) — locally only, never in CI
 node capture.js
 ```
 

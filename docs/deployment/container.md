@@ -136,12 +136,12 @@ CI (`.github/workflows/ci.yml`) builds the server image on every push/PR in a de
 
 The **push to GHCR** happens in the tag-triggered **release pipeline**
 (`.github/workflows/release.yml`, #62 / [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)):
-when a tag `vJAHR.MONAT.N` is pushed, the server image is built and pushed to GHCR as
+when a tag `vYEAR.MONTH.N` is pushed, the server image is built and pushed to GHCR as
 `ghcr.io/dominikz98/ebico-server:{VERSION}` **and** `:latest` — authenticated via
 the automatic `GITHUB_TOKEN` (no external secret). Procedure: [Release runbook](../development/release.md).
 
 ```bash
-# Veröffentlichtes Image ziehen und starten:
+# Pull and start the published image:
 docker run --rm -p 5014:8080 ghcr.io/dominikz98/ebico-server:latest
 curl -i http://localhost:5014/health        # -> 200 "Healthy"
 ```

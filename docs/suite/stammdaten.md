@@ -58,7 +58,7 @@ cascade-deleted rows remain as dead entries). For this there is
 **`IMasterDataChangeNotifier`** ([ADR-0031](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)):
 
 ```csharp
-// Program.cs — Singleton, wie die Stores dahinter
+// Program.cs — singleton, like the stores behind it
 builder.Services.AddSingleton<IMasterDataChangeNotifier, MasterDataChangeNotifier>();
 ```
 

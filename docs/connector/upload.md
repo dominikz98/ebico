@@ -53,11 +53,11 @@ EbicsResult<UploadResult> result = await client.Send(new CctUploadRequest { Pain
 
 if (result.IsSuccess)
 {
-    Console.WriteLine($"Transaktion {result.Value!.TransactionId}, {result.Value.NumSegments} Segment(e)");
+    Console.WriteLine($"Transaction {result.Value!.TransactionId}, {result.Value.NumSegments} segment(s)");
 }
 else
 {
-    Console.WriteLine($"Abgelehnt: {result.ReturnCode} {result.ReturnText}");
+    Console.WriteLine($"Rejected: {result.ReturnCode} {result.ReturnText}");
 }
 ```
 
@@ -73,17 +73,17 @@ else
 For other order types or fine control, `UploadRequest` serves:
 
 ```csharp
-// H005 über eine BTF …
+// H005 via a BTF …
 await client.Send(new UploadRequest
 {
     OrderData = painBytes,
     Btf = new BusinessTransactionFormat("SCT", messageName: "pain.001"),
 });
 
-// … oder über einen klassischen Order-Typ (H003/H004 direkt; H005 leitet die BTF daraus ab)
+// … or via a classic order type (H003/H004 directly; H005 derives the BTF from it)
 await client.Send(new UploadRequest { OrderData = painBytes, OrderType = "CCT" });
 
-// … oder generisch als FUL mit FileFormat (nur H003/H004)
+// … or generically as FUL with a FileFormat (H003/H004 only)
 await client.Send(new UploadRequest { OrderData = painBytes, FileFormat = "pain.001.001.09" });
 ```
 

@@ -29,7 +29,7 @@ public sealed class QuickstartSampleTests
         result.HpbReturnCode.Should().Be(EbicsReturnCode.OkCode);
         result.UploadReturnCode.Should().Be(EbicsReturnCode.OkCode);
         result.UploadTransactionId.Should().NotBeNullOrEmpty();
-        // Ein erfolgreicher Download endet mit 011000 (EBICS_DOWNLOAD_POSTPROCESS_DONE), nicht 000000.
+        // A successful download ends with 011000 (EBICS_DOWNLOAD_POSTPROCESS_DONE), not 000000.
         result.DownloadReturnCode.Should().Be(EbicsReturnCode.DownloadPostprocessDone.Code);
         result.DownloadSegments.Should().BeGreaterThan(0);
     }

@@ -1,16 +1,16 @@
 <Project>
 
   <!--
-    Zentrale Paketverwaltung (Central Package Management).
-    Versionen stehen NUR hier; in den .csproj-Dateien werden Pakete ohne
-    Version-Attribut referenziert. Siehe docs/development/solution-layout.md.
+    Central package management.
+    Versions live ONLY here; in the .csproj files packages are referenced without
+    a version attribute. See docs/development/solution-layout.md.
   -->
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
-  <!-- Test-Harness: xUnit v3 + AwesomeAssertions (MIT-Fork von FluentAssertions v7). -->
+  <!-- Test harness: xUnit v3 + AwesomeAssertions (MIT fork of FluentAssertions v7). -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="xunit.v3" Version="3.2.2" />
@@ -19,32 +19,32 @@
     <PackageVersion Include="AwesomeAssertions" Version="9.4.0" />
   </ItemGroup>
 
-  <!-- Test-Hilfsmittel: kanonischer XML-Vergleich (C14N) für Protokolltests. -->
+  <!-- Test tooling: canonical XML comparison (C14N) for the protocol tests. -->
   <ItemGroup>
     <!--
-      Mindestens 10.0.10: 10.0.9 hat vier High-Severity-Advisories (2026-07-20), die den
-      NuGet-Audit unter TreatWarningsAsErrors als NU1903 hart brechen lassen —
+      At least 10.0.10: 10.0.9 has four high-severity advisories (2026-07-20) that make the
+      NuGet audit break hard as NU1903 under TreatWarningsAsErrors —
       GHSA-cvvh-rhrc-wg4q / CVE-2026-47302 (DoS), GHSA-g8r8-53c2-pm3f / CVE-2026-47304
-      (Security Feature Bypass), GHSA-8q5v-6pqq-x66h / CVE-2026-50525 (DoS) und
-      GHSA-23rf-6693-g89p / CVE-2026-50648 (DoS). Betroffen <= 10.0.9, gepatcht in 10.0.10.
-      Nicht nur ein CI-Ärgernis: ein Signature-Bypass ausgerechnet in der XML-Signatur-
-      Bibliothek ist für ein EBICS-Projekt inhaltlich relevant. Siehe #121.
+      (security feature bypass), GHSA-8q5v-6pqq-x66h / CVE-2026-50525 (DoS) and
+      GHSA-23rf-6693-g89p / CVE-2026-50648 (DoS). Affected <= 10.0.9, patched in 10.0.10.
+      Not merely a CI annoyance: a signature bypass in the XML signature library of all
+      places is substantively relevant for an EBICS project. See #121.
     -->
     <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.10" />
   </ItemGroup>
 
-  <!-- Blazor-Komponententests der EBICO.Suite (framework-agnostisch, mit xUnit v3 genutzt). -->
+  <!-- Blazor component tests of the EBICO.Suite (framework-agnostic, used with xUnit v3). -->
   <ItemGroup>
     <PackageVersion Include="bunit" Version="2.7.2" />
     <!--
-      Transitiver Pin (CentralPackageTransitivePinningEnabled): bunit zieht AngleSharp 1.4.0, das die
-      Sicherheitslücke GHSA-pgww-w46g-26qg / CVE-2026-54570 (mXSS, < 1.5.0) hat und den NuGet-Audit unter
-      TreatWarningsAsErrors als NU1902 hart brechen lässt. Auf die gepatchte 1.5.x anheben (nur Test-Dep).
+      Transitive pin (CentralPackageTransitivePinningEnabled): bunit pulls AngleSharp 1.4.0, which has
+      the vulnerability GHSA-pgww-w46g-26qg / CVE-2026-54570 (mXSS, < 1.5.0) and makes the NuGet audit
+      break hard as NU1902 under TreatWarningsAsErrors. Raise it to the patched 1.5.x (test dep only).
     -->
     <PackageVersion Include="AngleSharp" Version="1.5.2" />
   </ItemGroup>
 
-  <!-- EBICO.Connector: DI/Options/HttpClient-Integration (IHttpClientFactory). -->
+  <!-- EBICO.Connector: DI/options/HttpClient integration (IHttpClientFactory). -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.9" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.9" />
@@ -52,30 +52,30 @@
   </ItemGroup>
 
   <!--
-    EBICO.Connector: INI/HIA-Brief als PDF (Onboarding, M6). QuestPDF Community-Lizenz
-    (kostenlos < 1 Mio USD Jahresumsatz) — siehe docs/adr/0010-pdf-bibliothek.md.
+    EBICO.Connector: INI/HIA letter as a PDF (onboarding, M6). QuestPDF community licence
+    (free below USD 1M annual revenue) — see docs/adr/0010-pdf-bibliothek.md.
   -->
   <ItemGroup>
     <PackageVersion Include="QuestPDF" Version="2025.12.4" />
   </ItemGroup>
 
-  <!-- Tests: konkreter DI-Container (der Connector referenziert nur die Abstractions). -->
+  <!-- Tests: the concrete DI container (the connector only references the abstractions). -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
   </ItemGroup>
 
   <!--
-    NuGet-Packaging (Issue #50): SourceLink für EBICO.Core + EBICO.Connector. Build-only
-    (PrivateAssets=all in Directory.Build.props), fließt nicht als Laufzeit-Abhängigkeit ins Paket.
+    NuGet packaging (issue #50): SourceLink for EBICO.Core + EBICO.Connector. Build-only
+    (PrivateAssets=all in Directory.Build.props), does not flow into the package as a runtime dependency.
   -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
   </ItemGroup>
 
   <!--
-    Integrationstests des EBICO.Server-Hosts (WebApplicationFactory<Program>).
-    Version an das installierte ASP.NET-Core-Shared-Framework (10.0.x) angleichen,
-    falls der Restore meckert.
+    Integration tests of the EBICO.Server host (WebApplicationFactory<Program>).
+    Align the version with the installed ASP.NET Core shared framework (10.0.x)
+    if the restore complains.
   -->
   <ItemGroup>
     <PackageVersion Include="Microsoft.AspNetCore.Mvc.Testing" Version="10.0.8" />

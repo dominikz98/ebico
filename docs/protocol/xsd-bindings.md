@@ -27,14 +27,14 @@ protocol core without needing the schemas.
 Regeneration (maintainer step after a schema update):
 
 ```bash
-# 1) Schemas lokal beziehen (proprietär, nicht im Repo)
+# 1) Obtain the schemas locally (proprietary, not in the repo)
 ./scripts/fetch-schemas.sh --zip ~/Downloads/<ebics_3.0_schema>.zip --version H005
 #    ... ebenso H004 / H003
 
 # 2) Tool wiederherstellen (einmalig pro Clone)
 dotnet tool restore
 
-# 3) Bindings neu generieren und mit-committen
+# 3) Regenerate the bindings and commit them along
 ./scripts/generate-bindings.sh --all
 ```
 

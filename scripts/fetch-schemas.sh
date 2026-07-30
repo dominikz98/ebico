@@ -2,62 +2,62 @@
 ###############################################################################
 # fetch-schemas.sh
 #
-# Bereitet die EBICS-Schemas reproduzierbar auf.
+# Prepares the EBICS schemas reproducibly.
 #
-# WARUM KEIN VOLLAUTOMATISCHER DOWNLOAD?
-#   Die Schema-/Spec-Dateien auf ebics.org liegen hinter einem "I accept"-
-#   Button und werden ueber signierte, ABLAUFENDE securedl-URLs ausgeliefert.
-#   Es gibt keine stabilen Direktlinks. Der Download-Schritt ist daher manuell;
-#   dieses Skript uebernimmt alles danach reproduzierbar:
-#     entpacken -> nach schemas/<VERSION>/ einsortieren -> SHA-256 ->
-#     -> Manifest schreiben -> optional gegen erwartete Dateiliste pruefen.
+# WHY IS THERE NO FULLY AUTOMATED DOWNLOAD?
+#   The schema/spec files on ebics.org sit behind an "I accept"
+#   button and are served via signed, EXPIRING securedl URLs.
+#   There are no stable direct links. The download step is therefore manual;
+#   this script handles everything after it reproducibly:
+#     unzip -> sort into schemas/<VERSION>/ -> SHA-256 ->
+#     -> write manifest -> optionally check against the expected file list.
 #
-# LIZENZ: Schemas/Specs sind proprietaer (EBICS SC). Download + Reproduktion
-#   mit Copyright-Vermerk erlaubt; Modifikation / derivative uses NICHT ohne
-#   schriftliche Genehmigung. Siehe docs/legal/ebics-licensing.md (falls
-#   vorhanden) bzw. docs/protocol/schema-sources.md.
+# LICENSE: schemas/specs are proprietary (EBICS SC). Download + reproduction
+#   with a copyright notice is allowed; modification / derivative uses are NOT
+#   without written permission. See docs/legal/ebics-licensing.md (if
+#   present) or docs/protocol/schema-sources.md.
 #
 # -----------------------------------------------------------------------------
 # WORKFLOW
-#   1) Schema-ZIP manuell laden:
+#   1) Download the schema ZIP manually:
 #        H005 (EBICS 3.0): https://www.ebics.org/en/technical-information/ebics-schema
-#        H004/H003 (Archiv): https://www.ebics.org/en/technical-information/archive-ebics/schema
-#      (auf der Seite "I accept" bestaetigen, ZIP speichern)
-#   2) Skript aufrufen, ZIP + Zielversion angeben:
+#        H004/H003 (archive): https://www.ebics.org/en/technical-information/archive-ebics/schema
+#      (confirm "I accept" on the page, save the ZIP)
+#   2) Call the script, passing the ZIP + target version:
 #        ./scripts/fetch-schemas.sh --zip ~/Downloads/EBICS_3.0_schema.zip --version H005
 #        ./scripts/fetch-schemas.sh --zip ~/Downloads/EBICS_2.5_schema.zip --version H004
-#   3) Ergebnis landet unter schemas/<VERSION>/ ; Manifest unter
-#      schemas/<VERSION>/MANIFEST.sha256 und schemas/manifest.json (aggregiert).
+#   3) The result lands under schemas/<VERSION>/ ; the manifest under
+#      schemas/<VERSION>/MANIFEST.sha256 and schemas/manifest.json (aggregated).
 #
-# Re-Lauf ist idempotent: Zielverzeichnis wird pro Version sauber neu befuellt.
+# Re-running is idempotent: the target directory is cleanly refilled per version.
 ###############################################################################
 set -euo pipefail
 
-# --- Konfiguration / Defaults ------------------------------------------------
+# --- Configuration / defaults ------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SCHEMA_ROOT="${REPO_ROOT}/schemas"
 ZIP=""
 VERSION=""
-STRICT="0"           # bei 1: fehlende erwartete Dateien fuehren zu Exit-Code 2
+STRICT="0"           # when 1: missing expected files lead to exit code 2
 KEEP_TMP="0"
 
 usage () {
   cat <<EOF
-fetch-schemas.sh - EBICS-Schemas reproduzierbar aufbereiten
+fetch-schemas.sh - prepare the EBICS schemas reproducibly
 
-  --zip <pfad>        Pfad zum manuell heruntergeladenen Schema-ZIP (Pflicht)
-  --version <id>      Zielversion: H005 | H004 | H003 (Pflicht)
-  --strict            Fehlende erwartete Schemadateien => Fehler (Exit 2)
-  --keep-tmp          Temporaeres Entpackverzeichnis nicht loeschen
-  -h, --help          Diese Hilfe
+  --zip <path>        Path to the manually downloaded schema ZIP (required)
+  --version <id>      Target version: H005 | H004 | H003 (required)
+  --strict            Missing expected schema files => error (exit 2)
+  --keep-tmp          Do not delete the temporary unpack directory
+  -h, --help          This help
 
-Beispiele:
+Examples:
   ./scripts/fetch-schemas.sh --zip ~/Downloads/ebics_3.0.zip --version H005
   ./scripts/fetch-schemas.sh --zip ~/Downloads/ebics_2.5.zip --version H004 --strict
 EOF
 }
 
-# --- Argumente ---------------------------------------------------------------
+# --- Arguments ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --zip)      ZIP="${2:-}"; shift 2 ;;
@@ -65,29 +65,29 @@ while [[ $# -gt 0 ]]; do
     --strict)   STRICT="1"; shift ;;
     --keep-tmp) KEEP_TMP="1"; shift ;;
     -h|--help)  usage; exit 0 ;;
-    *) echo "Unbekanntes Argument: $1" >&2; usage; exit 1 ;;
+    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
   esac
 done
 
-[[ -z "$ZIP" || -z "$VERSION" ]] && { echo "Fehler: --zip und --version sind Pflicht." >&2; usage; exit 1; }
-[[ -f "$ZIP" ]] || { echo "Fehler: ZIP nicht gefunden: $ZIP" >&2; exit 1; }
+[[ -z "$ZIP" || -z "$VERSION" ]] && { echo "Error: --zip and --version are required." >&2; usage; exit 1; }
+[[ -f "$ZIP" ]] || { echo "Error: ZIP not found: $ZIP" >&2; exit 1; }
 
 case "$VERSION" in
   H005|H004|H003) ;;
-  *) echo "Fehler: --version muss H005, H004 oder H003 sein (war: $VERSION)." >&2; exit 1 ;;
+  *) echo "Error: --version must be H005, H004 or H003 (was: $VERSION)." >&2; exit 1 ;;
 esac
 
-# --- Tool-Checks -------------------------------------------------------------
-need () { command -v "$1" >/dev/null 2>&1 || { echo "Fehlt: $1" >&2; exit 1; }; }
+# --- Tool checks -------------------------------------------------------------
+need () { command -v "$1" >/dev/null 2>&1 || { echo "Missing: $1" >&2; exit 1; }; }
 need unzip
 SHACMD=""
 if command -v sha256sum >/dev/null 2>&1; then SHACMD="sha256sum";
 elif command -v shasum  >/dev/null 2>&1; then SHACMD="shasum -a 256";
-else echo "Fehlt: sha256sum bzw. shasum" >&2; exit 1; fi
+else echo "Missing: sha256sum or shasum" >&2; exit 1; fi
 
-# --- Erwartete Dateien je Version (zur Plausibilitaetspruefung) --------------
-# Quelle: ebics.org Schema-Seite. Liste ist Soll-Stand, nicht zwingend
-# vollstaendig fuer alle Subversionen - dient als Warnhinweis.
+# --- Expected files per version (for a plausibility check) -------------------
+# Source: the ebics.org schema page. The list is the intended state, not
+# necessarily complete for every sub-version - it serves as a warning hint.
 expected_files () {
   case "$1" in
     H005)
@@ -119,8 +119,8 @@ xmldsig-core-schema.xsd
 EOF
       ;;
     H003)
-      # H003 verwendet (anders als H004/H005) UNSUFFIXIERTE Dateinamen;
-      # das Master-Schema heisst ebics.xsd.
+      # H003 uses UNSUFFIXED file names (unlike H004/H005);
+      # its master schema is called ebics.xsd.
       cat <<EOF
 ebics.xsd
 ebics_request.xsd
@@ -137,94 +137,94 @@ EOF
   esac
 }
 
-# --- Entpacken ---------------------------------------------------------------
+# --- Unpacking ---------------------------------------------------------------
 TMP="$(mktemp -d)"
 cleanup () { [[ "$KEEP_TMP" == "1" ]] || rm -rf "$TMP"; }
 trap cleanup EXIT
 
-echo ">> Entpacke $ZIP ..."
+echo ">> Unpacking $ZIP ..."
 unzip -o -q "$ZIP" -d "$TMP"
 
-# Quell-ZIP-Hash festhalten (zur Nachvollziehbarkeit des Bezugs)
+# Record the source ZIP hash (so the provenance stays traceable)
 ZIP_HASH="$($SHACMD "$ZIP" | awk '{print $1}')"
 
-# --- Zielverzeichnis vorbereiten --------------------------------------------
+# --- Prepare the target directory -------------------------------------------
 DEST="${SCHEMA_ROOT}/${VERSION}"
-echo ">> Zielverzeichnis: $DEST"
+echo ">> Target directory: $DEST"
 rm -rf "$DEST"
 mkdir -p "$DEST"
 
-# --- .xsd-Dateien flach einsortieren ----------------------------------------
-# (EBICS-ZIPs enthalten je nach Version Unterordner - wir flachen auf Dateinamen ab.
-#  Bei Namenskollision wird gewarnt und nicht ueberschrieben.)
-echo ">> Sortiere .xsd-Dateien ein ..."
+# --- Sort the .xsd files in flat --------------------------------------------
+# (Depending on the version, EBICS ZIPs contain subfolders - we flatten to file names.
+#  On a name collision a warning is emitted and nothing is overwritten.)
+echo ">> Sorting the .xsd files in ..."
 found_count=0
 while IFS= read -r -d '' f; do
   base="$(basename "$f")"
   if [[ -e "$DEST/$base" ]]; then
-    echo "   WARN: Namenskollision, uebersprungen: $base" >&2
+    echo "   WARN: name collision, skipped: $base" >&2
     continue
   fi
   cp "$f" "$DEST/$base"
   found_count=$((found_count+1))
 done < <(find "$TMP" -type f -iname '*.xsd' -print0)
 
-echo "   $found_count .xsd-Datei(en) uebernommen."
-[[ "$found_count" -eq 0 ]] && { echo "Fehler: keine .xsd im ZIP gefunden." >&2; exit 1; }
+echo "   $found_count .xsd file(s) taken over."
+[[ "$found_count" -eq 0 ]] && { echo "Error: no .xsd found in the ZIP." >&2; exit 1; }
 
-# --- Abgleich gegen erwartete Liste -----------------------------------------
-echo ">> Pruefe gegen erwartete Dateiliste ($VERSION) ..."
+# --- Compare against the expected list --------------------------------------
+echo ">> Checking against the expected file list ($VERSION) ..."
 missing=0
 while IFS= read -r exp; do
   [[ -z "$exp" ]] && continue
   if [[ ! -e "$DEST/$exp" ]]; then
-    echo "   fehlt (erwartet): $exp" >&2
+    echo "   missing (expected): $exp" >&2
     missing=$((missing+1))
   fi
 done < <(expected_files "$VERSION")
 if [[ "$missing" -gt 0 ]]; then
-  echo "   $missing erwartete Datei(en) nicht gefunden."
-  [[ "$STRICT" == "1" ]] && { echo "   --strict gesetzt -> Abbruch." >&2; exit 2; }
-  echo "   (Hinweis: je nach Subversion/Instant-XSD kann das ok sein.)"
+  echo "   $missing expected file(s) not found."
+  [[ "$STRICT" == "1" ]] && { echo "   --strict set -> aborting." >&2; exit 2; }
+  echo "   (Note: depending on the sub-version/instant XSD this can be fine.)"
 else
-  echo "   alle erwarteten Dateien vorhanden."
+  echo "   all expected files present."
 fi
 
-# --- Checksums je Version ----------------------------------------------------
-echo ">> Schreibe SHA-256-Manifest ..."
+# --- Checksums per version ---------------------------------------------------
+echo ">> Writing the SHA-256 manifest ..."
 ( cd "$DEST" && $SHACMD *.xsd | sort -k2 > MANIFEST.sha256 )
 echo "   $DEST/MANIFEST.sha256"
 
-# --- Aggregiertes JSON-Manifest ueber alle Versionen -------------------------
-# (manuell zusammengesetzt, ohne jq-Abhaengigkeit)
-echo ">> Aktualisiere schemas/manifest.json ..."
+# --- Aggregated JSON manifest across all versions ----------------------------
+# (assembled by hand, without a jq dependency)
+echo ">> Updating schemas/manifest.json ..."
 NOW="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 MJSON="${SCHEMA_ROOT}/manifest.json"
 TMPJSON="$(mktemp)"
 
-# Bestehende sourceZipSha256 / ingestedAt pro Version aus altem Manifest lesen,
-# damit ein Lauf fuer Version X die Metadaten von Version Y nicht verwirft.
-# Ohne jq: kleines awk, das pro Versionsblock die beiden Felder herauszieht.
-get_old_meta () {   # $1 = version, $2 = feldname  -> Wert oder leer
+# Read the existing sourceZipSha256 / ingestedAt per version from the old manifest,
+# so that a run for version X does not discard the metadata of version Y.
+# Without jq: a small awk that extracts the two fields per version block.
+get_old_meta () {   # $1 = version, $2 = field name  -> value or empty
   [[ -f "$MJSON" ]] || return 0
   awk -v ver="$1" -v key="$2" '
     $0 ~ "\""ver"\"[[:space:]]*:[[:space:]]*\\{" { inblock=1 }
     inblock && $0 ~ "\""key"\"" {
-      # Zeile der Form:  "key": "value",
+      # A line of the form:  "key": "value",
       line=$0
       sub(/^[^:]*:[[:space:]]*"/, "", line)
       sub(/".*$/, "", line)
       print line
       inblock=0
     }
-    inblock && /"files"[[:space:]]*:/ { inblock=0 }  # Feld nicht vorhanden
+    inblock && /"files"[[:space:]]*:/ { inblock=0 }  # field not present
   ' "$MJSON"
 }
 
 {
   echo "{"
   echo "  \"generatedAt\": \"${NOW}\","
-  echo "  \"note\": \"Reproduzierbar erzeugt von scripts/fetch-schemas.sh. Quelldateien sind proprietaer (EBICS SC) - siehe docs/protocol/schema-sources.md.\","
+  echo "  \"note\": \"Reproducibly produced by scripts/fetch-schemas.sh. The source files are proprietary (EBICS SC) - see docs/protocol/schema-sources.md.\","
   echo "  \"versions\": {"
   first_v=1
   for vdir in "${SCHEMA_ROOT}"/H*/ ; do
@@ -235,8 +235,8 @@ get_old_meta () {   # $1 = version, $2 = feldname  -> Wert oder leer
     [[ $first_v -eq 0 ]] && echo ","
     first_v=0
 
-    # Metadaten bestimmen: fuer die aktuell verarbeitete Version frisch,
-    # fuer andere Versionen aus dem alten Manifest uebernehmen.
+    # Determine the metadata: fresh for the version currently being processed,
+    # taken from the old manifest for the other versions.
     if [[ "$vid" == "$VERSION" ]]; then
       v_ziphash="$ZIP_HASH"
       v_ingested="$NOW"
@@ -266,20 +266,20 @@ get_old_meta () {   # $1 = version, $2 = feldname  -> Wert oder leer
 mv "$TMPJSON" "$MJSON"
 echo "   $MJSON"
 
-# --- README-Stub im Versionsordner ------------------------------------------
+# --- README stub in the version folder --------------------------------------
 cat > "$DEST/README.md" <<EOF
 # EBICS Schemas - $VERSION
 
-Reproduzierbar einsortiert von \`scripts/fetch-schemas.sh\` am ${NOW}.
+Reproducibly sorted in by \`scripts/fetch-schemas.sh\` on ${NOW}.
 
-- Quell-ZIP SHA-256: \`${ZIP_HASH}\`
-- Datei-Checksums: siehe \`MANIFEST.sha256\`
-- Quellen & Lizenz: siehe \`../../docs/protocol/schema-sources.md\`
+- Source ZIP SHA-256: \`${ZIP_HASH}\`
+- File checksums: see \`MANIFEST.sha256\`
+- Sources & license: see \`../../docs/protocol/schema-sources.md\`
 
-> Diese Dateien sind proprietaeres Eigentum der EBICS SC. Nicht modifizieren.
-> Pruefe vor dem Commit, ob diese Dateien ueberhaupt ins Repo duerfen
-> (siehe Lizenz-Issue / docs/legal/ebics-licensing.md).
+> These files are the proprietary property of the EBICS SC. Do not modify them.
+> Before committing, check whether these files may go into the repo at all
+> (see the license issue / docs/legal/ebics-licensing.md).
 EOF
 
-echo ">> Fertig. Schemas unter: $DEST"
-echo "   Tipp: 'git status schemas/' pruefen und Lizenzfrage beachten, bevor du committest."
+echo ">> Done. Schemas under: $DEST"
+echo "   Tip: check 'git status schemas/' and mind the license question before you commit."

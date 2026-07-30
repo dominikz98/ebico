@@ -25,7 +25,7 @@ namespace EBICO.Server.State;
 /// (<see cref="Partner.HostId"/>, <see cref="Partner.PartnerId"/>) pair and a
 /// <see cref="Subscriber"/> by its (<see cref="Subscriber.HostId"/>,
 /// <see cref="Subscriber.PartnerId"/>, <see cref="Subscriber.UserId"/>) triple. This makes the
-/// emulator multi-tenant (Mehr-Mandanten-Fähigkeit).
+/// emulator multi-tenant.
 /// </para>
 /// </remarks>
 public interface IEbicsStateStore

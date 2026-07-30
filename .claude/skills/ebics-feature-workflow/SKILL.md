@@ -66,7 +66,7 @@ Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
 ## Kontext-/Doku-Wartung (Teil der Definition of Done)
 
 Berührt der PR ein Muster, das in `docs/`, `CLAUDE.md` oder einem Skill beschrieben ist, gehört
-dessen Aktualisierung in **denselben** PR (siehe CLAUDE.md → „Wartung von Kontext, Doku & Skills").
+dessen Aktualisierung in **denselben** PR (siehe CLAUDE.md → „Maintaining context, docs & skills").
 Skills verweisen auf konkrete Symbole/Pfade und veralten sonst stillschweigend.
 
 ## Meta-/Tooling-Änderungen

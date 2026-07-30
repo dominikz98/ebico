@@ -9,7 +9,7 @@ namespace EBICO.Core.Payments;
 /// Builds a minimal, structurally plausible ISO 20022 <c>pain.002</c> Customer Payment Status Report for
 /// an accepted (or rejected) payment upload (issue #39). The report echoes the original message
 /// identifiers (<c>OrgnlMsgId</c>/<c>OrgnlMsgNmId</c>) and a group-level status; it is filed for later
-/// download (the "Ablage zur späteren Auslieferung"). This is intentionally a <em>group-level</em>
+/// download. This is intentionally a <em>group-level</em>
 /// acknowledgement — per-transaction status blocks are out of scope (ADR-0017).
 /// </summary>
 public static class PainStatusReportBuilder

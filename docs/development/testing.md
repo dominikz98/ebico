@@ -21,25 +21,25 @@ fixtures** (Milestone M0).
 Running:
 
 ```bash
-dotnet test                 # alle Tests
-dotnet test --collect:"XPlat Code Coverage"   # mit Coverage (wie in der CI)
+dotnet test                 # all tests
+dotnet test --collect:"XPlat Code Coverage"   # with coverage (as in CI)
 ```
 
 ## Directory layout
 
 ```
 tests/EBICO.Tests/
-├── Core/                       # Tests zu EBICO.Core (z. B. EbicsVersion)
-├── E2E/                        # Connector ↔ Server Round-Trips (#57, #58)
-├── Conformance/                # Konformität gegen reale Fremd-Clients (#59)
-│   └── Vendor/<client>/<VERSION>/request/  # committete OSS-Client-Captures (kein gitignore)
-├── Infrastructure/             # Harness-Helfer + deren Tests
+├── Core/                       # tests for EBICO.Core (e.g. EbicsVersion)
+├── E2E/                        # connector ↔ server round-trips (#57, #58)
+├── Conformance/                # conformance against real third-party clients (#59)
+│   └── Vendor/<client>/<VERSION>/request/  # committed OSS client captures (not gitignored)
+├── Infrastructure/             # harness helpers + their tests
 │   ├── CanonicalXmlComparer.cs
 │   ├── TestCertificates.cs
 │   └── SampleXml.cs
 └── Fixtures/
-    ├── Xml/<VERSION>/<direction>/   # EBICS-Beispiel-XML (proprietär, nicht eingecheckt)
-    └── Keys/                        # Schlüssel-Fixtures (in-process generiert)
+    ├── Xml/<VERSION>/<direction>/   # EBICS sample XML (proprietary, not checked in)
+    └── Keys/                        # key fixtures (generated in-process)
 ```
 
 The remaining folders follow the **subject under test** (`Connector/`, `Server/`, `Suite/`, `Schema/`, …).

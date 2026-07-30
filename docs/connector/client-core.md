@@ -75,7 +75,7 @@ services.AddEbicoConnector(o =>
     o.Version   = EbicsVersion.H005;
 })
 .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
-.AddStandardResilienceHandler();   // optional; Resilienz-Paket beim Aufrufer
+.AddStandardResilienceHandler();   // optional; resilience package on the caller's side
 ```
 
 `AddEbicoConnector(...)` registers the options + their validator, the

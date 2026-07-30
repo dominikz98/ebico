@@ -35,7 +35,7 @@ as the report text in the header) and the placement (`Kind`): a **technical** co
 place gets `000000` (`OkCode`). The report text follows the header code.
 
 ```csharp
-// Lookup über die Registry:
+// Lookup via the registry:
 if (EbicsReturnCodes.TryFromCode("091010", out var rc))
 {
     // rc.SymbolicName == "EBICS_INVALID_XML", rc.Kind == EbicsReturnCodeKind.Business

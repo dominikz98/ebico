@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
-  <!-- NuGet-Paketmetadaten (Issue #50). Gemeinsame Felder stehen in Directory.Build.props. -->
+  <!-- NuGet package metadata (issue #50). Shared fields live in Directory.Build.props. -->
   <PropertyGroup>
-    <Description>EBICS-Client als NuGet-Paket (Mediator-Muster): eine typsichere Onboarding-, Upload- und Download-API über IEbicsClient.Send für H003/H004/H005. Gegenstück zum EBICO-Server-Emulator.</Description>
+    <Description>EBICS client as a NuGet package (mediator pattern): a type-safe onboarding, upload and download API via IEbicsClient.Send for H003/H004/H005. Counterpart to the EBICO server emulator.</Description>
     <PackageTags>ebics;banking;sepa;client;connector;camt;pain;h005</PackageTags>
   </PropertyGroup>
 

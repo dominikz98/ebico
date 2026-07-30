@@ -54,7 +54,7 @@ For the common downloads a descriptive request suffices; the order type is fixed
 ```csharp
 var client = provider.GetRequiredService<IEbicsClient>();
 
-// Bank-to-Customer Statement (C53, camt.053), optional mit Zeitraum
+// Bank-to-Customer Statement (C53, camt.053), optionally with a period
 EbicsResult<DownloadResult> result = await client.Send(new C53DownloadRequest
 {
     Period = new DateRange(new DateOnly(2026, 1, 1), new DateOnly(2026, 3, 31)),
@@ -62,12 +62,12 @@ EbicsResult<DownloadResult> result = await client.Send(new C53DownloadRequest
 
 if (result.IsSuccess)
 {
-    ReadOnlyMemory<byte> orderData = result.Value!.OrderData; // entschlüsselter Plaintext (i. d. R. ZIP)
-    Console.WriteLine($"Transaktion {result.Value.TransactionId}, {result.Value.NumSegments} Segment(e)");
+    ReadOnlyMemory<byte> orderData = result.Value!.OrderData; // decrypted plaintext (usually a ZIP)
+    Console.WriteLine($"Transaction {result.Value.TransactionId}, {result.Value.NumSegments} segment(s)");
 }
 else
 {
-    Console.WriteLine($"Abgelehnt: {result.ReturnCode} {result.ReturnText}");
+    Console.WriteLine($"Rejected: {result.ReturnCode} {result.ReturnText}");
 }
 ```
 
@@ -101,11 +101,11 @@ connector format-agnostic (it knows neither ZIP nor camt), and the caller determ
 ```csharp
 var result = await client.Send(new C53DownloadRequest
 {
-    Parse = bytes => MyStatementParser.ReadEntries(bytes), // eigener Hook
+    Parse = bytes => MyStatementParser.ReadEntries(bytes), // your own hook
 });
 
 IReadOnlyList<StatementEntry>? entries = result.Value!.ParsedAs<IReadOnlyList<StatementEntry>>();
-byte[] raw = result.Value.OrderData.ToArray();             // die Roh-Bytes bleiben zugänglich
+byte[] raw = result.Value.OrderData.ToArray();             // the raw bytes stay accessible
 ```
 
 If the hook throws an exception, the connector sends a **negative Receipt** (the server makes the
@@ -116,13 +116,13 @@ data available again) and rethrows the exception.
 For other order types or fine control, `DownloadRequest` serves:
 
 ```csharp
-// H005 über eine BTF …
+// H005 via a BTF …
 await client.Send(new DownloadRequest { Btf = new BusinessTransactionFormat("EOP", messageName: "camt.053") });
 
-// … oder über einen klassischen Order-Typ (H003/H004 direkt; H005 leitet die BTF für Auszüge daraus ab)
+// … or via a classic order type (H003/H004 directly; H005 derives the statement BTF from it)
 await client.Send(new DownloadRequest { OrderType = "C53" });
 
-// … oder generisch als FDL mit FileFormat (nur H003/H004)
+// … or generically as FDL with a FileFormat (H003/H004 only)
 await client.Send(new DownloadRequest { FileFormat = "camt.053", Period = new DateRange(from, to) });
 ```
 

@@ -18,9 +18,9 @@
   </ItemGroup>
 
   <!--
-    WebApplicationFactory<Program> braucht das ASP.NET-Core-Shared-Framework im Testprojekt.
-    Es liefert zugleich System.Security.Cryptography.Xml und Microsoft.Extensions.DependencyInjection
-    (die daher nicht mehr als eigene PackageReference nötig sind — NU1510).
+    WebApplicationFactory<Program> needs the ASP.NET Core shared framework in the test project.
+    It also supplies System.Security.Cryptography.Xml and Microsoft.Extensions.DependencyInjection
+    (which are therefore no longer needed as their own PackageReference — NU1510).
   -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
@@ -29,19 +29,19 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\EBICO.Core\EBICO.Core.csproj" />
     <ProjectReference Include="..\..\src\EBICO.Connector\EBICO.Connector.csproj" />
-    <!-- 'EbicoServer'-Alias disambiguiert den globalen Program-Typ (EBICO.Server vs. EBICO.Suite)
-         in den WebApplicationFactory-Integrationstests; 'global' erhält den normalen Zugriff. -->
+    <!-- The 'EbicoServer' alias disambiguates the global Program type (EBICO.Server vs. EBICO.Suite)
+         in the WebApplicationFactory integration tests; 'global' keeps the normal access. -->
     <ProjectReference Include="..\..\src\EBICO.Server\EBICO.Server.csproj" Aliases="global,EbicoServer" />
     <ProjectReference Include="..\..\src\EBICO.Suite\EBICO.Suite.csproj" />
-    <!-- Quickstart-Sample (#50): dessen QuickstartRunner treibt der Smoke-Test end-to-end. -->
+    <!-- Quickstart sample (#50): the smoke test drives its QuickstartRunner end-to-end. -->
     <ProjectReference Include="..\..\samples\EBICO.Connector.Quickstart\EBICO.Connector.Quickstart.csproj" />
   </ItemGroup>
 
-  <!-- Fixtures (inkl. proprietärer, nicht eingecheckter Beispiel-XML) in den Output kopieren. -->
+  <!-- Copy the fixtures (incl. proprietary, non-checked-in sample XML) into the output. -->
   <ItemGroup>
     <None Update="Fixtures\**" CopyToOutputDirectory="PreserveNewest" />
-    <!-- Vendor-Captures echter Fremd-Clients (#59): committet und in den Output kopiert, damit der
-         Conformance-Replay sie zur Laufzeit neben dem Test-Assembly findet. -->
+    <!-- Vendor captures of real third-party clients (#59): committed and copied into the output so the
+         conformance replay finds them next to the test assembly at runtime. -->
     <None Update="Conformance\Vendor\**" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

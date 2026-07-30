@@ -1,13 +1,13 @@
 # EBICO.Core
 
-Die **geteilten EBICS-Primitives** von [EBICO](https://github.com/dominikz98/ebico): Schema-Bindings
-und Serialisierung, Krypto (RSA-Schlüsselmaterial, Signatur/Verschlüsselung, Fingerprints), das
-BTF-/Order-Modell, Domänen-Value-Objects (HostID/PartnerID/UserID …) und der Returncode-Katalog.
-Unterstützte Protokoll­versionen: **H003, H004, H005**.
+The **shared EBICS primitives** of [EBICO](https://github.com/dominikz98/ebico): schema bindings
+and serialisation, crypto (RSA key material, signing/encryption, fingerprints), the
+BTF/order model, domain value objects (HostID/PartnerID/UserID …) and the return-code catalogue.
+Supported protocol versions: **H003, H004, H005**.
 
-`EBICO.Core` ist das gemeinsame Fundament von **`EBICO.Connector`** (dem Client) und dem
-**EBICO-Server-Emulator**. In der Regel wird es **transitiv** über `EBICO.Connector` referenziert;
-ein direkter Verweis lohnt nur, wenn die Primitives eigenständig genutzt werden.
+`EBICO.Core` is the common foundation of **`EBICO.Connector`** (the client) and the
+**EBICO server emulator**. As a rule it is referenced **transitively** via `EBICO.Connector`;
+a direct reference is only worthwhile if you use the primitives on their own.
 
 ## Installation
 
@@ -15,12 +15,12 @@ ein direkter Verweis lohnt nur, wenn die Primitives eigenständig genutzt werden
 dotnet add package EBICO.Core
 ```
 
-## Dokumentation
+## Documentation
 
-Siehe den [Doku-Index](https://github.com/dominikz98/ebico/blob/main/docs/index.md), insbesondere die
-Rubrik *Protokoll & Schemas*.
+See the [doc index](https://github.com/dominikz98/ebico/blob/main/docs/index.md), in particular the
+*Protocol & schemas* section.
 
-## Lizenz
+## License
 
-MIT — siehe [LICENSE](https://github.com/dominikz98/ebico/blob/main/LICENSE). Die EBICS-Schemas/Specs
-selbst sind proprietäres Eigentum der EBICS SC und nicht Teil dieses Pakets.
+MIT — see [LICENSE](https://github.com/dominikz98/ebico/blob/main/LICENSE). The EBICS schemas/specs
+themselves are the proprietary property of the EBICS SC and are not part of this package.

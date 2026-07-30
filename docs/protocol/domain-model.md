@@ -43,14 +43,14 @@ All four IDs share the same schema restriction — **1–35 characters from
 | `SystemId` | technical system (`SystemID`) | optional (multi-user) | `[a-zA-Z0-9,=]{1,35}` |
 
 ```csharp
-var host = HostId.Create("BANKDE01");          // wirft InvalidEbicsIdentifierException bei ungültig
+var host = HostId.Create("BANKDE01");          // throws InvalidEbicsIdentifierException when invalid
 
-if (UserId.TryCreate(input, out var user))     // nicht-werfende Variante
+if (UserId.TryCreate(input, out var user))     // non-throwing variant
 {
     // user.Value ist garantiert valide
 }
 
-HostId.Create("A,B=C");                          // ok: Komma und Gleichheitszeichen sind erlaubt
+HostId.Create("A,B=C");                          // ok: comma and equals sign are allowed
 HostId.Create("AB CD");                          // InvalidEbicsIdentifierException (Leerzeichen)
 HostId.Create(new string('X', 36));              // InvalidEbicsIdentifierException (zu lang)
 ```
@@ -77,7 +77,7 @@ is **transport (`T`)** versus **bank-technical/authorising (`E`/`A`/`B`)**:
 SignatureClass.T.IsTransportOnly();    // true
 SignatureClass.E.IsBankTechnical();    // true
 
-var perm = new SubscriberPermission("CCT", SignatureClass.T);  // CCT nur einreichen, nicht freigeben
+var perm = new SubscriberPermission("CCT", SignatureClass.T);  // may only submit CCT, not release it
 perm.IsTransportOnly;                                          // true
 ```
 

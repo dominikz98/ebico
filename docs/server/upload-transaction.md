@@ -53,7 +53,7 @@ against a missing field — by the presence of a `TransactionID` in the static h
 | 6. Response | `ebicsResponse`, `phase=Initialisation`, `TransactionID`, `EBICS_OK` |
 
 ```xml
-<!-- Request (gekürzt) -->
+<!-- Request (abridged) -->
 <ebicsRequest Version="H004" ...>
   <header authenticate="true">
     <static>
@@ -65,11 +65,11 @@ against a missing field — by the presence of a `TransactionID` in the static h
   </header>
   <body><DataTransfer>
     <DataEncryptionInfo authenticate="true"><TransactionKey>…</TransactionKey> …</DataEncryptionInfo>
-    <SignatureData authenticate="true">…</SignatureData>   <!-- ES: einbehalten, nicht geprüft -->
+    <SignatureData authenticate="true">…</SignatureData>   <!-- ES: retained, not verified -->
   </DataTransfer></body>
 </ebicsRequest>
 
-<!-- Response (gekürzt) -->
+<!-- Response (abridged) -->
 <ebicsResponse Version="H004" ...>
   <header><static><TransactionID>…</TransactionID></static>
     <mutable><TransactionPhase>Initialisation</TransactionPhase><ReturnCode>000000</ReturnCode><ReportText>EBICS_OK</ReportText></mutable>

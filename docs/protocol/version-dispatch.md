@@ -108,12 +108,12 @@ because it is a caller bug, not bad input data.
 ## Usage
 
 ```csharp
-// Zielversion auswählen (z. B. Connector-DI: o.Version = EbicsVersion.H005)
+// Select the target version (e.g. connector DI: o.Version = EbicsVersion.H005)
 var requestType = EbicsVersions.Get(options.Version).RequestType;
 
-// Inbound-Dispatch im Server: Version aus den Bytes der Anfrage erkennen
+// Inbound dispatch in the server: detect the version from the request bytes
 var info = EbicsVersionDetector.Detect(rawRequestXml);
-// info.Version / info.RequestType → die passende Bindings-Familie
+// info.Version / info.RequestType → the matching bindings family
 ```
 
 ## Tests

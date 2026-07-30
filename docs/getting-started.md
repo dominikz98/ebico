@@ -15,7 +15,7 @@ Two ways — pick one.
 ```bash
 docker compose up --build
 #   server -> http://localhost:5014
-#   suite  -> http://localhost:5267   (Blazor-Admin-/Inspektor-UI)
+#   suite  -> http://localhost:5267   (Blazor admin/inspector UI)
 ```
 
 Alternatively just the published server image (available after the first tagged release, #62):
@@ -29,7 +29,7 @@ Details & ENV configuration: [Container image](deployment/container.md).
 ### Option B: `dotnet run` (from source)
 
 ```bash
-dotnet run --project src/EBICO.Server      # lauscht auf http://localhost:5014
+dotnet run --project src/EBICO.Server      # listens on http://localhost:5014
 ```
 
 ### Is it running? (check liveness)
@@ -65,12 +65,12 @@ dotnet run --project samples/EBICO.Connector.Quickstart
 Expected output (ports/IDs vary):
 
 ```text
-EBICO.Server läuft auf http://127.0.0.1:52341 (EBICS-Endpoint http://127.0.0.1:52341/ebics, Version H005).
-Teilnehmerschlüssel erzeugt (A00x/X002/E002).
+EBICO.Server listening on http://127.0.0.1:52341 (EBICS endpoint http://127.0.0.1:52341/ebics, version H005).
+Subscriber keys generated (A00x/X002/E002).
 Onboarding: INI 000000, HIA 000000, HPB 000000.
-Upload (CCT): 000000, TxId ..., 1 Segment(e).
-Download (C53): 011000, 1 Segment(e), ... Byte, Einträge: ....
-Quickstart erfolgreich abgeschlossen.
+Upload (CCT): 000000, TxId ..., 1 segment(s).
+Download (C53): 011000, 1 segment(s), ... bytes, entries: ....
+Quickstart completed successfully.
 ```
 
 How to point the same client at a **separately running** server instead (from step 1) or a

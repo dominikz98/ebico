@@ -105,7 +105,7 @@ the ID belongs to a download transaction (`OwnsTransaction`), otherwise to the u
   <body><DataTransfer>
     <DataEncryptionInfo authenticate="true">
       <EncryptionPubKeyDigest Version="E002" Algorithm="…sha256">…</EncryptionPubKeyDigest>
-      <TransactionKey>…</TransactionKey>              <!-- RSA-OAEP für den Teilnehmer -->
+      <TransactionKey>…</TransactionKey>              <!-- RSA-OAEP for the subscriber -->
     </DataEncryptionInfo>
     <OrderData>…segment 1…</OrderData>
   </DataTransfer><ReturnCode>000000</ReturnCode></body>

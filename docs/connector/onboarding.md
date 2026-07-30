@@ -42,18 +42,18 @@ All requests follow the mediator pattern (`IEbicsRequest<TResult>`; see [client 
 services.AddEbicoConnector(o => { /* Url, HostId, PartnerId, UserId, Version */ })
         .Services.AddEbicoOnboarding();
 
-// 1. Schlüssel erzeugen (einmalig, außerhalb der Send-Pipeline).
+// 1. Generate the keys (once, outside the send pipeline).
 var keys = await keyGenerator.GenerateAsync();          // ISubscriberKeyGenerator
 
-// 2./3. INI + HIA senden.
-var ini = await client.Send(new IniRequest());          // -> IniResult (mit Brief)
-var hia = await client.Send(new HiaRequest());          // -> HiaResult (mit Brief)
+// 2./3. Send INI + HIA.
+var ini = await client.Send(new IniRequest());          // -> IniResult (with letter)
+var hia = await client.Send(new HiaRequest());          // -> HiaResult (with letter)
 
-// 4. Brief ausgeben (Text + PDF).
-File.WriteAllText("ini-brief.txt", ini.Value!.Letter!.Text);
-File.WriteAllBytes("ini-brief.pdf", ini.Value!.Letter!.Pdf!);
+// 4. Write out the letter (text + PDF).
+File.WriteAllText("ini-letter.txt", ini.Value!.Letter!.Text);
+File.WriteAllBytes("ini-letter.pdf", ini.Value!.Letter!.Pdf!);
 
-// 5. Bankschlüssel abrufen + gegen den Bankbrief verifizieren.
+// 5. Fetch the bank keys + verify them against the bank letter.
 var hpb = await client.Send(new HpbRequest
 {
     ExpectedAuthenticationKeyDigest = bankLetterAuthDigest,

@@ -5,7 +5,7 @@ namespace EBICO.Server.Orders;
 
 /// <summary>
 /// Files the positive <c>pain.002</c> customer payment status report for an accepted payment order into the
-/// download-data provider for later delivery (the "Ablage zur späteren Auslieferung"). Shared between the
+/// download-data provider for later delivery. Shared between the
 /// immediate-accept path of <see cref="SepaPaymentUploadProcessor"/> (issue #39) and the release path of
 /// <see cref="VeuSignatureUploadProcessor"/> (issue #42), which files the same report once an order awaiting
 /// distributed signatures has collected all required signatures.

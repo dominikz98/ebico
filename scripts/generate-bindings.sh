@@ -2,39 +2,39 @@
 ###############################################################################
 # generate-bindings.sh
 #
-# Erzeugt die C#-XSD-Bindings (EBICO.Core/Schema) reproduzierbar aus den lokal
-# bezogenen EBICS-Schemas.
+# Produces the C# XSD bindings (EBICO.Core/Schema) reproducibly from the locally
+# obtained EBICS schemas.
 #
-# WARUM EIN SKRIPT?
-#   Die Bindings werden committet (ADR-0006), aber die XSDs selbst bleiben
-#   proprietaer und ungetrackt (ADR-0003). Dieses Skript ist der reproduzierbare
-#   Weg, die committeten .cs nach einem Schema-Update neu zu generieren.
-#   Es ist KEIN Build-Schritt: die CI kompiliert die committeten Bindings ohne
-#   Schemas oder dieses Tool.
+# WHY A SCRIPT?
+#   The bindings are committed (ADR-0006), but the XSDs themselves stay
+#   proprietary and untracked (ADR-0003). This script is the reproducible
+#   way to regenerate the committed .cs after a schema update.
+#   It is NOT a build step: CI compiles the committed bindings without
+#   the schemas or this tool.
 #
-# VORAUSSETZUNGEN
-#   1) Schemas lokal vorhanden:   ./scripts/fetch-schemas.sh ... (schemas/<V>/)
-#   2) Tool wiederhergestellt:    dotnet tool restore  (.config/dotnet-tools.json
-#                                 pinnt dotnet-xscgen / XmlSchemaClassGenerator)
+# PREREQUISITES
+#   1) Schemas available locally:  ./scripts/fetch-schemas.sh ... (schemas/<V>/)
+#   2) Tool restored:             dotnet tool restore  (.config/dotnet-tools.json
+#                                 pins dotnet-xscgen / XmlSchemaClassGenerator)
 #
-# AUFRUF
+# INVOCATION
 #   ./scripts/generate-bindings.sh --all
 #   ./scripts/generate-bindings.sh --version H005
 #
-# ERGEBNIS (idempotent; Zielordner werden pro Lauf sauber neu befuellt)
+# RESULT (idempotent; the target folders are cleanly refilled per run)
 #   src/EBICO.Core/Schema/
-#     H005/ H004/ H003/                 versionsspezifische Typen
-#     Shared/XmlDsig/                   W3C xmldsig (einmal, geteilt)
-#     Shared/Hev/                       HEV / H000 (einmal, geteilt)
-#     Shared/Signature/S001/            EBICS-Signatur S001 (H003+H004)
-#     Shared/Signature/S002/            EBICS-Signatur S002 (H005)
+#     H005/ H004/ H003/                 version-specific types
+#     Shared/XmlDsig/                   W3C xmldsig (once, shared)
+#     Shared/Hev/                       HEV / H000 (once, shared)
+#     Shared/Signature/S001/            EBICS signature S001 (H003+H004)
+#     Shared/Signature/S002/            EBICS signature S002 (H005)
 #
-# NACHBEARBEITUNG: nach jedem Lauf wird apply_binding_fixups() angewendet (ein
-#   dokumentierter Eingriff in die generierten Typen, Issue #117 / ADR-0029 —
-#   siehe Kommentar an der Funktion und docs/protocol/xsd-bindings.md).
+# POST-PROCESSING: apply_binding_fixups() is applied after every run (a
+#   documented intervention in the generated types, issue #117 / ADR-0029 —
+#   see the comment on the function and docs/protocol/xsd-bindings.md).
 #
-# LIZENZ: Schemas/Specs sind proprietaer (EBICS SC). Die generierten Bindings
-#   sind abgeleitete Artefakte; siehe docs/legal/ebics-licensing.md und ADR-0006.
+# LICENSE: schemas/specs are proprietary (EBICS SC). The generated bindings
+#   are derived artefacts; see docs/legal/ebics-licensing.md and ADR-0006.
 ###############################################################################
 set -euo pipefail
 
@@ -46,39 +46,39 @@ VERSION=""
 
 usage () {
   cat <<EOF
-generate-bindings.sh - EBICS-XSD-Bindings reproduzierbar generieren
+generate-bindings.sh - generate the EBICS XSD bindings reproducibly
 
-  --all               Alle Versionen (H003, H004, H005) neu generieren
-  --version <id>      Nur eine Version: H005 | H004 | H003
-  -h, --help          Diese Hilfe
+  --all               Regenerate all versions (H003, H004, H005)
+  --version <id>      A single version only: H005 | H004 | H003
+  -h, --help          This help
 
-Voraussetzung: ./scripts/fetch-schemas.sh (Schemas lokal) + dotnet tool restore.
+Prerequisite: ./scripts/fetch-schemas.sh (schemas locally) + dotnet tool restore.
 EOF
 }
 
-# --- Argumente ---------------------------------------------------------------
+# --- Arguments ---------------------------------------------------------------
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --all)      DO_ALL="1"; shift ;;
     --version)  VERSION="${2:-}"; shift 2 ;;
     -h|--help)  usage; exit 0 ;;
-    *) echo "Unbekanntes Argument: $1" >&2; usage; exit 1 ;;
+    *) echo "Unknown argument: $1" >&2; usage; exit 1 ;;
   esac
 done
 
 if [[ "$DO_ALL" == "0" && -z "$VERSION" ]]; then
-  echo "Fehler: --all oder --version <id> angeben." >&2
+  echo "Error: pass --all or --version <id>." >&2
   usage; exit 1
 fi
 
-# --- gemeinsame xscgen-Optionen ---------------------------------------------
-#   --nullable          : nullable Adapter-Properties fuer optionale Werttypen
-#                         (statt *Specified; verhindert stillen Datenverlust)
-#   --netCore --pcl     : portable, framework-unabhaengige Klassen
-#   --separateFiles     : eine Datei pro Typ (kleine, reviewbare Diffs)
-#   --namespaceHierarchy: ein Ordner je C#-Namespace -> trennt shared/versioniert
-#   --commentLanguages en: <summary> aus den XSD-<annotation>s (englisch)
-#   --commandArgs-      : keine Befehlszeile in den Header (sonst nicht-determin.)
+# --- shared xscgen options ---------------------------------------------------
+#   --nullable          : nullable adapter properties for optional value types
+#                         (instead of *Specified; prevents silent data loss)
+#   --netCore --pcl     : portable, framework-independent classes
+#   --separateFiles     : one file per type (small, reviewable diffs)
+#   --namespaceHierarchy: one folder per C# namespace -> separates shared/versioned
+#   --commentLanguages en: <summary> from the XSD <annotation>s (English)
+#   --commandArgs-      : no command line in the header (non-deterministic otherwise)
 XSCGEN_COMMON=(--nullable --netCore --pcl --separateFiles --namespaceHierarchy
                --commentLanguages en --commandArgs-)
 
@@ -87,7 +87,7 @@ HEV_MAP="http://www.ebics.org/H000=EBICO.Core.Schema.Hev"
 S001_MAP="http://www.ebics.org/S001=EBICO.Core.Schema.Signature.S001"
 S002_MAP="http://www.ebics.org/S002=EBICO.Core.Schema.Signature.S002"
 
-# Generiert eine Version in ein Staging-Verzeichnis (Echo: Pfad zu .../Schema)
+# Generates one version into a staging directory (echo: path to .../Schema)
 generate_to_staging () {
   local ver="$1" staging="$2"
   local -a maps
@@ -95,11 +95,11 @@ generate_to_staging () {
     H005) maps=(-n "urn:org:ebics:H005=EBICO.Core.Schema.H005" -n "$S002_MAP" -n "$HEV_MAP" -n "$DS_MAP") ;;
     H004) maps=(-n "urn:org:ebics:H004=EBICO.Core.Schema.H004" -n "$S001_MAP" -n "$HEV_MAP" -n "$DS_MAP") ;;
     H003) maps=(-n "http://www.ebics.org/H003=EBICO.Core.Schema.H003" -n "$S001_MAP" -n "$HEV_MAP" -n "$DS_MAP") ;;
-    *) echo "Unbekannte Version: $ver" >&2; return 1 ;;
+    *) echo "Unknown version: $ver" >&2; return 1 ;;
   esac
 
   if [[ ! -d "${SCHEMA_ROOT}/${ver}" ]] || ! ls "${SCHEMA_ROOT}/${ver}"/*.xsd >/dev/null 2>&1; then
-    echo "Fehler: keine XSDs unter ${SCHEMA_ROOT}/${ver}/ — zuerst fetch-schemas.sh ausfuehren." >&2
+    echo "Error: no XSDs under ${SCHEMA_ROOT}/${ver}/ — run fetch-schemas.sh first." >&2
     return 2
   fi
 
@@ -107,7 +107,7 @@ generate_to_staging () {
       "schemas/${ver}"/*.xsd >/dev/null )
 }
 
-# Kopiert einen Namespace-Ordner aus dem Staging an seinen Zielort
+# Copies a namespace folder out of the staging area to its target location
 place () {
   local src="$1" dst="$2"
   rm -rf "$dst"
@@ -116,29 +116,29 @@ place () {
 }
 
 ###############################################################################
-# NACHBEARBEITUNG DER GENERIERTEN BINDINGS (Issue #117, ADR-0029)
+# POST-PROCESSING OF THE GENERATED BINDINGS (issue #117, ADR-0029)
 #
-# xscgen uebersetzt eine XSD-<restriction>, die ein Element neu (konkreter)
-# typisiert, NICHT: `OrderDetails` bleibt im Static-Header auf dem abstrakten
-# `OrderDetailsType` stehen. Der XmlSerializer verlangt dann einen
-# xsi:type-Diskriminator, den reale Fremd-Clients nicht senden -> deren
-# INI/HIA/HPB werden abgelehnt. Die konkreten Sub-Typen tragen in allen drei
-# Versionen keine eigenen Member; `abstract` zu streichen kostet also nichts und
-# macht das Binding beidseitig xsi:type-frei (Empfang bleibt tolerant, weil die
-# [XmlInclude]-Attribute stehen bleiben).
+# xscgen does NOT translate an XSD <restriction> that re-types an element more
+# concretely: in the static header, `OrderDetails` stays on the abstract
+# `OrderDetailsType`. The XmlSerializer then demands an
+# xsi:type discriminator that real third-party clients do not send -> their
+# INI/HIA/HPB get rejected. In all three versions the concrete sub-types carry
+# no members of their own; stripping `abstract` therefore costs nothing and
+# makes the binding xsi:type-free in both directions (receiving stays tolerant,
+# because the [XmlInclude] attributes remain in place).
 #
-# Der Eingriff MUSS hier stehen und nicht nur im committeten .cs, sonst ist er
-# nach der naechsten Regenerierung still verschwunden. Faellt das erwartete
-# Muster weg (neuer xscgen-/Schemastand), bricht das Skript hart ab.
+# The intervention MUST live here and not only in the committed .cs, otherwise it
+# silently disappears with the next regeneration. If the expected
+# pattern goes away (a new xscgen/schema revision), the script aborts hard.
 ###############################################################################
 apply_binding_fixups () {
   local ver="$1"
   local file="${OUT_ROOT}/${ver}/OrderDetailsType.cs"
   local tmp
 
-  [[ -f "$file" ]] || { echo "Fixup-Fehler: $file fehlt." >&2; return 1; }
+  [[ -f "$file" ]] || { echo "Fixup error: $file is missing." >&2; return 1; }
 
-  # \r?$ und das mitgefuehrte eol halten CRLF-Checkouts (Windows) unveraendert.
+  # \r?$ and the carried-along eol keep CRLF checkouts (Windows) unchanged.
   tmp="$(mktemp)"
   awk '
     /^    public abstract partial class OrderDetailsType\r?$/ {
@@ -156,13 +156,13 @@ apply_binding_fixups () {
     END { if (!patched) exit 3 }
   ' "$file" > "$tmp" || {
     rm -f "$tmp"
-    echo "Fixup-Fehler ($ver): 'public abstract partial class OrderDetailsType' nicht gefunden." >&2
-    echo "  -> Generator-/Schemastand hat sich geaendert. Fixup pruefen (ADR-0029), nicht ignorieren." >&2
+    echo "Fixup error ($ver): 'public abstract partial class OrderDetailsType' not found." >&2
+    echo "  -> The generator/schema revision has changed. Review the fixup (ADR-0029), do not ignore this." >&2
     return 1
   }
 
   mv "$tmp" "$file"
-  echo "   Fixup angewendet: ${file#${REPO_ROOT}/}"
+  echo "   Fixup applied: ${file#${REPO_ROOT}/}"
 }
 
 declare -A STAGES=()
@@ -172,24 +172,24 @@ trap cleanup EXIT
 TARGETS=()
 if [[ "$DO_ALL" == "1" ]]; then TARGETS=(H003 H004 H005); else TARGETS=("$VERSION"); fi
 
-# 1) Alle Zielversionen in eigene Staging-Verzeichnisse generieren
+# 1) Generate all target versions into their own staging directories
 for ver in "${TARGETS[@]}"; do
   st="$(mktemp -d)"
   STAGES["$ver"]="$st"
-  echo ">> generiere $ver ..."
+  echo ">> generating $ver ..."
   generate_to_staging "$ver" "$st"
 done
 
-# 2) Versionsspezifische Typen platzieren + Fixups anwenden
+# 2) Place the version-specific types + apply the fixups
 for ver in "${TARGETS[@]}"; do
   place "${STAGES[$ver]}/EBICO/Core/Schema/${ver}" "${OUT_ROOT}/${ver}"
   apply_binding_fixups "$ver"
 done
 
-# 3) Geteilte Namespaces einmal platzieren (deterministische Quelle je Namespace)
-#    XmlDsig + Hev aus H005 (bzw. der ersten verfuegbaren Version);
-#    S002 aus H005, S001 aus H004/H003.
-pick_stage () { # erste verfuegbare Version aus der Argumentliste
+# 3) Place the shared namespaces once (a deterministic source per namespace)
+#    XmlDsig + Hev from H005 (or the first available version);
+#    S002 from H005, S001 from H004/H003.
+pick_stage () { # the first available version from the argument list
   for v in "$@"; do [[ -n "${STAGES[$v]:-}" ]] && { echo "${STAGES[$v]}"; return; }; done
 }
 DS_SRC="$(pick_stage H005 H004 H003)"
@@ -202,4 +202,4 @@ S002_SRC="$(pick_stage H005)"
 S001_SRC="$(pick_stage H004 H003)"
 [[ -n "$S001_SRC" ]] && place "${S001_SRC}/EBICO/Core/Schema/Signature/S001" "${OUT_ROOT}/Shared/Signature/S001"
 
-echo ">> fertig. Bindings unter ${OUT_ROOT#${REPO_ROOT}/}"
+echo ">> done. Bindings under ${OUT_ROOT#${REPO_ROOT}/}"
