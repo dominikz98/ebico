@@ -1,170 +1,170 @@
-# EBICO — Kontext für Claude Code
+# EBICO — context for Claude Code
 
-Du arbeitest am Projekt **EBICO**: einer EBICS-Implementierung in C# (.NET 10),
-konzeptionell wie *Azurite*, aber für EBICS statt Azure Storage. Ziel ist ein
-Server-Emulator plus ein Client-Package.
+You are working on the **EBICO** project: an EBICS implementation in C# (.NET 10),
+conceptually like *Azurite*, but for EBICS instead of Azure Storage. The goal is a
+server emulator plus a client package.
 
-## Projektstruktur (5 Projekte)
+## Project structure (5 projects)
 
-- `src/EBICO.Core` — geteilte Primitives (Schemas/Serialisierung, Krypto, BTF/Order-Modelle)
-- `src/EBICO.Connector` — NuGet-Client für den Zugriff auf einen EBICS-Server (Mediator-Muster)
-- `src/EBICO.Server` — der Emulator (hostbar, ASP.NET Core)
-- `src/EBICO.Suite` — Blazor-UI (Blazor Web App, Interactive Server) für den Server
-- `tests/EBICO.Tests` — Unit-/Integration-/Conformance-Tests (xUnit v3)
+- `src/EBICO.Core` — shared primitives (schemas/serialisation, crypto, BTF/order models)
+- `src/EBICO.Connector` — NuGet client for accessing an EBICS server (mediator pattern)
+- `src/EBICO.Server` — the emulator (hostable, ASP.NET Core)
+- `src/EBICO.Suite` — Blazor UI (Blazor Web App, Interactive Server) for the server
+- `tests/EBICO.Tests` — unit/integration/conformance tests (xUnit v3)
 
-Projektreferenzen: Connector→Core, Server→Core, Suite→{Core, Server}, Tests→{Core, Connector, Server}.
-(Suite→Server seit #53: die Blazor-UI nutzt den `IMasterDataManager`/State-Store in-process, ADR-0009.)
+Project references: Connector→Core, Server→Core, Suite→{Core, Server}, Tests→{Core, Connector, Server}.
+(Suite→Server since #53: the Blazor UI uses the `IMasterDataManager`/state store in-process, ADR-0009.)
 
-Unterstützte EBICS-Versionen: **H003, H004, H005**. Order-Abdeckung: möglichst
-vollständige BTF/Order-Palette.
+Supported EBICS versions: **H003, H004, H005**. Order coverage: the most
+complete BTF/order palette possible.
 
-## Build & Tooling
+## Build & tooling
 
-- **.NET 10**, SDK gepinnt via `global.json`.
+- **.NET 10**, SDK pinned via `global.json`.
 - `Directory.Build.props`: `Nullable enable`, `ImplicitUsings`, `TreatWarningsAsErrors`,
-  `RestorePackagesWithLockFile`. XML-Doc-Pflicht (`GenerateDocumentationFile`) nur
-  für `EBICO.Core` + `EBICO.Connector`.
-- **Zentrale Paketverwaltung** (`Directory.Packages.props`): Versionen NUR dort,
-  `PackageReference` in den `.csproj` ohne Version-Attribut.
-- Test: **xUnit v3** + **AwesomeAssertions** (MIT-Fork von FluentAssertions v7;
-  FluentAssertions v8 ist kommerziell lizenziert → bewusst NICHT verwendet).
+  `RestorePackagesWithLockFile`. Mandatory XML doc (`GenerateDocumentationFile`) only
+  for `EBICO.Core` + `EBICO.Connector`.
+- **Central package management** (`Directory.Packages.props`): versions ONLY there,
+  `PackageReference` in the `.csproj` files without a version attribute.
+- Tests: **xUnit v3** + **AwesomeAssertions** (MIT fork of FluentAssertions v7;
+  FluentAssertions v8 is commercially licensed → deliberately NOT used).
 
-## Projektweite, verbindliche Regeln (Definition of Done je Feature)
+## Project-wide, binding rules (Definition of Done per feature)
 
-1. **DOKU:** Jedes Feature wird in Markdown unter `docs/` dokumentiert und im
-   Doku-Index (`docs/index.md`) verlinkt. Docs-as-Code: Doku gehört in denselben
-   PR wie der Code.
-2. **TESTS:** Jedes Feature wird mit Unit-Tests abgesichert (Happy Path +
-   Negativ-/Grenzfälle). Protokoll-/Krypto-Logik gegen Testvektoren und
-   Sample-XML, nicht nur Selbstkonsistenz. Kein Feature gilt ohne Tests als fertig.
-3. **CI grün:** `dotnet build` + `dotnet test`, keine neuen Warnungen.
-4. **XML-Doc-Kommentare** an öffentlichen APIs.
-5. **Code-Review** durchgeführt.
+1. **DOCS:** Every feature is documented in Markdown under `docs/` and linked in
+   the doc index (`docs/index.md`). Docs-as-Code: documentation belongs in the same
+   PR as the code.
+2. **TESTS:** Every feature is covered by unit tests (happy path +
+   negative/edge cases). Protocol/crypto logic against test vectors and
+   sample XML, not just self-consistency. No feature counts as done without tests.
+3. **CI green:** `dotnet build` + `dotnet test`, no new warnings.
+4. **XML-doc comments** on public APIs.
+5. **Code review** carried out.
 
-## Arbeitsweise
+## Way of working
 
-- **Issue-getrieben:** pro Issue ein Branch (`feat/<nr>-<slug>`) + ein PR, Doku
-  und Tests inklusive. PR-Body nutzt `.github/PULL_REQUEST_TEMPLATE.md` und enthält
-  `Closes #<nr>`.
-- Issues/Milestones liegen auf GitHub (`gh issue list`). Übersicht:
-  `docs/ticket-overview.md` (10 Milestones M0–M9, 63 Issues, 12 Epics).
-- Roadmap: M0 (Fundament) → M1 (Core/Protokoll) → M2 (Krypto) → M3–M5 (Server)
-  → M6 (Connector) → M7 (Suite) → M8 (Conformance) → M9 (Packaging).
+- **Issue-driven:** one branch (`feat/<no>-<slug>`) + one PR per issue, docs
+  and tests included. The PR body uses `.github/PULL_REQUEST_TEMPLATE.md` and contains
+  `Closes #<no>`.
+- Issues/milestones live on GitHub (`gh issue list`). Overview:
+  `docs/ticket-overview.md` (10 milestones M0–M9, 63 issues, 12 epics).
+- Roadmap: M0 (foundation) → M1 (core/protocol) → M2 (crypto) → M3–M5 (server)
+  → M6 (connector) → M7 (Suite) → M8 (conformance) → M9 (packaging).
 
-## Wichtige Randbedingungen
+## Important constraints
 
-- **LIZENZ:** Die EBICS-Schemas/Specs sind proprietär (EBICS SC). Modifikation /
-  derivative uses ohne Genehmigung nicht erlaubt. XSDs und offizielle Beispiel-XML
-  werden **nicht** ins Repo committet (`.gitignore`); lokal via
-  `scripts/fetch-schemas.sh` beziehen. Die **generierten C#-Bindings** unter
-  `src/EBICO.Core/Schema/` **werden hingegen committet** (ADR-0006, Option B; via
-  `scripts/generate-bindings.sh` reproduzierbar) — so baut/testet die CI ohne
-  Schemas. Genehmigung der EBICS SC wird parallel verfolgt.
-- Die Architektur in `docs/connector/architecture.md` ist ein begründeter
-  Vorschlag, **kein** gegen die Spec verifiziertes Design. Sobald die echten
-  Schemas vorliegen, Details (z. B. Reihenfolge E002/A00x/X002, Segmentschleife je
-  Version) gegen die offiziellen XSDs/Annexe verifizieren und Doku nachziehen.
+- **LICENSE:** The EBICS schemas/specs are proprietary (EBICS SC). Modification /
+  derivative uses without permission are not allowed. XSDs and official sample XML
+  are **not** committed to the repo (`.gitignore`); obtain them locally via
+  `scripts/fetch-schemas.sh`. The **generated C# bindings** under
+  `src/EBICO.Core/Schema/` **are committed, however** (ADR-0006, option B;
+  reproducible via `scripts/generate-bindings.sh`) — that way CI builds/tests without
+  the schemas. Permission from the EBICS SC is being pursued in parallel.
+- The architecture in `docs/connector/architecture.md` is a reasoned
+  proposal, **not** a design verified against the spec. Once the real
+  schemas are available, verify the details (e.g. order of E002/A00x/X002, segment loop per
+  version) against the official XSDs/annexes and update the docs.
 
-## Connector-Architektur in Kürze (Details: `docs/connector/architecture.md`)
+## Connector architecture in brief (details: `docs/connector/architecture.md`)
 
-Mediator-Muster: der Aufrufer kennt nur `IEbicsClient.Send(request)` und bekommt
-ein typisiertes `EbicsResult<T>`. Pipeline pro `Send`: Validierung → Serialisierung
-→ Komprimieren/E002/A00x → X002 → Transport (HttpClient hinter `ITransport`) →
-Verify/Entschlüsseln → Returncode → ggf. Segmente → Deserialisieren. Eigener
-Dispatch statt MediatR. Key-Store als Abstraktion (`IKeyStore`).
+Mediator pattern: the caller only knows `IEbicsClient.Send(request)` and receives
+a typed `EbicsResult<T>`. Pipeline per `Send`: validation → serialisation
+→ compress/E002/A00x → X002 → transport (HttpClient behind `ITransport`) →
+verify/decrypt → return code → segments if needed → deserialise. Own
+dispatch instead of MediatR. Key store as an abstraction (`IKeyStore`).
 
-## Doku-Landkarte (Einstiegspunkte)
+## Documentation map (entry points)
 
-- `docs/index.md` — annotierter Gesamtindex; **immer zuerst** nachschlagen.
-- `docs/server/order-coverage-matrix.md` — **Source of Truth** für OrderType/BTF ×
-  Version × Status. Per Guard-Test (`OrderCoverageMatrixTests`) mit den Code-Katalogen
-  synchron gehalten; enthält einen eigenen Lücken-Abschnitt. Seit #124 trennt sie
-  **Server**- und **Connector**-Verfügbarkeit: serverseitig implementiert heißt nicht,
-  dass der mitgelieferte Client die Auftragsart senden kann.
-- `docs/adr/README.md` — 31 ADRs (0001–0031, MADR-lite, alle `accepted`) + Backlog
-  offener/abgelöster Entscheidungen. Jede größere Designfrage ist hier begründet.
-- `docs/ticket-overview.md` — Milestones (M0–M9), Issues, Epics.
-- Feature-Doku liegt thematisch unter `docs/<bereich>/<name>.md`
+- `docs/index.md` — annotated overall index; **always look here first**.
+- `docs/server/order-coverage-matrix.md` — **source of truth** for order type/BTF ×
+  version × status. Kept in sync with the code catalogues via a guard test
+  (`OrderCoverageMatrixTests`); contains its own gaps section. Since #124 it separates
+  **server** and **connector** availability: implemented server-side does not mean
+  the bundled client can send that order type.
+- `docs/adr/README.md` — 31 ADRs (0001–0031, MADR-lite, all `accepted`) + a backlog
+  of open/superseded decisions. Every larger design question is reasoned out here.
+- `docs/ticket-overview.md` — milestones (M0–M9), issues, epics.
+- Feature docs live thematically under `docs/<area>/<name>.md`
   (`protocol/`, `server/`, `connector/`, `suite/`, `development/`, `deployment/`, `legal/`).
 
-## Querschnittliche Code-Konventionen
+## Cross-cutting code conventions
 
-- **Multi-Version-Dispatch (H003/H004/H005):** durchgängiges Leitmotiv. Pro Feature eine
-  versionsagnostische Base-Klasse (`<Xxx>OrderHandlerBase`) + je Version eine Subklasse
-  (`H003<Xxx>OrderHandler` …). Tests spannen die Version×Fall-Matrix via `TheoryData`.
-- **DI-Registrierung (`AddEbicoServer` in `EbicoServerServiceCollectionExtensions.cs`):**
-  Infrastruktur-Dienste (Stores, Verifier, Resolver) mit `TryAddSingleton` (überschreibbar).
-  Mehrfach-Extension-Points dagegen mit `AddSingleton` (NICHT `TryAdd`), damit mehrere
-  koexistieren: Order-Handler (`IEbicsOrderHandler`, Auflösung via
-  `IEbicsOrderHandlerResolver` keyed nach `(Version, OrderType)`) sowie Upload-/Download-
-  Processoren (`IUploadOrderProcessor`/`IDownloadOrderProcessor`, Engine konsumiert das
-  ganze `IEnumerable<…>`, erster `CanProcess`-Match gewinnt).
-- **BTF/OrderType-Auflösung:** `BtfOrderTypeCatalog.Resolve{Upload,Download}OrderType`
-  bildet alle drei Konventionen ab (H005 BTU/BTD+BTF · H003/H004 direkter Code ·
-  H003/H004 FUL/FDL+FileFormat). Berechtigung: `Subscriber.HasPermissionFor` → `090003`.
-  **Administrative Order-Typen haben keinen BTF** und bleiben auf H005 `AdminOrderType` — das gilt
-  clientseitig für Upload **und** Download symmetrisch (seit #124; vorher verlangte nur der
-  Upload-Pfad einen BTF und sperrte damit die VEU-Uploads aus). Der Katalog ist ein
-  Best-Effort-Seed, also **kein** Orakel dafür, ob es eine Auftragsart gibt.
-- **Guard-Tests halten Doku↔Code synchron:** ein neuer OrderType muss in Katalog **und**
-  Coverage-Matrix nachgezogen werden, sonst schlägt `OrderCoverageMatrixTests` fehl.
-- **Geteilte Transport-Defaults (#124/ADR-0030):** Segmentgröße und Body-Limit sind gekoppelt — ein
-  base64-kodiertes Segment reist *mitsamt Envelope* in einem HTTP-Body. Der Default steht deshalb genau
-  einmal (`EbicsSegmentation.DefaultSegmentSizeBytes`, 512 KiB) und wird von `EbicoServerOptions` **und**
-  dem Connector-`UploadExecutor` konsumiert; `MaxSegmentSizeForRequestBody(…)` leitet abweichende Werte
-  ab, `SegmentSizeCompatibilityTests` bewacht die Beziehung. Vorsicht bei Änderungen: die vorherige
-  Konstellation (768 KiB Client / 1 MiB Server) machte jeden mehrsegmentigen Upload unmöglich (HTTP 413).
-- **Antwort-Auswertung im Connector:** Returncode **und** Report-Text immer gemeinsam über
-  `EbicsReturnCodes.CombineOutcome(headerCode, headerText, bodyCode)` auflösen. Der `ReportText` steht nur
-  im Header — ihn zu einem Body-Code zu mischen ergab „`090005: EBICS_OK`" (#124).
-- **Generierte Bindings + dokumentierte Fixups:** `scripts/generate-bindings.sh` ist kein reiner
-  Generator — `apply_binding_fixups()` korrigiert nach jedem Lauf, was xscgen nicht abbilden kann
-  (aktuell: `abstract` aus `OrderDetailsType` streichen, sonst verlangt der `XmlSerializer` einen
-  `xsi:type`, den reale Clients nicht senden — ADR-0029). Fixups gehören **ins Skript** (nicht nur
-  ins committete `.cs`), brauchen einen Guard-Test und einen Eintrag in
-  `docs/protocol/xsd-bindings.md`; fehlt das Muster, bricht das Skript ab.
-- **Test-Setup:** xUnit v3 + AwesomeAssertions; `TestContext.Current.CancellationToken`
-  (Falle xUnit1051 unter `TreatWarningsAsErrors`); Server-Integrationstests via
-  `extern alias EbicoServer` + `WebApplicationFactory<Program>`; E2E über `EbicsE2EHarness`
-  + `E2EKeyPool` (RSA-2048 ist harte Untergrenze ⇒ Schlüssel-Wiederverwendung);
-  XML-Vergleich mit `CanonicalXmlComparer`; proprietäre Sample-XML „skip-if-missing".
-- **Spec-Vorbehalte (aktueller Stand):** serverseitige **X002-Verifikation ist aktiv**
-  (`X002EbicsRequestVerifier`, ADR-0023/#58, greift erst nach HIA). **ES/A00x-Signaturprüfung
-  der OrderData bleibt zurückgestellt**; kein Key-Gültigkeitsfenster; Server-Antworten
-  unsigniert. Bei der **VEU** (ADR-0020/#124) wertet der Emulator nur die `OrderID` aus — die
-  übrigen Felder der Order-Params werden schema-konform gesendet, aber nicht geprüft; Park-Trigger
-  (`OZHNN`/`SignatureFlag`) und HVE-Signatur sind ungeprüft. Teile der Architektur sind Design-Intent, noch nicht gegen die offiziellen
-  XSDs verifiziert (Schemas proprietär). Zwei Entscheidungen sind gegen einen **realen Client**
-  belegt, nicht gegen die Annexe (#117/ADR-0029): `OrderDetails` ohne `xsi:type` und `A006`/PSS
-  ab H004 (H003 ausgeschlossen).
+- **Multi-version dispatch (H003/H004/H005):** the pervasive leitmotif. Per feature one
+  version-agnostic base class (`<Xxx>OrderHandlerBase`) + one subclass per version
+  (`H003<Xxx>OrderHandler` …). Tests span the version×case matrix via `TheoryData`.
+- **DI registration (`AddEbicoServer` in `EbicoServerServiceCollectionExtensions.cs`):**
+  infrastructure services (stores, verifiers, resolvers) with `TryAddSingleton` (overridable).
+  Multi-registration extension points, by contrast, with `AddSingleton` (NOT `TryAdd`), so several
+  can coexist: order handlers (`IEbicsOrderHandler`, resolved via
+  `IEbicsOrderHandlerResolver` keyed by `(Version, OrderType)`) as well as upload/download
+  processors (`IUploadOrderProcessor`/`IDownloadOrderProcessor`, the engine consumes the
+  whole `IEnumerable<…>`, the first `CanProcess` match wins).
+- **BTF/order-type resolution:** `BtfOrderTypeCatalog.Resolve{Upload,Download}OrderType`
+  covers all three conventions (H005 BTU/BTD+BTF · H003/H004 direct code ·
+  H003/H004 FUL/FDL+FileFormat). Authorisation: `Subscriber.HasPermissionFor` → `090003`.
+  **Administrative order types have no BTF** and stay on the H005 `AdminOrderType` — that applies
+  client-side to upload **and** download symmetrically (since #124; before that only the
+  upload path demanded a BTF and thereby locked out the VEU uploads). The catalogue is a
+  best-effort seed, hence **not** an oracle for whether an order type exists.
+- **Guard tests keep docs↔code in sync:** a new order type must be added to the catalogue **and**
+  the coverage matrix, otherwise `OrderCoverageMatrixTests` fails.
+- **Shared transport defaults (#124/ADR-0030):** segment size and body limit are coupled — a
+  base64-encoded segment travels *together with its envelope* in one HTTP body. The default therefore lives
+  exactly once (`EbicsSegmentation.DefaultSegmentSizeBytes`, 512 KiB) and is consumed by `EbicoServerOptions` **and**
+  the connector's `UploadExecutor`; `MaxSegmentSizeForRequestBody(…)` derives deviating values
+  from it, `SegmentSizeCompatibilityTests` guards the relationship. Take care when changing this: the previous
+  constellation (768 KiB client / 1 MiB server) made every multi-segment upload impossible (HTTP 413).
+- **Response evaluation in the connector:** always resolve return code **and** report text together via
+  `EbicsReturnCodes.CombineOutcome(headerCode, headerText, bodyCode)`. The `ReportText` only lives
+  in the header — mixing it into a body code produced "`090005: EBICS_OK`" (#124).
+- **Generated bindings + documented fixups:** `scripts/generate-bindings.sh` is not a pure
+  generator — `apply_binding_fixups()` corrects, after every run, what xscgen cannot express
+  (currently: strip `abstract` from `OrderDetailsType`, otherwise the `XmlSerializer` demands an
+  `xsi:type` that real clients do not send — ADR-0029). Fixups belong **in the script** (not only
+  in the committed `.cs`), need a guard test and an entry in
+  `docs/protocol/xsd-bindings.md`; if the pattern is missing, the script aborts.
+- **Test setup:** xUnit v3 + AwesomeAssertions; `TestContext.Current.CancellationToken`
+  (the xUnit1051 trap under `TreatWarningsAsErrors`); server integration tests via
+  `extern alias EbicoServer` + `WebApplicationFactory<Program>`; E2E via `EbicsE2EHarness`
+  + `E2EKeyPool` (RSA-2048 is a hard lower bound ⇒ key reuse);
+  XML comparison with `CanonicalXmlComparer`; proprietary sample XML is "skip-if-missing".
+- **Spec caveats (current state):** server-side **X002 verification is active**
+  (`X002EbicsRequestVerifier`, ADR-0023/#58, only takes effect after HIA). **ES/A00x signature verification
+  of the order data remains deferred**; no key validity window; server responses are
+  unsigned. For the **VEU** (ADR-0020/#124) the emulator only evaluates the `OrderID` — the
+  remaining fields of the order params are sent schema-conformant but not checked; the parking triggers
+  (`OZHNN`/`SignatureFlag`) and the HVE signature are unchecked. Parts of the architecture are design intent, not yet verified against the official
+  XSDs (the schemas are proprietary). Two decisions are evidenced against a **real client**,
+  not against the annexes (#117/ADR-0029): `OrderDetails` without `xsi:type`, and `A006`/PSS
+  from H004 onwards (H003 excluded).
 
-## Verfügbare Skills (`.claude/skills/`)
+## Available skills (`.claude/skills/`)
 
-Abrufbare Schritt-für-Schritt-Rezepte für die wiederkehrenden Abläufe:
+Retrievable step-by-step recipes for the recurring workflows:
 
-- `ebics-order-handler` — neuen serverseitigen Order-Handler bzw. Upload-/Download-Processor anlegen.
-- `ebics-conformance-test` — E2E-/Conformance-Tests schreiben (Round-Trip, Wire-Shapes, Vendor-Captures, Tampering).
-- `ebics-feature-workflow` — kompletter Feature-/Bugfix-Ablauf inkl. Definition of Done (Branch → Doku → ADR → Tests → PR).
-- `ebics-crypto` — EBICS-Krypto (A005/A006, X002, E002, Fingerprints, X.509).
-- `ebics-suite` — an der Blazor-Suite arbeiten (Seiten/Komponenten, Stammdaten, Inspektor, Schlüssel-Ansicht).
-- `ebics-connector` — am Connector-NuGet-Paket arbeiten (Send-Pipeline, DI, Sende-Validierung, Packaging).
+- `ebics-order-handler` — create a new server-side order handler or upload/download processor.
+- `ebics-conformance-test` — write E2E/conformance tests (round-trip, wire shapes, vendor captures, tampering).
+- `ebics-feature-workflow` — the complete feature/bugfix workflow incl. Definition of Done (branch → docs → ADR → tests → PR).
+- `ebics-crypto` — EBICS crypto (A005/A006, X002, E002, fingerprints, X.509).
+- `ebics-suite` — work on the Blazor Suite (pages/components, master data, inspector, key view).
+- `ebics-connector` — work on the connector NuGet package (send pipeline, DI, send-side validation, packaging).
 
-## Wartung von Kontext, Doku & Skills
+## Maintaining context, docs & skills
 
-Diese Kontextdateien pflegen sich **nicht** selbst. Ihre Aktualisierung ist Teil der Definition
-of Done und gehört in **denselben PR** wie die auslösende Änderung:
+These context files do **not** maintain themselves. Keeping them up to date is part of the Definition
+of Done and belongs in the **same PR** as the change that triggered it:
 
-- **Doku (`docs/`):** neue/geänderte Features dokumentieren und in `docs/index.md` verlinken;
-  bei Auftragsarten `docs/server/order-coverage-matrix.md` nachziehen (Guard-Test erzwingt das).
-- **`CLAUDE.md`:** anpassen, sobald sich eine querschnittliche Konvention, die Projektstruktur
-  oder ein Spec-Vorbehalt ändert.
-- **Skills (`.claude/skills/`):** aktualisieren, wenn sich ein beschriebener Ablauf oder ein
-  referenziertes Symbol/Pfad ändert (z. B. Umbenennung eines Handlers, Interfaces oder einer
-  Doku-Seite). Die Skills verweisen bewusst auf konkrete Dateien/Typen und veralten sonst
-  **stillschweigend** — es gibt dafür keinen automatischen Wächter.
+- **Docs (`docs/`):** document new/changed features and link them in `docs/index.md`;
+  for order types, update `docs/server/order-coverage-matrix.md` (a guard test enforces this).
+- **`CLAUDE.md`:** adjust it as soon as a cross-cutting convention, the project structure
+  or a spec caveat changes.
+- **Skills (`.claude/skills/`):** update them when a described workflow or a
+  referenced symbol/path changes (e.g. renaming a handler, an interface or a
+  doc page). The skills deliberately point at concrete files/types and otherwise go stale
+  **silently** — there is no automatic guard for that.
 
-Faustregel: Berührt ein PR ein Muster, das in `CLAUDE.md` oder einem Skill beschrieben ist,
-gehört die Aktualisierung dieses Textes in denselben PR. Die PR-Checkliste
-(`.github/PULL_REQUEST_TEMPLATE.md`) fragt „Docs/Skills aktualisiert?" explizit ab und verlangt
-eine Issue-Verlinkung (`Closes #<nr>`) — **jeder** PR referenziert genau ein Issue, auch reine
-Tooling-/Meta-Änderungen (z. B. an `.claude/` oder `CLAUDE.md` selbst).
+Rule of thumb: if a PR touches a pattern described in `CLAUDE.md` or in a skill,
+updating that text belongs in the same PR. The PR checklist
+(`.github/PULL_REQUEST_TEMPLATE.md`) explicitly asks "Docs/skills updated?" and requires
+an issue link (`Closes #<no>`) — **every** PR references exactly one issue, including pure
+tooling/meta changes (e.g. to `.claude/` or `CLAUDE.md` itself).

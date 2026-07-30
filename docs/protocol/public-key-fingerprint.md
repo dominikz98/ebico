@@ -61,13 +61,13 @@ the order-data layer.
 | INI letter | digest → grouped uppercase hex | `ToLetterFormat(...)` |
 
 ```csharp
-// Fingerprint eines beliebigen öffentlichen Schlüssels (versionsagnostisch):
+// Fingerprint of any public key (version-agnostic):
 byte[] digest = PublicKeyFingerprint.Compute(bankKey);   // 32 Byte SHA-256
 
-// Verifikation eines vom Gegenüber gesendeten Hashes (konstantzeitig, kein Throw):
+// Verification of a hash sent by the counterparty (constant-time, no throw):
 bool ok = PublicKeyFingerprint.Verify(bankKey, clientSentDigest);
 
-// Darstellung für den INI-Brief:
+// Representation for the INI letter:
 string letter = PublicKeyFingerprint.ToLetterFormat(digest);
 ```
 

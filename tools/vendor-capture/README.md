@@ -1,32 +1,31 @@
-# Vendor-Capture-Tool (Issue #59)
+# Vendor capture tool (issue #59)
 
-Erzeugt **echte EBICS-Request-XML** eines Fremd-Clients für EBICOs Konformitäts-Corpus. Verwendeter
-Client: [`ebics-client`](https://github.com/node-ebics/node-ebics-client) (npm, **MIT**) — ein
-eigenständiger Node.js-EBICS-Client, der die H004-Wire-Formate spricht.
+Produces **real EBICS request XML** from a third-party client for EBICO's conformance corpus. The
+client used: [`ebics-client`](https://github.com/node-ebics/node-ebics-client) (npm, **MIT**) — a
+standalone Node.js EBICS client that speaks the H004 wire formats.
 
-## Was es tut
+## What it does
 
-Treibt den Client durch die Onboarding-Orders **INI / HIA / HPB** und greift die **exakten
-Request-Bytes** ab, die er auf den Draht legt — in
-`tests/EBICO.Tests/Conformance/Vendor/node-ebics-client/H004/request/{ini,hia,hpb}.xml`. Diese Captures
-werden von `tests/EBICO.Tests/Conformance/VendorCaptureConformanceTests.cs` gegen den echten Server
-replayt.
+Drives the client through the onboarding orders **INI / HIA / HPB** and captures the **exact
+request bytes** it puts on the wire — into
+`tests/EBICO.Tests/Conformance/Vendor/node-ebics-client/H004/request/{ini,hia,hpb}.xml`. Those captures
+are replayed against the real server by `tests/EBICO.Tests/Conformance/VendorCaptureConformanceTests.cs`.
 
-Der Client postet gegen eine **lokale Wegwerf-Senke** (niemals eine echte Bank); die Antwort wird
-verworfen, nur der Request zählt. Alles **Schlüsselmaterial wird hier frisch erzeugt und ist
-Wegwerf-Material** (siehe `PROVENANCE.md` im Corpus).
+The client posts against a **local throwaway sink** (never a real bank); the response is
+discarded, only the request matters. All **key material is generated fresh here and is
+throwaway material** (see `PROVENANCE.md` in the corpus).
 
-## Ausführen (einmalig, lokal, offline)
+## Running it (once, locally, offline)
 
 ```bash
 cd tools/vendor-capture
-npm install        # zieht ebics-client (MIT) — nur lokal, nicht in der CI
-npm run capture    # bzw. node capture.js
+npm install        # pulls ebics-client (MIT) — locally only, not in CI
+npm run capture    # or: node capture.js
 ```
 
-> **Nicht Teil von Build/CI.** `dotnet build`/`dotnet test` und die CI berühren dieses Verzeichnis nicht.
-> `node_modules/` und `package-lock.json` sind `.gitignore`d. Ein erneuter Lauf erzeugt neue Captures
-> (frische Wegwerf-Schlüssel, neue Nonces/Timestamps) — nur bewusst neu committen.
+> **Not part of build/CI.** `dotnet build`/`dotnet test` and CI do not touch this directory.
+> `node_modules/` and `package-lock.json` are `.gitignore`d. A repeat run produces new captures
+> (fresh throwaway keys, new nonces/timestamps) — only re-commit them deliberately.
 
-Details zur Einordnung: [`docs/development/conformance-real-clients.md`](../../docs/development/conformance-real-clients.md)
-und [`docs/adr/0026-konformitaet-gegen-reale-clients.md`](../../docs/adr/0026-konformitaet-gegen-reale-clients.md).
+Background on how this fits in: [`docs/development/conformance-real-clients.md`](../../docs/development/conformance-real-clients.md)
+and [`docs/adr/0026-konformitaet-gegen-reale-clients.md`](../../docs/adr/0026-konformitaet-gegen-reale-clients.md).

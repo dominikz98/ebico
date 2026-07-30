@@ -1,16 +1,16 @@
 name: Release
 
-# Tag-getriggerte Veröffentlichung (M9 / #62, ADR-0027). Der Tag trägt die CalVer-Version
-# (v{JAHR}.{MONAT}.{BUILD}, z. B. v2026.7.42); Paket- und Image-Version werden daraus
-# abgeleitet. Feuert NUR auf v*.*.*-Tags — normale main-Pushes/PRs laufen weiter über ci.yml.
-# Ohne das Secret NUGET_API_KEY (nuget.org) passiert beim NuGet-Push nichts; der GHCR-Push
-# nutzt das automatische GITHUB_TOKEN. Der Merge dieses Workflows publiziert also nichts.
+# Tag-triggered publishing (M9 / #62, ADR-0027). The tag carries the CalVer version
+# (v{YEAR}.{MONTH}.{BUILD}, e.g. v2026.7.42); the package and image versions are derived
+# from it. Fires ONLY on v*.*.* tags — regular main pushes/PRs still go through ci.yml.
+# Without the NUGET_API_KEY secret (nuget.org) the NuGet push does nothing; the GHCR push
+# uses the automatic GITHUB_TOKEN. Merging this workflow therefore publishes nothing.
 on:
   push:
     tags: ['v*.*.*']
 
-# Least privilege: GitHub-Release erstellen (contents) + GHCR-Image pushen (packages).
-# Der NuGet-Push braucht keine GITHUB-Permission, sondern das NUGET_API_KEY-Secret.
+# Least privilege: create the GitHub release (contents) + push the GHCR image (packages).
+# The NuGet push needs no GITHUB permission, only the NUGET_API_KEY secret.
 permissions:
   contents: write
   packages: write
@@ -25,9 +25,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0 # volle Historie für auto-generierte Release-Notes & SourceLink
+          fetch-depth: 0 # full history for auto-generated release notes & SourceLink
 
-      - name: Setup .NET (aus global.json)
+      - name: Setup .NET (from global.json)
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -40,33 +40,33 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
-      # Version aus dem Tag: v2026.7.42 -> 2026.7.42. Muss dem CalVer-Muster
-      # {JAHR}.{MONAT}.{BUILD} entsprechen (ADR-0024/0027), sonst Abbruch.
-      - name: Version aus Tag ableiten
+      # Version from the tag: v2026.7.42 -> 2026.7.42. Must match the CalVer pattern
+      # {YEAR}.{MONTH}.{BUILD} (ADR-0024/0027), otherwise abort.
+      - name: Derive version from tag
         id: version
         run: |
           version="${GITHUB_REF_NAME#v}"
           if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag '$GITHUB_REF_NAME' ergibt keine gültige CalVer-Version ('$version'); erwartet vJAHR.MONAT.BUILD (z. B. v2026.7.42)."
+            echo "::error::Tag '$GITHUB_REF_NAME' does not yield a valid CalVer version ('$version'); expected vYEAR.MONTH.BUILD (e.g. v2026.7.42)."
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Release-Version: $version"
+          echo "Release version: $version"
 
       - name: Restore
         run: dotnet restore EBICO.sln
 
-      # Version-aus-Tag überschreibt die datumsbasierte CalVer-Berechnung aus
-      # Directory.Build.props (dort kommt BUILD sonst aus github.run_number). Build/Test
-      # re-verifizieren die DoD (keine neuen Warnungen wegen TreatWarningsAsErrors).
-      - name: Build (Release, keine neuen Warnungen)
+      # Version-from-tag overrides the date-based CalVer computation in
+      # Directory.Build.props (where BUILD otherwise comes from github.run_number). Build/test
+      # re-verify the DoD (no new warnings, thanks to TreatWarningsAsErrors).
+      - name: Build (Release, no new warnings)
         run: dotnet build EBICO.sln -c Release --no-restore -p:Version=${{ steps.version.outputs.version }}
 
       - name: Test (Release)
         run: dotnet test EBICO.sln -c Release --no-build
 
-      # Packt EBICO.Core + EBICO.Connector aus dem bereits gebauten Output (--no-build);
-      # -p:Version hält nuspec- und Assembly-Version deckungsgleich mit dem Build oben.
+      # Packs EBICO.Core + EBICO.Connector from the already-built output (--no-build);
+      # -p:Version keeps the nuspec and assembly versions identical to the build above.
       - name: Pack EBICO.Core (Release)
         run: >-
           dotnet pack src/EBICO.Core/EBICO.Core.csproj
@@ -79,17 +79,17 @@ jobs:
           -c Release --no-build -o ./artifacts
           -p:Version=${{ steps.version.outputs.version }}
 
-      # Push nach nuget.org. Die .snupkg-Symbolpakete werden von 'dotnet nuget push'
-      # automatisch mit publiziert. --skip-duplicate macht erneute Läufe idempotent.
-      - name: Push NuGet-Pakete (nuget.org)
+      # Push to nuget.org. The .snupkg symbol packages are published automatically by
+      # 'dotnet nuget push'. --skip-duplicate makes re-runs idempotent.
+      - name: Push NuGet packages (nuget.org)
         run: >-
           dotnet nuget push "./artifacts/*.nupkg"
           --source "$NUGET_FEED"
           --api-key "${{ secrets.NUGET_API_KEY }}"
           --skip-duplicate
 
-      # Container-Push nach GHCR (ADR-0022 verweist den Push auf diese Pipeline). Baut das
-      # Server-Image wie der container-build-Job in ci.yml und pusht :VERSION + :latest.
+      # Container push to GHCR (ADR-0022 defers the push to this pipeline). Builds the
+      # server image like the container-build job in ci.yml and pushes :VERSION + :latest.
       - name: Login GHCR
         uses: docker/login-action@v3
         with:
@@ -97,7 +97,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ github.token }}
 
-      - name: Build & Push Server-Image (GHCR)
+      - name: Build & push server image (GHCR)
         run: |
           image="ghcr.io/${{ github.repository_owner }}/ebico-server"
           version="${{ steps.version.outputs.version }}"
@@ -105,9 +105,9 @@ jobs:
           docker push "$image:$version"
           docker push "$image:latest"
 
-      # GitHub-Release mit automatisch generierten Notes (aus den PRs/Commits seit dem
-      # letzten Tag) und den NuGet-Artefakten als Anhang.
-      - name: GitHub-Release erstellen
+      # GitHub release with automatically generated notes (from the PRs/commits since the
+      # last tag) and the NuGet artefacts attached.
+      - name: Create GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
         run: >-

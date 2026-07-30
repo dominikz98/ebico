@@ -5,7 +5,7 @@ on:
     branches: [main]
   pull_request:
 
-# Nur der jeweils neueste Lauf pro Branch/PR; ältere werden abgebrochen.
+# Only the most recent run per branch/PR; older ones are cancelled.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -21,15 +21,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET (aus global.json)
+      - name: Setup .NET (from global.json)
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
 
-      # NuGet-Cache über die Projekt-/CPM-Dateien verschlüsselt. Es werden
-      # bewusst keine packages.lock.json verwendet (siehe
-      # docs/development/solution-layout.md), daher der explizite actions/cache
-      # statt der setup-dotnet-Cache-Option.
+      # NuGet cache keyed on the project/CPM files. No packages.lock.json is used
+      # deliberately (see docs/development/solution-layout.md), hence the explicit
+      # actions/cache instead of the setup-dotnet cache option.
       - name: Cache NuGet
         uses: actions/cache@v4
         with:
@@ -41,7 +40,7 @@ jobs:
       - name: Restore
         run: dotnet restore EBICO.sln
 
-      - name: Build (Release, keine neuen Warnungen)
+      - name: Build (Release, no new warnings)
         run: dotnet build EBICO.sln -c Release --no-restore
 
       - name: Test (+ Coverage)
@@ -51,7 +50,7 @@ jobs:
           --results-directory ./TestResults
           --logger "trx;LogFileName=test-results.trx"
 
-      - name: Upload Coverage-Artefakt
+      - name: Upload coverage artefact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -59,7 +58,7 @@ jobs:
           path: '**/coverage.cobertura.xml'
           if-no-files-found: error
 
-      - name: Upload Testergebnisse (TRX)
+      - name: Upload test results (TRX)
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -74,10 +73,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Offline: prüft relative Doku-Links (Docs-as-Code), ohne flakige
-      # externe Requests (z. B. die vielen ebics.org-URLs). Externe Links
-      # können später als nicht-blockierender Scheduled-Job dazukommen.
-      - name: Link Checker (offline, relative Links)
+      # Offline: checks relative doc links (Docs-as-Code) without flaky
+      # external requests (e.g. the many ebics.org URLs). External links
+      # can be added later as a non-blocking scheduled job.
+      - name: Link checker (offline, relative links)
         uses: lycheeverse/lychee-action@v2
         with:
           args: --offline --no-progress --verbose "**/*.md"
@@ -90,9 +89,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Baut das Server-Container-Image (Issue #61). Build-only: kein Registry-Login/Push (das
-      # gehört zur Publish-Pipeline, M9 / #62). Hält das Dockerfile grün, ohne Secrets zu brauchen.
-      - name: Build Server-Image (build-only)
+      # Builds the server container image (issue #61). Build-only: no registry login/push (that
+      # belongs to the publish pipeline, M9 / #62). Keeps the Dockerfile green without needing secrets.
+      - name: Build server image (build-only)
         run: docker build --build-arg PROJECT=EBICO.Server -t ebico-server:ci .
 
   pack:
@@ -103,7 +102,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET (aus global.json)
+      - name: Setup .NET (from global.json)
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
@@ -116,11 +115,11 @@ jobs:
           restore-keys: |
             nuget-${{ runner.os }}-
 
-      # Packt die veröffentlichten Bibliotheken EBICO.Core + EBICO.Connector (Issue #50) inkl.
-      # README, XML-Doc, snupkg-Symbols, SourceLink und Lizenz-Metadaten. Die CalVer-BUILD-Komponente
-      # kommt aus der Run-Nummer ({JAHR}.{MONAT}.{run_number}). Build-only: kein Registry-Push — das
-      # Publizieren gehört zur Publish-Pipeline (M9 / #62). Analog zum container-build-Job hält das die
-      # Pakete grün, ohne Secrets zu brauchen.
+      # Packs the published libraries EBICO.Core + EBICO.Connector (issue #50) incl.
+      # README, XML doc, snupkg symbols, SourceLink and licence metadata. The CalVer BUILD component
+      # comes from the run number ({YEAR}.{MONTH}.{run_number}). Build-only: no registry push — the
+      # publishing belongs to the publish pipeline (M9 / #62). As with the container-build job, this keeps
+      # the packages green without needing secrets.
       - name: Pack EBICO.Core (Release)
         run: >-
           dotnet pack src/EBICO.Core/EBICO.Core.csproj
@@ -133,7 +132,7 @@ jobs:
           -c Release -o ./artifacts
           -p:EbicoBuildNumber=${{ github.run_number }}
 
-      - name: Upload NuGet-Artefakt (nupkg + snupkg)
+      - name: Upload NuGet artefact (nupkg + snupkg)
         uses: actions/upload-artifact@v4
         with:
           name: nuget

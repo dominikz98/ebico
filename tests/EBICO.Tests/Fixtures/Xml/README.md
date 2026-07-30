@@ -1,38 +1,38 @@
-# Sample-XML-Fixtures
+# Sample XML fixtures
 
-Hier liegen EBICS-Beispiel-Nachrichten je Protokollversion und Richtung:
+This is where the EBICS sample messages live, per protocol version and direction:
 
 ```
-Xml/<VERSION>/<direction>/<datei>.xml
+Xml/<VERSION>/<direction>/<file>.xml
    VERSION   = H003 | H004 | H005
    direction = request | response
 ```
 
-Geladen werden sie über den Helfer
+They are loaded via the helper
 [`SampleXml`](../../Infrastructure/SampleXml.cs):
 
 ```csharp
 if (SampleXml.TryLoad(EbicsVersion.H005, SampleDirection.Request, "ebicsRequest_HPB.xml", out var xml))
 {
-    // ... gegen CanonicalXmlComparer prüfen
+    // ... check against CanonicalXmlComparer
 }
 ```
 
-## ⚠️ Lizenz: Beispiele werden NICHT eingecheckt
+## ⚠️ License: samples are NOT checked in
 
-Die offiziellen EBICS-Beispiel-XML stammen von ebics.org und sind
-**proprietäres Eigentum der EBICS SC** — wie die Schemas selbst. Sie werden
-daher **nicht** in dieses Repo committet; `.gitignore` schließt
-`tests/**/Fixtures/Xml/**/*.xml` aus (vgl. Lizenz-Issue #5 und
+The official EBICS sample XML comes from ebics.org and is the
+**proprietary property of the EBICS SC** — just like the schemas themselves. It is
+therefore **not** committed to this repo; `.gitignore` excludes
+`tests/**/Fixtures/Xml/**/*.xml` (cf. license issue #5 and
 `docs/protocol/schema-sources.md`).
 
-Quelle: <https://www.ebics.org/en/technical-information/examples>
+Source: <https://www.ebics.org/en/technical-information/examples>
 
-## Lokal bereitstellen
+## Providing them locally
 
-Lade die Beispiele manuell von ebics.org und lege die `.xml`-Dateien in die
-passenden Unterordner. Tests, die Beispiele brauchen, **überspringen sich
-selbst** (`Assert.Skip`), wenn die Dateien fehlen — die Suite bleibt also auch
-ohne sie (z. B. in der CI) grün.
+Download the samples manually from ebics.org and put the `.xml` files into the
+matching subfolders. Tests that need samples **skip themselves**
+(`Assert.Skip`) when the files are missing — so the suite stays green even
+without them (e.g. in CI).
 
-Die `.gitkeep`-Dateien halten nur die Verzeichnisstruktur im Repo.
+The `.gitkeep` files only keep the directory structure in the repo.

@@ -8,7 +8,7 @@ namespace EBICO.Core.Domain;
 /// <remarks>
 /// The partner is scoped to a bank: the same <see cref="PartnerId"/> may denote different
 /// customers at different banks, so the identity is the (<see cref="HostId"/>,
-/// <see cref="PartnerId"/>) pair. This makes the emulator multi-tenant (Mehr-Mandanten-Fähigkeit).
+/// <see cref="PartnerId"/>) pair. This makes the emulator multi-tenant.
 /// The optional <see cref="Address"/> and <see cref="Accounts"/> feed the customer/subscriber data
 /// download orders HTD/HKD (issue #41).
 /// </remarks>

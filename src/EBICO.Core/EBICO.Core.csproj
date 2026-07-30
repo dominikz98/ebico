@@ -4,9 +4,9 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
 
-  <!-- NuGet-Paketmetadaten (Issue #50). Gemeinsame Felder stehen in Directory.Build.props. -->
+  <!-- NuGet package metadata (issue #50). Shared fields live in Directory.Build.props. -->
   <PropertyGroup>
-    <Description>Geteilte EBICS-Primitives (Schemas/Serialisierung, Krypto, BTF- und Order-Modelle) — die gemeinsame Basis von EBICO.Connector und dem EBICO-Server-Emulator. Unterstützt H003/H004/H005.</Description>
+    <Description>Shared EBICS primitives (schemas/serialisation, crypto, BTF and order models) — the common foundation of EBICO.Connector and the EBICO server emulator. Supports H003/H004/H005.</Description>
     <PackageTags>ebics;banking;sepa;iso20022;camt;pain;crypto;emulator</PackageTags>
   </PropertyGroup>
 
@@ -15,9 +15,9 @@
   </ItemGroup>
 
   <!--
-    XML-Canonicalization (C14N) für Signaturen (#15). Liefert die BCL-Transforms
-    XmlDsigC14NTransform / XmlDsigExcC14NTransform. Version zentral in Directory.Packages.props.
-    RSA-Krypto läuft über System.Security.Cryptography (Framework, kein Paket) — siehe
+    XML canonicalisation (C14N) for signatures (#15). Provides the BCL transforms
+    XmlDsigC14NTransform / XmlDsigExcC14NTransform. Version centrally in Directory.Packages.props.
+    RSA crypto goes through System.Security.Cryptography (framework, not a package) — see
     ADR-0008.
   -->
   <ItemGroup>

@@ -28,29 +28,29 @@ The coverage matrix therefore separates **server** and **client** availability s
 ## The flow
 
 ```csharp
-// 1) Auftrag einreichen und zum Parken markieren.
+// 1) Submit the order and mark it for parking.
 var submitted = await client.Send(new CctUploadRequest
 {
     Pain001 = painBytes,
     DistributedSignature = true,   // H005: BTUOrderParams/SignatureFlag · H003/H004: OrderAttribute=OZHNN
 });
 
-// 2) Offene Aufträge abholen — hier steht die vom Server vergebene OrderID.
+// 2) Fetch the pending orders — this is where the server-assigned OrderID appears.
 var overview = await client.Send(new HvuDownloadRequest());
 
-// 3) Status eines einzelnen Auftrags (optional).
+// 3) Status of a single order (optional).
 var detail = await client.Send(new HvdDownloadRequest
 {
     Order = new VeuOrderReference { OrderId = "V001", OrderType = "CCT" },
 });
 
-// 4) Zeichnen — durch einen ANDEREN Teilnehmer (siehe unten).
+// 4) Sign — by a DIFFERENT subscriber (see below).
 var signed = await client.Send(new HveUploadRequest
 {
     Order = new VeuOrderReference { OrderId = "V001", OrderType = "CCT" },
 });
 
-// ... oder stornieren.
+// ... or cancel.
 var cancelled = await client.Send(new HvsUploadRequest
 {
     Order = new VeuOrderReference { OrderId = "V001", OrderType = "CCT" },

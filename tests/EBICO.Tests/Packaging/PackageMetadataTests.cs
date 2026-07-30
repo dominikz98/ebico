@@ -27,8 +27,8 @@ public sealed class PackageMetadataTests
         var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
         informational.Should().NotBeNull();
 
-        // CalVer {JAHR}.{MONAT}.{BUILD} (ADR-0024); NuGet normalisiert den Monat ohne führende Null.
-        // SourceLink hängt "+<commit-sha>" an — nur der Versionsteil davor ist relevant.
+        // CalVer {YEAR}.{MONTH}.{BUILD} (ADR-0024); NuGet normalises the month without a leading zero.
+        // SourceLink appends "+<commit-sha>" — only the version part before it is relevant.
         var version = informational!.InformationalVersion.Split('+')[0];
         version.Should().MatchRegex(@"^\d{4}\.\d{1,2}\.\d+$");
 

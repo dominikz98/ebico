@@ -50,9 +50,9 @@ public static class QuickstartRunner
     {
         ArgumentNullException.ThrowIfNull(log);
 
-        // 1) EBICO.Server in-process starten (Kestrel, ephemerer Loopback-Port).
+        // 1) Start EBICO.Server in-process (Kestrel, ephemeral loopback port).
         var builder = WebApplication.CreateBuilder();
-        builder.Logging.SetMinimumLevel(LogLevel.Warning); // Server-Logspam aus dem Demo-Output halten
+        builder.Logging.SetMinimumLevel(LogLevel.Warning); // keep server log spam out of the demo output
         builder.WebHost.UseUrls("http://127.0.0.1:0");
         builder.Services.AddEbicoServer();
 
@@ -66,10 +66,10 @@ public static class QuickstartRunner
             var baseUrl = app.Services.GetRequiredService<IServer>()
                 .Features.Get<IServerAddressesFeature>()!.Addresses.First();
             var endpointUrl = baseUrl.TrimEnd('/') + serverOptions.EndpointPath;
-            log.WriteLine($"EBICO.Server läuft auf {baseUrl} (EBICS-Endpoint {endpointUrl}, Version {version}).");
+            log.WriteLine($"EBICO.Server listening on {baseUrl} (EBICS endpoint {endpointUrl}, version {version}).");
 
-            // 2) Stammdaten + Bank-Keypair serverseitig seeden. Der Subscriber startet in 'New';
-            //    das echte INI/HIA treibt ihn nach Initialized/Ready.
+            // 2) Seed the master data + bank key pair server-side. The subscriber starts out in 'New';
+            //    the real INI/HIA drives it to Initialized/Ready.
             var hostId = HostId.Create(Host);
             var partnerId = PartnerId.Create(Partner);
             var userId = UserId.Create(User);
@@ -85,7 +85,7 @@ public static class QuickstartRunner
                     permissions: [new SubscriberPermission("CCT", SignatureClass.T), new SubscriberPermission("C53", SignatureClass.T)]),
                 ct);
 
-            // Bekanntes Bank-Keypair seeden, damit HPB die zurückgelieferten Fingerprints prüfen kann.
+            // Seed a known bank key pair so HPB can verify the fingerprints it gets back.
             var bankKeys = new BankKeyPair(
                 RsaKeyMaterial.Generate(),
                 KeyVersions.Default(KeyPurpose.Authentication, version).Version,
@@ -93,11 +93,11 @@ public static class QuickstartRunner
                 KeyVersions.Default(KeyPurpose.Encryption, version).Version);
             await app.Services.GetRequiredService<IServerBankKeyStore>().SetAsync(hostId, bankKeys, ct);
 
-            // 3) Connector-DI gegen den laufenden Server aufbauen.
+            // 3) Wire up the connector DI against the running server.
             var services = new ServiceCollection();
             services.AddEbicoConnector(o =>
             {
-                o.Url = endpointUrl; // absolute URL inkl. Endpoint-Pfad
+                o.Url = endpointUrl; // absolute URL incl. endpoint path
                 o.HostId = Host;
                 o.PartnerId = Partner;
                 o.UserId = User;
@@ -109,11 +109,11 @@ public static class QuickstartRunner
             await using var provider = services.BuildServiceProvider();
             var client = provider.GetRequiredService<IEbicsClient>();
 
-            // 4) Teilnehmerschlüssel (A00x/X002/E002) erzeugen und ablegen.
+            // 4) Generate and store the subscriber keys (A00x/X002/E002).
             await provider.GetRequiredService<ISubscriberKeyGenerator>().GenerateAsync(ct: ct);
-            log.WriteLine("Teilnehmerschlüssel erzeugt (A00x/X002/E002).");
+            log.WriteLine("Subscriber keys generated (A00x/X002/E002).");
 
-            // 5) Onboarding: INI -> HIA -> HPB (Bank-Fingerprints in-flow geprüft).
+            // 5) Onboarding: INI -> HIA -> HPB (bank fingerprints verified in-flow).
             var ini = await client.Send(new IniRequest { IncludeLetter = false }, ct);
             var hia = await client.Send(new HiaRequest { IncludeLetter = false }, ct);
             var hpb = await client.Send(
@@ -125,19 +125,19 @@ public static class QuickstartRunner
                 ct);
             log.WriteLine($"Onboarding: INI {ini.ReturnCode}, HIA {hia.ReturnCode}, HPB {hpb.ReturnCode}.");
 
-            // 6) Upload: SEPA Credit Transfer (pain.001).
+            // 6) Upload: SEPA credit transfer (pain.001).
             var pain = Encoding.UTF8.GetBytes(SamplePain.CreditTransfer(12.34m, 56.78m));
             var upload = await client.Send(new CctUploadRequest { Pain001 = pain }, ct);
             log.WriteLine(
-                $"Upload (CCT): {upload.ReturnCode}, TxId {upload.Value?.TransactionId}, {upload.Value?.NumSegments} Segment(e).");
+                $"Upload (CCT): {upload.ReturnCode}, TxId {upload.Value?.TransactionId}, {upload.Value?.NumSegments} segment(s).");
 
-            // 7) Download: Kontoauszug camt.053 (C53) mit Parse-Hook (ZIP-Einträge auslesen).
+            // 7) Download: camt.053 account statement (C53) with a parse hook (read the ZIP entries).
             var download = await client.Send(
                 new C53DownloadRequest { Parse = zip => ZipEntryNames(zip) },
                 ct);
             var entries = download.Value?.ParsedAs<IReadOnlyList<string>>() ?? [];
             log.WriteLine(
-                $"Download (C53): {download.ReturnCode}, {download.Value?.NumSegments} Segment(e), {download.Value?.OrderData.Length ?? 0} Byte, Einträge: {string.Join(", ", entries)}.");
+                $"Download (C53): {download.ReturnCode}, {download.Value?.NumSegments} segment(s), {download.Value?.OrderData.Length ?? 0} bytes, entries: {string.Join(", ", entries)}.");
 
             var result = new QuickstartResult(
                 Success: ini.IsSuccess && hia.IsSuccess && hpb.IsSuccess && upload.IsSuccess && download.IsSuccess,
@@ -149,7 +149,7 @@ public static class QuickstartRunner
                 DownloadReturnCode: download.ReturnCode,
                 DownloadSegments: download.Value?.NumSegments ?? 0);
 
-            log.WriteLine(result.Success ? "Quickstart erfolgreich abgeschlossen." : "Quickstart mit Fehlern beendet.");
+            log.WriteLine(result.Success ? "Quickstart completed successfully." : "Quickstart finished with errors.");
             return result;
         }
         finally

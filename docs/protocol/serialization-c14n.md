@@ -47,7 +47,7 @@ H003 legacy special case), the root **element name** one of the six envelopes
 
 ```csharp
 IEbicsEnvelope envelope = EbicsXmlSerializer.DeserializeEnvelope(rawXml);
-// envelope.ProtocolVersion → die erkannte Version; konkreter Typ je nach Wurzelelement
+// envelope.ProtocolVersion → the detected version; the concrete type depends on the root element
 ```
 
 Incoming XML is **hardened against DTD/XXE** (`DtdProcessing.Prohibit`,

@@ -1,11 +1,11 @@
 using EBICO.Connector.Quickstart;
 using EBICO.Core;
 
-// Minimaler EBICS-Quickstart: startet den EBICO.Server-Emulator in-process und fährt mit dem
-// EBICO.Connector den vollständigen Rundlauf Onboarding -> Upload -> Download. Kein externer
-// Server, keine echte Bank nötig — einfach `dotnet run`.
+// Minimal EBICS quickstart: starts the EBICO.Server emulator in-process and drives the full
+// round-trip onboarding -> upload -> download with the EBICO.Connector. No external
+// server and no real bank needed — just `dotnet run`.
 //
-// Die EBICS-Version ist wählbar (Default H005):
+// The EBICS version is selectable (default H005):
 //   dotnet run --project samples/EBICO.Connector.Quickstart -- --version H004
 //   dotnet run --project samples/EBICO.Connector.Quickstart -- H003
 //   EBICO_QUICKSTART_VERSION=H004 dotnet run --project samples/EBICO.Connector.Quickstart
@@ -13,11 +13,11 @@ var version = ResolveVersion(args, Environment.GetEnvironmentVariable("EBICO_QUI
 
 var result = await QuickstartRunner.RunAsync(Console.Out, version);
 
-// Exit-Code 0 nur, wenn jeder Schritt fachlich erfolgreich war (für CI/Skripte).
+// Exit code 0 only when every step succeeded functionally (handy for CI/scripts).
 return result.Success ? 0 : 1;
 
-// Löst die EBICS-Version aus den Argumenten (`--version <v>`, `--version=<v>` oder positional `<v>`)
-// bzw. der Umgebungsvariablen auf; fällt bei fehlender/ungültiger Angabe auf H005 zurück.
+// Resolves the EBICS version from the arguments (`--version <v>`, `--version=<v>` or positional `<v>`)
+// or from the environment variable; falls back to H005 when the value is missing/invalid.
 static EbicsVersion ResolveVersion(string[] args, string? envValue)
 {
     var candidates = new List<string?>();

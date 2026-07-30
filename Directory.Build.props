@@ -1,52 +1,52 @@
 <Project>
 
   <!--
-    Zentrale, projektweite Build-Konventionen für alle EBICO-Projekte.
-    Siehe docs/development/solution-layout.md für die Begründung.
+    Central, project-wide build conventions for all EBICO projects.
+    See docs/development/solution-layout.md for the rationale.
   -->
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- Definition of Done: keine neuen Warnungen. -->
+    <!-- Definition of Done: no new warnings. -->
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest</AnalysisLevel>
 
     <!--
-      Style-Regeln (IDExxxx) leiten nur die IDE und brechen den Build NICHT.
-      Echte Compiler-/Analyzer-Warnungen werden via TreatWarningsAsErrors hart.
+      Style rules (IDExxxx) only guide the IDE and do NOT break the build.
+      Genuine compiler/analyser warnings are made hard via TreatWarningsAsErrors.
     -->
     <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
   </PropertyGroup>
 
   <!--
-    XML-Doc wird nur für die Bibliotheks-Projekte mit öffentlicher API erzwungen
-    (DoD: "XML-Doc-Kommentare an öffentlichen APIs"). Server/Suite sind Apps,
-    keine veröffentlichte API-Fläche; Tests brauchen keine Doc-Files.
+    XML doc is only enforced for the library projects with a public API
+    (DoD: "XML-doc comments on public APIs"). Server/Suite are apps,
+    not a published API surface; tests need no doc files.
   -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <!--
-    NuGet-Packaging der veröffentlichten Bibliotheken (Issue #50). Nur EBICO.Core +
-    EBICO.Connector sind packbar; die Apps (Server/Suite) und Tests bleiben es nicht.
-    Grundsatzentscheidung: docs/adr/0024-nuget-packaging-und-versionierung.md.
+    NuGet packaging of the published libraries (issue #50). Only EBICO.Core +
+    EBICO.Connector are packable; the apps (Server/Suite) and the tests stay unpackable.
+    Underlying decision: docs/adr/0024-nuget-packaging-und-versionierung.md.
   -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
     <IsPackable>true</IsPackable>
 
     <!--
-      CalVer {JAHR}.{MONAT}.{BUILD} (bewusst statt SemVer, siehe ADR-0024). NuGet/MSBuild
-      normalisieren Komponenten zu Integern — der Monat trägt keine führende Null (2026.07.1 → 2026.7.1).
-      BUILD kommt in der CI aus github.run_number (-p:EbicoBuildNumber=…), lokal Default 0.
+      CalVer {YEAR}.{MONTH}.{BUILD} (deliberately instead of SemVer, see ADR-0024). NuGet/MSBuild
+      normalise the components to integers — the month carries no leading zero (2026.07.1 → 2026.7.1).
+      In CI, BUILD comes from github.run_number (-p:EbicoBuildNumber=…), locally it defaults to 0.
     -->
     <EbicoBuildNumber Condition="'$(EbicoBuildNumber)' == ''">0</EbicoBuildNumber>
     <VersionPrefix>$([System.DateTime]::UtcNow.Year).$([System.DateTime]::UtcNow.Month).$(EbicoBuildNumber)</VersionPrefix>
 
-    <!-- Paket-Metadaten (gemeinsam; Description/PackageTags stehen je Projekt in der .csproj). -->
+    <!-- Package metadata (shared; Description/PackageTags live per project in the .csproj). -->
     <Authors>Dominik Zettl</Authors>
     <Company>tecvia</Company>
     <Copyright>© $([System.DateTime]::UtcNow.Year) tecvia</Copyright>
@@ -56,7 +56,7 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
-    <!-- Symbols (snupkg) + SourceLink: Debugging bis in die Quellen des jeweiligen Commits. -->
+    <!-- Symbols (snupkg) + SourceLink: debugging right into the sources of the respective commit. -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
@@ -65,7 +65,7 @@
   </PropertyGroup>
 
   <ItemGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
-    <!-- Deterministische source_link.json in die Pakete (Version zentral in Directory.Packages.props). -->
+    <!-- A deterministic source_link.json into the packages (version centrally in Directory.Packages.props). -->
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="all" />
   </ItemGroup>
 

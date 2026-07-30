@@ -93,10 +93,10 @@ the crypto stages is described on their own doc pages:
 ## Core abstractions
 
 ```csharp
-// Marker + Ergebnistyp-Bindung: Der Request "weiß", was er zurückgibt.
+// Marker + result-type binding: the request "knows" what it returns.
 public interface IEbicsRequest<TResult> { }
 
-// Der Mediator. Das ist alles, was die aufrufende App kennt.
+// The mediator. This is all the calling app knows.
 public interface IEbicsClient
 {
     Task<EbicsResult<TResult>> Send<TResult>(
@@ -104,13 +104,13 @@ public interface IEbicsClient
         CancellationToken ct = default);
 }
 
-// Beispiel-Request – nur Daten, keine Logik.
+// Example request – data only, no logic.
 public sealed class CddUploadRequest : IEbicsRequest<UploadReceipt>
 {
     public required ReadOnlyMemory<byte> Pain008 { get; init; }
 }
 
-// Ein Handler pro Request-Typ, vom Client nachgeschlagen.
+// One handler per request type, looked up by the client.
 public interface IEbicsRequestHandler<TRequest, TResult>
     where TRequest : IEbicsRequest<TResult>
 {
@@ -254,13 +254,13 @@ a business return code (no error) and — distinct from that — genuine technic
 errors that are thrown as an exception.
 
 ```csharp
-// Skizze; die endgültige Form inkl. Returncode-Katalog folgt in #36 (M4).
+// Sketch; the final form incl. the return-code catalogue follows in #36 (M4).
 public readonly record struct EbicsResult<T>
 {
-    public bool IsSuccess { get; init; }        // Auftrag fachlich erfolgreich?
-    public T? Value { get; init; }              // nur bei Erfolg gesetzt
-    public string ReturnCode { get; init; }     // EBICS-Returncode, z. B. "000000"
-    public string? ReturnText { get; init; }    // menschenlesbarer Text
+    public bool IsSuccess { get; init; }        // order functionally successful?
+    public T? Value { get; init; }              // set on success only
+    public string ReturnCode { get; init; }     // EBICS return code, e.g. "000000"
+    public string? ReturnText { get; init; }    // human-readable text
 }
 ```
 
@@ -315,7 +315,7 @@ services.AddEbicoConnector(o =>
     o.Version   = EbicsVersion.H005;
 })
 .ConfigureHttpClient(c => c.Timeout = TimeSpan.FromSeconds(30))
-.AddStandardResilienceHandler();   // optional, Paket beim Aufrufer
+.AddStandardResilienceHandler();   // optional, package on the caller's side
 ```
 
 > Refinement over the original sketch (`.AddHttpClient()`): the return value is

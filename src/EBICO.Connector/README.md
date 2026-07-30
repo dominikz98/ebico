@@ -1,13 +1,13 @@
 # EBICO.Connector
 
-Ein **EBICS-Client** als NuGet-Paket für den Zugriff auf einen EBICS-Server — konzeptionell
-wie *Azurite* für Azure Storage, nur für EBICS. `EBICO.Connector` kapselt die komplette
-Client-Pipeline hinter einer typsicheren API nach dem **Mediator-Muster**: Der Aufrufer kennt
-nur `IEbicsClient.Send(request)` und erhält ein `EbicsResult<T>`. Unterstützte Protokoll­versionen:
+An **EBICS client** as a NuGet package for accessing an EBICS server — conceptually
+like *Azurite* for Azure Storage, only for EBICS. `EBICO.Connector` encapsulates the complete
+client pipeline behind a type-safe API following the **mediator pattern**: the caller only knows
+`IEbicsClient.Send(request)` and receives an `EbicsResult<T>`. Supported protocol versions:
 **H003, H004, H005**.
 
-Gegenstück ist der [EBICO-Server-Emulator](https://github.com/dominikz98/ebico) — damit lässt
-sich der gesamte Ablauf lokal ohne echte Bank testen.
+Its counterpart is the [EBICO server emulator](https://github.com/dominikz98/ebico) — with it you can
+test the entire flow locally without a real bank.
 
 ## Installation
 
@@ -15,7 +15,7 @@ sich der gesamte Ablauf lokal ohne echte Bank testen.
 dotnet add package EBICO.Connector
 ```
 
-## Schnellstart
+## Quickstart
 
 ```csharp
 using EBICO.Connector;
@@ -28,7 +28,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 
-// Verbindung konfigurieren. Wichtig: Url ist die ABSOLUTE URL inkl. Endpoint-Pfad.
+// Configure the connection. Important: Url is the ABSOLUTE URL incl. the endpoint path.
 services.AddEbicoConnector(o =>
 {
     o.Url = "https://bank.example/ebics";
@@ -38,7 +38,7 @@ services.AddEbicoConnector(o =>
     o.Version = EbicsVersion.H005;
 });
 
-// Feature-Module dazuladen (jeweils optional).
+// Add the feature modules (each one optional).
 services.AddEbicoOnboarding();
 services.AddEbicoUpload();
 services.AddEbicoDownload();
@@ -46,46 +46,46 @@ services.AddEbicoDownload();
 var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IEbicsClient>();
 
-// 1) Teilnehmerschlüssel (A00x/X002/E002) einmalig erzeugen und im Key-Store ablegen.
+// 1) Generate the subscriber keys (A00x/X002/E002) once and store them in the key store.
 await provider.GetRequiredService<ISubscriberKeyGenerator>().GenerateAsync();
 
 // 2) Onboarding: INI -> HIA -> HPB.
 await client.Send(new IniRequest());
 await client.Send(new HiaRequest());
-var hpb = await client.Send(new HpbRequest()); // Bank-Fingerprints ggf. gegen den Bankbrief prüfen
+var hpb = await client.Send(new HpbRequest()); // verify the bank fingerprints against the bank letter if needed
 
-// 3) Upload eines SEPA Credit Transfer (pain.001).
+// 3) Upload of a SEPA credit transfer (pain.001).
 var upload = await client.Send(new CctUploadRequest { Pain001 = painBytes });
 
-// 4) Download eines Kontoauszugs (camt.053).
+// 4) Download of an account statement (camt.053).
 EbicsResult<DownloadResult> download = await client.Send(new C53DownloadRequest());
 if (download.IsSuccess)
 {
-    ReadOnlyMemory<byte> orderData = download.Value!.OrderData; // entschlüsselt, i. d. R. ein ZIP
+    ReadOnlyMemory<byte> orderData = download.Value!.OrderData; // decrypted, usually a ZIP
 }
 ```
 
-## Ergebnis & Fehlerbehandlung
+## Result & error handling
 
-- **Fachliche** Returncodes stehen in `EbicsResult<T>` (`IsSuccess`, `ReturnCode`, `ReturnText`) —
-  es wird nichts geworfen. Ein erfolgreicher Download endet mit `011000`
-  (`EBICS_DOWNLOAD_POSTPROCESS_DONE`), nicht `000000`.
-- **Technische**/Konfigurationsfehler werfen Ausnahmen
+- **Functional** return codes live in `EbicsResult<T>` (`IsSuccess`, `ReturnCode`, `ReturnText`) —
+  nothing is thrown. A successful download ends with `011000`
+  (`EBICS_DOWNLOAD_POSTPROCESS_DONE`), not `000000`.
+- **Technical**/configuration errors throw exceptions
   (`EbicsConfigurationException`, `EbicsTransportException`, …).
 
-## Dokumentation
+## Documentation
 
-- [Connector-Architektur](https://github.com/dominikz98/ebico/blob/main/docs/connector/architecture.md)
-- [Client-Kern & Konfiguration](https://github.com/dominikz98/ebico/blob/main/docs/connector/client-core.md)
+- [Connector architecture](https://github.com/dominikz98/ebico/blob/main/docs/connector/architecture.md)
+- [Client core & configuration](https://github.com/dominikz98/ebico/blob/main/docs/connector/client-core.md)
 - [Onboarding](https://github.com/dominikz98/ebico/blob/main/docs/connector/onboarding.md) ·
   [Upload](https://github.com/dominikz98/ebico/blob/main/docs/connector/upload.md) ·
   [Download](https://github.com/dominikz98/ebico/blob/main/docs/connector/download.md)
-- [Packaging & Beispiele](https://github.com/dominikz98/ebico/blob/main/docs/connector/packaging.md)
+- [Packaging & samples](https://github.com/dominikz98/ebico/blob/main/docs/connector/packaging.md)
 
-Ein lauffähiges End-to-End-Beispiel (Server in-process) liegt unter
+A runnable end-to-end sample (server in-process) lives under
 [`samples/EBICO.Connector.Quickstart`](https://github.com/dominikz98/ebico/tree/main/samples/EBICO.Connector.Quickstart).
 
-## Lizenz
+## License
 
-MIT — siehe [LICENSE](https://github.com/dominikz98/ebico/blob/main/LICENSE). Die EBICS-Schemas/Specs
-selbst sind proprietäres Eigentum der EBICS SC und nicht Teil dieses Pakets.
+MIT — see [LICENSE](https://github.com/dominikz98/ebico/blob/main/LICENSE). The EBICS schemas/specs
+themselves are the proprietary property of the EBICS SC and are not part of this package.

@@ -63,12 +63,12 @@ request DOM and canonicalized as a subtree; the **same** seam serves signing and
 round-trips stay symmetric.
 
 ```csharp
-// Request serialisieren (AuthSignature noch leer/abwesend), dann signieren:
+// Serialise the request (AuthSignature still empty/absent), then sign:
 string requestXml = EbicsXmlSerializer.SerializeToString(request, EbicsVersion.H005);
 SignatureType auth = AuthenticationSignature.Sign(requestXml, signerKey, KeyVersion.Create("X002"));
 request.AuthSignature = auth;
 
-// Serverseitig verifizieren (über das empfangene Wire-XML + die deserialisierte AuthSignature):
+// Verify server-side (over the received wire XML + the deserialised AuthSignature):
 bool ok = AuthenticationSignature.Verify(requestXml, request.AuthSignature, signerPubKey, KeyVersion.Create("X002"));
 ```
 

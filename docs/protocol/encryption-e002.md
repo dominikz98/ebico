@@ -47,12 +47,12 @@ fits comfortably. RSA-OAEP runs over `RSA.Encrypt`/`RSA.Decrypt`, the AES layer 
 `Aes.EncryptCbc`/`Aes.DecryptCbc`.
 
 ```csharp
-// Voll-Hybrid (die übliche Schicht):
+// Full hybrid (the usual layer):
 var enc = EncryptionE002.Encrypt(orderData, recipientPubKey, KeyVersion.Create("E002"));
 byte[] back = EncryptionE002.Decrypt(enc, recipientKey, KeyVersion.Create("E002"));
 
-// Primitive einzeln (z. B. wenn ein Transaktionsschlüssel über Segmente wiederverwendet wird):
-var tk        = EncryptionE002.GenerateTransactionKey();                 // 16-Byte AES-Schlüssel
+// The primitives individually (e.g. when a transaction key is reused across segments):
+var tk        = EncryptionE002.GenerateTransactionKey();                 // 16-byte AES key
 var encData   = EncryptionE002.EncryptOrderData(orderData, tk);          // AES-128-CBC
 var encTk     = EncryptionE002.EncryptTransactionKey(tk, recipientPubKey, KeyVersion.Create("E002")); // RSA-OAEP
 var tkBack    = EncryptionE002.DecryptTransactionKey(encTk, recipientKey, KeyVersion.Create("E002"));

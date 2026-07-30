@@ -3,14 +3,14 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <OutputType>Exe</OutputType>
-    <!-- Ein Beispiel, kein veröffentlichtes Artefakt. -->
+    <!-- A sample, not a published artefact. -->
     <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <!--
-    Der Quickstart hostet den EBICO.Server in-process (Kestrel), damit er ohne externen
-    Server läuft. Dafür braucht die Konsolenapp das ASP.NET-Core-Shared-Framework
-    (WebApplication); ProjectReferences flowen die FrameworkReference nicht automatisch.
+    The quickstart hosts the EBICO.Server in-process (Kestrel) so that it runs without an
+    external server. For that the console app needs the ASP.NET Core shared framework
+    (WebApplication); ProjectReferences do not flow the FrameworkReference automatically.
   -->
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
