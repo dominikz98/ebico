@@ -46,6 +46,16 @@ complete BTF/order palette possible.
 - **Issue-driven:** one branch (`feat/<no>-<slug>`) + one PR per issue, docs
   and tests included. The PR body uses `.github/PULL_REQUEST_TEMPLATE.md` and contains
   `Closes #<no>`.
+- **Project language is English** (#133, epic #128): every contributor-facing text is written in
+  English with **British spelling** (`authorisation`, `serialisation`) — `docs/` and ADRs, code
+  comments and XML doc, Suite UI strings, `CLAUDE.md` and `.claude/skills/`, commit messages, PR
+  descriptions and new issues. Reuse the terminology of the merged translations instead of coining
+  new terms (e.g. *master data*, *subscriber*, *order type*, *bank-technical signature*, *return
+  code*, *spec caveat*). Known exceptions: German file names, doc slugs and Suite routes stay until
+  #134 renames them; the generated XSD bindings keep the German `<xs:documentation>` text of the
+  proprietary schemas (ADR-0006, do not hand-edit); the INI/HIA letter
+  (`InitializationLetterTextBuilder`) stays German because the subscriber prints and posts it to a
+  German-speaking bank.
 - Issues/milestones live on GitHub (`gh issue list`). Overview:
   `docs/ticket-overview.md` (10 milestones M0–M9, 63 issues, 12 epics).
 - Roadmap: M0 (foundation) → M1 (core/protocol) → M2 (crypto) → M3–M5 (server)

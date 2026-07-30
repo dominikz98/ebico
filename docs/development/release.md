@@ -10,7 +10,7 @@ A release comes about by **setting and pushing a tag** `vYEAR.MONTH.N`. Everythi
 automatically:
 
 ```bash
-git tag v2026.7.1      # CalVer: {JAHR}.{MONAT}.{BUILD}
+git tag v2026.7.1      # CalVer: {YEAR}.{MONTH}.{BUILD}
 git push origin v2026.7.1
 ```
 
