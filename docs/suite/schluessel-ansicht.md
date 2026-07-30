@@ -49,7 +49,7 @@ The new DTO:
 ```csharp
 public sealed record KeyView
 {
-    public required string OwnerLabel { get; init; }      // "Teilnehmer PARTNER01 / USER0001"
+    public required string OwnerLabel { get; init; }      // "Subscriber PARTNER01 / USER0001"
     public required KeyPurpose Purpose { get; init; }      // Signature / Encryption / Authentication
     public required string KeyVersion { get; init; }       // "A006"
     public required RsaKeyMaterial PublicKey { get; init; }

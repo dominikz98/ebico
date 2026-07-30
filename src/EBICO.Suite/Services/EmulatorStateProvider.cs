@@ -70,7 +70,7 @@ public sealed class EmulatorStateProvider : IEmulatorStateProvider
                 if (stored is not null)
                 {
                     views.Add(KeyViewFactory.Create(
-                        $"Teilnehmer {subscriber.PartnerId.Value} / {subscriber.UserId.Value}",
+                        $"Subscriber {subscriber.PartnerId.Value} / {subscriber.UserId.Value}",
                         stored.Version,
                         stored.Key));
                 }

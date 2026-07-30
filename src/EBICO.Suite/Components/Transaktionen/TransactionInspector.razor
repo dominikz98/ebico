@@ -5,13 +5,13 @@
 
 <section class="mb-4">
     <div class="d-flex justify-content-between align-items-center">
-        <h2 id="transactions-heading">Transaktionen</h2>
-        <button class="btn btn-outline-secondary btn-sm" id="tx-refresh" @onclick="ReloadAsync">Aktualisieren</button>
+        <h2 id="transactions-heading">Transactions</h2>
+        <button class="btn btn-outline-secondary btn-sm" id="tx-refresh" @onclick="ReloadAsync">Refresh</button>
     </div>
 
     @if (_loading)
     {
-        <p><em>Lade Transaktionen…</em></p>
+        <p><em>Loading transactions…</em></p>
     }
     else
     {
@@ -19,13 +19,13 @@
             <thead>
                 <tr>
                     <th>Status</th>
-                    <th>Richtung</th>
+                    <th>Direction</th>
                     <th>OrderType</th>
-                    <th>Kunde / Teilnehmer</th>
-                    <th>Segmente</th>
-                    <th>Transaktions-ID</th>
-                    <th>Letzter Returncode</th>
-                    <th class="text-end">Aktion</th>
+                    <th>Customer / Subscriber</th>
+                    <th>Segments</th>
+                    <th>Transaction ID</th>
+                    <th>Last return code</th>
+                    <th class="text-end">Action</th>
                 </tr>
             </thead>
             <tbody>
@@ -46,7 +46,7 @@
                 }
                 @if (_transactions.Count == 0)
                 {
-                    <tr><td colspan="8"><em>Keine Transaktionen erfasst.</em></td></tr>
+                    <tr><td colspan="8"><em>No transactions recorded.</em></td></tr>
                 }
             </tbody>
         </table>
@@ -60,10 +60,10 @@
             <div class="card-body">
                 <div class="d-flex justify-content-between align-items-start">
                     <h3 class="h5">
-                        Transaktion <code>@ShortId(detail.Summary.TransactionIdHex)</code>
+                        Transaction <code>@ShortId(detail.Summary.TransactionIdHex)</code>
                         <span class="badge @StatusBadgeCss(detail.Summary.Status)">@detail.Summary.Status</span>
                     </h3>
-                    <button class="btn btn-sm btn-outline-secondary" id="tx-detail-close" @onclick="() => _selectedTxId = null">Schließen</button>
+                    <button class="btn btn-sm btn-outline-secondary" id="tx-detail-close" @onclick="() => _selectedTxId = null">Close</button>
                 </div>
                 <p class="text-muted small mb-3">
                     @detail.Summary.Kind · @(detail.Summary.OrderType ?? "—") ·
@@ -73,13 +73,13 @@
 
                 <ul class="nav nav-tabs mb-3">
                     <li class="nav-item">
-                        <button class="nav-link @TabCss(DetailTab.RawXml)" id="tab-rawxml" @onclick="() => _activeTab = DetailTab.RawXml">Roh-XML</button>
+                        <button class="nav-link @TabCss(DetailTab.RawXml)" id="tab-rawxml" @onclick="() => _activeTab = DetailTab.RawXml">Raw XML</button>
                     </li>
                     <li class="nav-item">
                         <button class="nav-link @TabCss(DetailTab.OrderData)" id="tab-orderdata" @onclick="() => _activeTab = DetailTab.OrderData">OrderData</button>
                     </li>
                     <li class="nav-item">
-                        <button class="nav-link @TabCss(DetailTab.Events)" id="tab-events" @onclick="() => _activeTab = DetailTab.Events">Ereignisverlauf</button>
+                        <button class="nav-link @TabCss(DetailTab.Events)" id="tab-events" @onclick="() => _activeTab = DetailTab.Events">Event history</button>
                     </li>
                 </ul>
 
@@ -88,7 +88,7 @@
                     <div id="tab-panel-rawxml">
                         @if (detail.Messages.Count == 0)
                         {
-                            <p class="text-muted"><em>Keine Roh-XML erfasst (z. B. Key-Management-Order ohne Transaktionsbezug).</em></p>
+                            <p class="text-muted"><em>No raw XML recorded (e.g. a key-management order without a transaction context).</em></p>
                         }
                         else
                         {
@@ -97,11 +97,11 @@
                                 <h4 class="h6">@m.Phase@(m.SegmentNumber is { } sn ? $" · Segment {sn}" : string.Empty)</h4>
                                 <div class="row mb-3">
                                     <div class="col-md-6">
-                                        <div class="text-muted small">Request@(m.RequestTruncated ? " (gekürzt)" : string.Empty)</div>
+                                        <div class="text-muted small">Request@(m.RequestTruncated ? " (truncated)" : string.Empty)</div>
                                         <pre class="tx-xml">@m.RequestXml</pre>
                                     </div>
                                     <div class="col-md-6">
-                                        <div class="text-muted small">Response@(m.ResponseTruncated ? " (gekürzt)" : string.Empty)</div>
+                                        <div class="text-muted small">Response@(m.ResponseTruncated ? " (truncated)" : string.Empty)</div>
                                         <pre class="tx-xml">@m.ResponseXml</pre>
                                     </div>
                                 </div>
@@ -115,7 +115,7 @@
                         @if (detail.OrderData is { } od)
                         {
                             <p class="text-muted small">
-                                Länge: @od.ByteLength Byte@(od.Truncated ? " (Vorschau gekürzt)" : string.Empty) · entschlüsselt &amp; dekomprimiert
+                                Length: @od.ByteLength bytes@(od.Truncated ? " (preview truncated)" : string.Empty) · decrypted &amp; decompressed
                             </p>
                             <div class="btn-group btn-group-sm mb-2" role="group">
                                 <button class="btn @(_orderDataHex ? "btn-outline-secondary" : "btn-secondary")"
@@ -128,8 +128,8 @@
                         else
                         {
                             <p class="text-muted">
-                                <em>Kein entschlüsseltes OrderData verfügbar — die Transaktion ist nicht mehr resident
-                                    oder wurde noch nicht abgeschlossen.</em>
+                                <em>No decrypted OrderData available — the transaction is no longer resident
+                                    or has not been completed yet.</em>
                             </p>
                         }
                     </div>
@@ -139,7 +139,7 @@
                     <div id="tab-panel-events">
                         <table class="table table-sm">
                             <thead>
-                                <tr><th>Seq</th><th>Zeit</th><th>Typ</th><th>Severity</th><th>Returncode</th><th>Meldung</th></tr>
+                                <tr><th>Seq</th><th>Time</th><th>Type</th><th>Severity</th><th>Return code</th><th>Message</th></tr>
                             </thead>
                             <tbody>
                                 @foreach (var e in detail.Events)
@@ -155,7 +155,7 @@
                                 }
                                 @if (detail.Events.Count == 0)
                                 {
-                                    <tr><td colspan="6"><em>Keine Ereignisse.</em></td></tr>
+                                    <tr><td colspan="6"><em>No events.</em></td></tr>
                                 }
                             </tbody>
                         </table>
@@ -167,14 +167,14 @@
 }
 
 <section class="mb-4">
-    <h2 id="event-log-heading">Globales Protokoll</h2>
-    <p class="text-muted small">Alle Kunden, roh und ungefiltert — auch betreiberinterne Ereignisse.</p>
+    <h2 id="event-log-heading">Global log</h2>
+    <p class="text-muted small">All customers, raw and unfiltered — including operator-internal events.</p>
 
     <div class="row g-2 mb-3">
         <div class="col-auto">
-            <label class="form-label small mb-0" for="filter-partner">Kunde</label>
+            <label class="form-label small mb-0" for="filter-partner">Customer</label>
             <select class="form-select form-select-sm" id="filter-partner" @bind="_filterPartner" @bind:after="ApplyFilterAsync">
-                <option value="">Alle Kunden</option>
+                <option value="">All customers</option>
                 @foreach (var partner in _customerOptions)
                 {
                     <option value="@partner">@partner</option>
@@ -182,9 +182,9 @@
             </select>
         </div>
         <div class="col-auto">
-            <label class="form-label small mb-0" for="filter-type">Typ</label>
+            <label class="form-label small mb-0" for="filter-type">Type</label>
             <select class="form-select form-select-sm" id="filter-type" @bind="_filterType" @bind:after="ApplyFilterAsync">
-                <option value="">Alle Typen</option>
+                <option value="">All types</option>
                 @foreach (var type in _typeOptions)
                 {
                     <option value="@type">@type</option>
@@ -194,7 +194,7 @@
         <div class="col-auto">
             <label class="form-label small mb-0" for="filter-severity">Severity</label>
             <select class="form-select form-select-sm" id="filter-severity" @bind="_filterSeverity" @bind:after="ApplyFilterAsync">
-                <option value="">Alle</option>
+                <option value="">All</option>
                 @foreach (var severity in _severityOptions)
                 {
                     <option value="@severity">@severity</option>
@@ -202,11 +202,11 @@
             </select>
         </div>
         <div class="col-auto">
-            <label class="form-label small mb-0" for="filter-from">Von (UTC)</label>
+            <label class="form-label small mb-0" for="filter-from">From (UTC)</label>
             <input type="datetime-local" class="form-control form-control-sm" id="filter-from" @bind="_filterFrom" @bind:after="ApplyFilterAsync" />
         </div>
         <div class="col-auto">
-            <label class="form-label small mb-0" for="filter-to">Bis (UTC)</label>
+            <label class="form-label small mb-0" for="filter-to">To (UTC)</label>
             <input type="datetime-local" class="form-control form-control-sm" id="filter-to" @bind="_filterTo" @bind:after="ApplyFilterAsync" />
         </div>
     </div>
@@ -215,15 +215,15 @@
         <thead>
             <tr>
                 <th>Seq</th>
-                <th>Zeit</th>
-                <th>Kunde / Teilnehmer</th>
-                <th>Typ</th>
+                <th>Time</th>
+                <th>Customer / Subscriber</th>
+                <th>Type</th>
                 <th>Severity</th>
-                <th>Sichtbarkeit</th>
+                <th>Visibility</th>
                 <th>OrderType</th>
-                <th>Returncode</th>
-                <th>Transaktion</th>
-                <th>Meldung</th>
+                <th>Return code</th>
+                <th>Transaction</th>
+                <th>Message</th>
             </tr>
         </thead>
         <tbody>
@@ -254,7 +254,7 @@
             }
             @if (_events.Count == 0)
             {
-                <tr><td colspan="10"><em>Keine Ereignisse für den aktuellen Filter.</em></td></tr>
+                <tr><td colspan="10"><em>No events for the current filter.</em></td></tr>
             }
         </tbody>
     </table>
@@ -274,7 +274,7 @@
     private IReadOnlyList<string> _customerOptions = [];
 
     // Filter options come from the log, not from Enum.GetValues: an option no event carries only ever
-    // leads into „Keine Ereignisse für den aktuellen Filter." (issue #126).
+    // leads into "No events for the current filter." (issue #126).
     private IReadOnlyList<EbicsEventType> _typeOptions = [];
     private IReadOnlyList<EbicsEventSeverity> _severityOptions = [];
 

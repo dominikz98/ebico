@@ -1,12 +1,12 @@
 namespace EBICO.Suite.Services;
 
 /// <summary>
-/// Broadcasts „the master data changed" to every component that displays it, so the independently
-/// rendered management islands on the Stammdaten page stay consistent with each other (issue #126).
+/// Broadcasts "the master data changed" to every component that displays it, so the independently
+/// rendered management islands on the master-data page stay consistent with each other (issue #126).
 /// </summary>
 /// <remarks>
 /// <para>
-/// The Stammdaten page hosts <c>BankManager</c>, <c>PartnerManager</c> and <c>SubscriberManager</c> as
+/// The master-data page hosts <c>BankManager</c>, <c>PartnerManager</c> and <c>SubscriberManager</c> as
 /// three <em>separate</em> <c>InteractiveServer</c> islands. Each holds its own copy of the state, but
 /// all three write through the same <see cref="EBICO.Server.State.IMasterDataManager"/> — and a bank
 /// deletion cascades into partners and subscribers. Without a notification path a mutation in one

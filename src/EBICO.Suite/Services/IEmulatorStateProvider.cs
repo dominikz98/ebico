@@ -4,7 +4,7 @@ namespace EBICO.Suite.Services;
 
 /// <summary>
 /// Read-only access to the EBICS emulator's server-side state for the Suite UI:
-/// the registered banks, partners (Kunden) and subscribers (Teilnehmer).
+/// the registered banks, partners (customers) and subscribers.
 /// </summary>
 /// <remarks>
 /// This is the Suite's read-model contract. The real emulator store (keys,
@@ -20,12 +20,12 @@ public interface IEmulatorStateProvider
     /// <returns>The registered <see cref="Bank"/>s.</returns>
     Task<IReadOnlyList<Bank>> GetBanksAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the partners (Kunden) registered at the emulator.</summary>
+    /// <summary>Returns the partners (customers) registered at the emulator.</summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The registered <see cref="Partner"/>s.</returns>
     Task<IReadOnlyList<Partner>> GetPartnersAsync(CancellationToken cancellationToken = default);
 
-    /// <summary>Returns the subscribers (Teilnehmer) registered at the emulator.</summary>
+    /// <summary>Returns the subscribers registered at the emulator.</summary>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>The registered <see cref="Subscriber"/>s.</returns>
     Task<IReadOnlyList<Subscriber>> GetSubscribersAsync(CancellationToken cancellationToken = default);

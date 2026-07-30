@@ -19,7 +19,7 @@ public class DemoDataBannerTests
 
         var cut = ctx.Render<DemoDataBanner>();
 
-        cut.Markup.Should().Contain("Beispieldaten");
+        cut.Markup.Should().Contain("Sample data");
         cut.Markup.Should().Contain("EBICO.Server");
     }
 

@@ -1,16 +1,16 @@
 @page "/transaktionen"
 
-<PageTitle>Transaktionen</PageTitle>
+<PageTitle>Transactions</PageTitle>
 
-<h1>Transaktions-Inspektor</h1>
+<h1>Transaction Inspector</h1>
 
 <p class="text-muted">
-    Laufende und abgeschlossene Upload-/Download-Transaktionen mit Roh-XML, entschlüsseltem OrderData
-    und Returncodes — plus die globale, ungefilterte Protokollansicht über alle Kunden
-    (Betreiber-/Entwicklersicht, inklusive interner Ereignisse). Gezeigt wird der Zustand
-    <em>dieses</em> Prozesses (Beispieldaten), nicht der eines separat gestarteten Emulators.
+    Running and completed upload/download transactions with raw XML, decrypted OrderData
+    and return codes — plus the global, unfiltered log view across all customers
+    (operator/developer view, including internal events). It shows the state of
+    <em>this</em> process (sample data), not that of a separately started emulator.
 </p>
 
-@* Static-SSR-Seite mit einer interaktiven Insel (ADR-0009: Render-Modus am Einbettungsort).
-   Die Insel liest in-process über den ITransactionInspectorProvider (EBICO.Server-Stores). *@
+@* Static-SSR page with one interactive island (ADR-0009: render mode at the embedding site).
+   The island reads in-process through the ITransactionInspectorProvider (EBICO.Server stores). *@
 <TransactionInspector @rendermode="InteractiveServer" />

@@ -80,7 +80,7 @@ public class EmulatorStateProviderTests
         var keys = await sut.GetKeysAsync(_ct);
 
         keys.Should().HaveCount(5);
-        keys.Should().Contain(k => k.OwnerLabel == "Teilnehmer PARTNER01 / USER0001")
+        keys.Should().Contain(k => k.OwnerLabel == "Subscriber PARTNER01 / USER0001")
             .And.Contain(k => k.OwnerLabel == "Bank EBICOHOST");
         keys.Select(k => k.KeyVersion).Should().Contain("A006").And.Contain("E002").And.Contain("X002");
 
@@ -106,7 +106,7 @@ public class EmulatorStateProviderTests
 
         // A subscriber present in the store but without stored keys yields no key view: the list is
         // driven by the per-purpose GetAsync probe, not by enumeration.
-        keys.Should().NotContain(k => k.OwnerLabel.Contains("Teilnehmer"));
+        keys.Should().NotContain(k => k.OwnerLabel.Contains("Subscriber"));
         // A bank present in the store but not among the seeded BankHosts is never surfaced.
         keys.Should().NotContain(k => k.OwnerLabel == "Bank HOSTA");
     }

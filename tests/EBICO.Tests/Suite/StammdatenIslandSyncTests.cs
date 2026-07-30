@@ -84,7 +84,7 @@ public class StammdatenIslandSyncTests
         banks.FindAll("tr")
             .First(r => r.TextContent.Contains("WEGBANK", StringComparison.Ordinal))
             .QuerySelectorAll("button")
-            .First(b => b.TextContent.Trim() == "Löschen")
+            .First(b => b.TextContent.Trim() == "Delete")
             .Click();
         banks.Find("#bank-delete-confirm").Click();
 
@@ -107,14 +107,14 @@ public class StammdatenIslandSyncTests
         partners.Markup.Should().Contain("CUST01");
         subscribers.Markup.Should().Contain("USER01");
 
-        banks.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        banks.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         banks.Find("#bank-delete-confirm").Click();
 
         // The cascade removed both server-side; the sibling islands must reflect it without a reload.
         partners.Markup.Should().NotContain("CUST01");
-        partners.Markup.Should().Contain("Keine Partner registriert.");
+        partners.Markup.Should().Contain("No partners registered.");
         subscribers.Markup.Should().NotContain("USER01");
-        subscribers.Markup.Should().Contain("Keine Teilnehmer registriert.");
+        subscribers.Markup.Should().Contain("No subscribers registered.");
     }
 
     [Fact]
@@ -130,7 +130,7 @@ public class StammdatenIslandSyncTests
         var subscribers = ctx.Render<SubscriberManager>();
         subscribers.Markup.Should().Contain("USER01");
 
-        partners.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        partners.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         partners.Find("#partner-delete-confirm").Click();
 
         subscribers.Markup.Should().NotContain("USER01");
@@ -174,7 +174,7 @@ public class StammdatenIslandSyncTests
         subscribers.FindAll("button").First(b => b.TextContent.Trim() == "Details").Click();
         subscribers.FindAll("#perm-add").Should().ContainSingle("the detail panel is open");
 
-        partners.FindAll("button").First(b => b.TextContent.Trim() == "Löschen").Click();
+        partners.FindAll("button").First(b => b.TextContent.Trim() == "Delete").Click();
         partners.Find("#partner-delete-confirm").Click();
 
         subscribers.FindAll("#perm-add").Should().BeEmpty("the subscriber behind the panel was cascaded away");
@@ -197,13 +197,13 @@ public class StammdatenIslandSyncTests
         banks.FindAll("tr")
             .First(r => r.TextContent.Contains("ZZZBANK", StringComparison.Ordinal))
             .QuerySelectorAll("button")
-            .First(b => b.TextContent.Trim() == "Löschen")
+            .First(b => b.TextContent.Trim() == "Delete")
             .Click();
         banks.Find("#bank-delete-confirm").Click();
 
         // The form must not keep pointing at a bank that no longer exists.
         partners.Find("#partner-host").GetAttribute("value").Should().NotBe("ZZZBANK");
-        partners.Markup.Should().Contain("zwischenzeitlich gelöscht");
+        partners.Markup.Should().Contain("deleted in the meantime");
     }
 
     [Fact]

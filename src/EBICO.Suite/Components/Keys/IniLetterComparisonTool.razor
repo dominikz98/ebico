@@ -1,26 +1,26 @@
 @inject IEmulatorStateProvider State
 
 @*
-    INI-Brief-Vergleich (issue #55): verifies a public-key fingerprint typed from an INI letter
+    INI-letter comparison (issue #55): verifies a public-key fingerprint typed from an INI letter
     against a known key or a pasted public key, using PublicKeyFingerprint.Verify (constant time).
     Rendered as an interactive island; the render mode is applied at the embedding site.
 *@
 
 <p class="text-muted">
-    Prüft einen aus dem INI-Brief abgetippten Fingerprint gegen einen Schlüssel — genau der
-    manuelle Abgleich, den die Bank bei INI-Eingang durchführt.
+    Checks a fingerprint transcribed from the INI letter against a key — exactly the
+    manual comparison the bank performs when an INI letter arrives.
 </p>
 
 <div class="row g-3">
     <div class="col-md-6">
-        <label class="form-label" for="key-source">Schlüssel</label>
+        <label class="form-label" for="key-source">Key</label>
         <select id="key-source" class="form-select" @bind="_selectedIndex">
             @for (var i = 0; i < _keys.Count; i++)
             {
                 var key = _keys[i];
                 <option value="@i">@key.OwnerLabel — @key.KeyVersion</option>
             }
-            <option value="-1">Öffentlichen Schlüssel einfügen (PEM)…</option>
+            <option value="-1">Paste public key (PEM)…</option>
         </select>
 
         @if (_selectedIndex < 0)
@@ -31,42 +31,42 @@
     </div>
 
     <div class="col-md-6">
-        <label class="form-label" for="expected-fingerprint">Fingerprint aus INI-Brief</label>
+        <label class="form-label" for="expected-fingerprint">Fingerprint from INI letter</label>
         <textarea id="expected-fingerprint" class="form-control fingerprint-input" rows="6"
-                  placeholder="z. B. 1A 2B 3C …" @bind="_expected"></textarea>
+                  placeholder="e.g. 1A 2B 3C …" @bind="_expected"></textarea>
     </div>
 </div>
 
-<button class="btn btn-primary mt-3" @onclick="Compare">Vergleichen</button>
+<button class="btn btn-primary mt-3" @onclick="Compare">Compare</button>
 
 @switch (_result)
 {
     case Outcome.Match:
-        <div class="alert alert-success mt-3" role="alert">Fingerprint stimmt überein.</div>
+        <div class="alert alert-success mt-3" role="alert">Fingerprint matches.</div>
         break;
     case Outcome.Mismatch:
         <div class="alert alert-danger mt-3" role="alert">
-            Fingerprint stimmt <strong>nicht</strong> überein.
+            Fingerprint does <strong>not</strong> match.
             @if (_actualFingerprint is not null)
             {
-                <div class="mt-2">Tatsächlicher Fingerprint des Schlüssels:</div>
+                <div class="mt-2">Actual fingerprint of the key:</div>
                 <pre class="mb-0 fingerprint-input">@_actualFingerprint</pre>
             }
         </div>
         break;
     case Outcome.InvalidKey:
         <div class="alert alert-warning mt-3" role="alert">
-            Der eingefügte Schlüssel konnte nicht gelesen werden (PEM mit öffentlichem RSA-Schlüssel erwartet).
+            The pasted key could not be read (a PEM with an RSA public key is expected).
         </div>
         break;
     case Outcome.InvalidFingerprint:
         <div class="alert alert-warning mt-3" role="alert">
-            Der Fingerprint konnte nicht als Hexadezimalwert gelesen werden.
+            The fingerprint could not be read as a hexadecimal value.
         </div>
         break;
     case Outcome.MissingFingerprint:
         <div class="alert alert-warning mt-3" role="alert">
-            Bitte den Fingerprint aus dem INI-Brief eintragen.
+            Please enter the fingerprint from the INI letter.
         </div>
         break;
 }
@@ -87,7 +87,7 @@
     {
         _actualFingerprint = null;
 
-        // An empty field is „nothing typed yet", not „unreadable hex" — the tool exists for transcribing
+        // An empty field is "nothing typed yet", not "unreadable hex" — the tool exists for transcribing
         // a fingerprint off a letter, so the two cases need different guidance (issue #126).
         if (string.IsNullOrWhiteSpace(_expected))
         {

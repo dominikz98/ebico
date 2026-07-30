@@ -90,8 +90,8 @@ public class TransactionInspectorTests
     [Fact]
     public void FilterOptions_OnlyOfferValuesThatOccur()
     {
-        // Issue #126: the Typ/Severity dropdowns used to list every enum value, so picking one that no
-        // event carries led straight into „Keine Ereignisse für den aktuellen Filter."
+        // Issue #126: the Type/Severity dropdowns used to list every enum value, so picking one that no
+        // event carries led straight into "No events for the current filter."
         using var ctx = new BunitContext();
         ctx.Services.AddScoped<ITransactionInspectorProvider>(_ => new FakeInspector());
 

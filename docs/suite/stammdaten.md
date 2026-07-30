@@ -22,14 +22,14 @@ Instead of its own HTTP API (which does exist server-side as an admin API, see
 To this end `EBICO.Suite` now references `EBICO.Server` (Suite → Server → Core).
 
 ```csharp
-// Program.cs — Server-Zustand in-process
+// Program.cs — server state in-process
 builder.Services.AddSingleton<IEbicsStateStore, InMemoryEbicsStateStore>();
 builder.Services.AddSingleton<IMasterDataManager, MasterDataManager>();
-builder.Services.AddSingleton<SampleEmulatorStateProvider>();          // Sample-Daten + Schlüssel
-builder.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>(); // Live-Read-Model
+builder.Services.AddSingleton<SampleEmulatorStateProvider>();          // sample data + keys
+builder.Services.AddScoped<IEmulatorStateProvider, EmulatorStateProvider>(); // live read model
 …
 var app = builder.Build();
-await EmulatorStateSeeder.SeedAsync(app.Services);   // Sample-Stammdaten in den In-Memory-Store
+await EmulatorStateSeeder.SeedAsync(app.Services);   // sample master data into the in-memory store
 ```
 
 | Type | Role |

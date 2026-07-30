@@ -1,16 +1,16 @@
 @page "/stammdaten"
 
-<PageTitle>Stammdaten</PageTitle>
+<PageTitle>Master Data</PageTitle>
 
-<h1>Stammdaten</h1>
+<h1>Master Data</h1>
 
 <p class="text-muted">
-    Verwaltung der registrierten Banken, Partner (Kunden) und Teilnehmer des Emulators:
-    Anlegen, Bearbeiten, Löschen sowie Teilnehmer-Status und Berechtigungen.
+    Management of the emulator's registered banks, partners (customers) and subscribers:
+    create, edit, delete as well as subscriber lifecycle state and permissions.
 </p>
 
-@* Static-SSR-Seite mit interaktiven Inseln je Aggregat (ADR-0009: Render-Modus am Einbettungsort).
-   Die Komponenten schreiben in-process über den IMasterDataManager (EBICO.Server). *@
+@* Static-SSR page with interactive islands per aggregate (ADR-0009: render mode at the embedding site).
+   The components write in-process through the IMasterDataManager (EBICO.Server). *@
 <BankManager @rendermode="InteractiveServer" />
 <PartnerManager @rendermode="InteractiveServer" />
 <SubscriberManager @rendermode="InteractiveServer" />

@@ -28,7 +28,7 @@ Since no live traffic arises, sample transactions are seeded.
 ```csharp
 // Program.cs — Transaktions-/Ereignis-Zustand in-process (ADR-0009)
 builder.Services.AddOptions<EbicoServerOptions>();
-builder.Services.AddSingleton(TimeProvider.System);              // von Event-Log/Capture-Store benötigt
+builder.Services.AddSingleton(TimeProvider.System);              // required by the event log / capture store
 builder.Services.AddSingleton<IEventLog, InMemoryEventLog>();
 builder.Services.AddSingleton<IUploadTransactionStore, InMemoryUploadTransactionStore>();
 builder.Services.AddSingleton<IDownloadTransactionStore, InMemoryDownloadTransactionStore>();

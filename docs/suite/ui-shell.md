@@ -32,9 +32,9 @@ the Blazor template demo pages (Counter/Weather) were removed.
 | Entry | Route | Content |
 | --- | --- | --- |
 | Dashboard | `/` | Metrics of the emulator state (count of banks/partners/subscribers) |
-| Stammdaten | `/stammdaten` | Management of banks/partners/subscribers ([#53](stammdaten.md)) |
-| Transaktionen | `/transaktionen` | Transaction inspector ([#54](transaktions-inspektor.md)) |
-| Schlüssel | `/schluessel` | Fingerprints, INI-letter comparison, test-CA/key tools ([#55](schluessel-ansicht.md)) |
+| Master Data | `/stammdaten` | Management of banks/partners/subscribers ([#53](stammdaten.md)) |
+| Transactions | `/transaktionen` | Transaction inspector ([#54](transaktions-inspektor.md)) |
+| Keys | `/schluessel` | Fingerprints, INI-letter comparison, test-CA/key tools ([#55](schluessel-ansicht.md)) |
 
 The `MainLayout` keeps the template's sidebar structure (sidebar + content),
 but shows the EBICO title in the top row instead of the template "About" link.

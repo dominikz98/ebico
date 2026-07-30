@@ -8,13 +8,13 @@
 *@
 
 <p class="text-muted">
-    Erzeugt RSA-Test-Schlüssel und self-signed Test-Zertifikate (H005) zum Ausprobieren der
-    Onboarding-Flows. Nur für Tests — kein Produktivschlüsselmaterial.
+    Generates RSA test keys and self-signed test certificates (H005) for trying out the
+    onboarding flows. For testing only — not production key material.
 </p>
 
 <div class="row g-3">
     <div class="col-md-4">
-        <label class="form-label" for="purpose">Zweck</label>
+        <label class="form-label" for="purpose">Purpose</label>
         <select id="purpose" class="form-select" @bind="_purpose">
             @foreach (var purpose in Enum.GetValues<KeyPurpose>())
             {
@@ -23,33 +23,33 @@
         </select>
     </div>
     <div class="col-md-8">
-        <label class="form-label" for="subject">Zertifikats-Subject</label>
+        <label class="form-label" for="subject">Certificate subject</label>
         <input id="subject" class="form-control" @bind="_subject" />
     </div>
 </div>
 
 <div class="mt-3">
-    <button id="generate-key" class="btn btn-primary" @onclick="GenerateKey">Schlüssel erzeugen</button>
+    <button id="generate-key" class="btn btn-primary" @onclick="GenerateKey">Generate key</button>
     <button id="create-cert" class="btn btn-outline-primary ms-2" @onclick="CreateCertificate">
-        Test-Zertifikat erzeugen
+        Generate test certificate
     </button>
 </div>
 
 @if (_key is not null)
 {
     <div class="mt-4">
-        <h3 class="h5">Erzeugter Schlüssel</h3>
+        <h3 class="h5">Generated key</h3>
         <div>Fingerprint (SHA-256):</div>
         <pre class="mb-2 keytext">@_keyFingerprint</pre>
 
-        <label class="form-label" for="public-pem">Öffentlicher Schlüssel (PEM)</label>
+        <label class="form-label" for="public-pem">Public key (PEM)</label>
         <textarea id="public-pem" class="form-control keytext" rows="6" readonly>@_publicKeyPem</textarea>
         <div class="mt-2">
             <button id="download-public" class="btn btn-sm btn-outline-secondary" @onclick="DownloadPublicKey">
-                Public Key herunterladen
+                Download public key
             </button>
             <button id="download-private" class="btn btn-sm btn-outline-secondary ms-2" @onclick="DownloadPrivateKey">
-                Private Key herunterladen
+                Download private key
             </button>
         </div>
     </div>
@@ -58,21 +58,21 @@
 @if (_cert is not null)
 {
     <div class="mt-4">
-        <h3 class="h5">Test-Zertifikat</h3>
+        <h3 class="h5">Test certificate</h3>
         @if (_cert.IsValid)
         {
-            <div class="alert alert-success" role="alert">Zertifikat ist gültig (self-signed, als eigener Vertrauensanker geprüft).</div>
+            <div class="alert alert-success" role="alert">Certificate is valid (self-signed, verified as its own trust anchor).</div>
         }
         else
         {
-            <div class="alert alert-danger" role="alert">Zertifikat ungültig: @_cert.Errors</div>
+            <div class="alert alert-danger" role="alert">Certificate invalid: @_cert.Errors</div>
         }
 
         <table class="table table-sm">
             <tbody>
                 <tr><th scope="row">Subject</th><td>@_cert.Subject</td></tr>
-                <tr><th scope="row">Gültig ab</th><td>@_cert.NotBefore.ToString("u")</td></tr>
-                <tr><th scope="row">Gültig bis</th><td>@_cert.NotAfter.ToString("u")</td></tr>
+                <tr><th scope="row">Valid from</th><td>@_cert.NotBefore.ToString("u")</td></tr>
+                <tr><th scope="row">Valid until</th><td>@_cert.NotAfter.ToString("u")</td></tr>
                 <tr><th scope="row">Thumbprint</th><td><code>@_cert.Thumbprint</code></td></tr>
             </tbody>
         </table>
@@ -87,11 +87,11 @@
             </ul>
         }
 
-        <label class="form-label" for="cert-pem">Zertifikat (PEM)</label>
+        <label class="form-label" for="cert-pem">Certificate (PEM)</label>
         <textarea id="cert-pem" class="form-control keytext" rows="6" readonly>@_cert.Pem</textarea>
         <div class="mt-2">
             <button id="download-cert" class="btn btn-sm btn-outline-secondary" @onclick="DownloadCertificate">
-                Zertifikat herunterladen
+                Download certificate
             </button>
         </div>
     </div>
@@ -147,9 +147,9 @@
 
     private static string PurposeLabel(KeyPurpose purpose) => purpose switch
     {
-        KeyPurpose.Signature => "Signatur (A)",
-        KeyPurpose.Encryption => "Verschlüsselung (E)",
-        KeyPurpose.Authentication => "Authentifikation (X)",
+        KeyPurpose.Signature => "Signature (A)",
+        KeyPurpose.Encryption => "Encryption (E)",
+        KeyPurpose.Authentication => "Authentication (X)",
         _ => purpose.ToString(),
     };
 

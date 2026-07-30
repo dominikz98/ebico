@@ -31,10 +31,10 @@ public class StammdatenCreateCollisionTests
 
         cut.Find("#bank-new").Click();
         cut.Find("#bank-hostid").Change("EBICOHOST");
-        cut.Find("#bank-name").Change("Überschrieben");
+        cut.Find("#bank-name").Change("Overwritten");
         cut.Find("#bank-save").Click();
 
-        cut.Find(".alert-warning").TextContent.Should().Contain("existiert bereits");
+        cut.Find(".alert-warning").TextContent.Should().Contain("already exists");
         var stored = await manager.GetBankAsync(Host, _ct);
         stored!.Name.Should().Be("Bestandsname");
         stored.SupportedVersions.Should().Equal(EbicsVersion.H004);
@@ -48,7 +48,7 @@ public class StammdatenCreateCollisionTests
         await manager.SaveBankAsync(new Bank(Host, "Alt"), _ct);
         var cut = ctx.Render<BankManager>();
 
-        cut.FindAll("button").First(b => b.TextContent.Trim() == "Bearbeiten").Click();
+        cut.FindAll("button").First(b => b.TextContent.Trim() == "Edit").Click();
         cut.Find("#bank-name").Change("Neu");
         cut.Find("#bank-save").Click();
 
@@ -66,10 +66,10 @@ public class StammdatenCreateCollisionTests
 
         cut.Find("#partner-new").Click();
         cut.Find("#partner-id").Change("CUST01");
-        cut.Find("#partner-name").Change("Überschrieben");
+        cut.Find("#partner-name").Change("Overwritten");
         cut.Find("#partner-save").Click();
 
-        cut.Find(".alert-warning").TextContent.Should().Contain("existiert bei EBICOHOST bereits");
+        cut.Find(".alert-warning").TextContent.Should().Contain("already exists at EBICOHOST");
         (await manager.GetPartnerAsync(Host, Partner, _ct))!.Name.Should().Be("Bestandskunde");
     }
 
@@ -111,7 +111,7 @@ public class StammdatenCreateCollisionTests
         cut.Find("#sub-user").Change("USER01");
         cut.Find("#subscriber-save").Click();
 
-        cut.Find(".alert-warning").TextContent.Should().Contain("existiert bei EBICOHOST/CUST01 bereits");
+        cut.Find(".alert-warning").TextContent.Should().Contain("already exists at EBICOHOST/CUST01");
 
         var stored = await manager.GetSubscriberAsync(Host, Partner, User, _ct);
         stored!.State.Should().Be(SubscriberState.Ready, "the create form must not reset the lifecycle");

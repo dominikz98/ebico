@@ -1,30 +1,30 @@
 @page "/"
 @inject IEmulatorStateProvider State
 
-<PageTitle>EBICO — Übersicht</PageTitle>
+<PageTitle>EBICO — Overview</PageTitle>
 
-<h1>Übersicht</h1>
+<h1>Overview</h1>
 
-<p class="text-muted">Zustand des EBICS-Emulators auf einen Blick.</p>
+<p class="text-muted">State of the EBICS emulator at a glance.</p>
 
 @if (_loading)
 {
-    <p><em>Lade Emulator-Zustand…</em></p>
+    <p><em>Loading emulator state…</em></p>
 }
 else
 {
     <div class="ebico-cards">
         <div class="ebico-card">
             <div class="ebico-card-value">@_bankCount</div>
-            <div class="ebico-card-label">Banken</div>
+            <div class="ebico-card-label">Banks</div>
         </div>
         <div class="ebico-card">
             <div class="ebico-card-value">@_partnerCount</div>
-            <div class="ebico-card-label">Partner</div>
+            <div class="ebico-card-label">Partners</div>
         </div>
         <div class="ebico-card">
             <div class="ebico-card-value">@_subscriberCount</div>
-            <div class="ebico-card-label">Teilnehmer</div>
+            <div class="ebico-card-label">Subscribers</div>
         </div>
     </div>
 }
