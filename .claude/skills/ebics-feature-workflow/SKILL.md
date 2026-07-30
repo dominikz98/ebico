@@ -1,80 +1,83 @@
 ---
 name: ebics-feature-workflow
 description: >-
-  Der verbindliche Ablauf für jedes Feature bzw. jeden Bugfix in EBICO, inklusive Definition of Done.
-  Verwenden, sobald eine Änderung umgesetzt wird, die als Feature/Bugfix in einen PR mündet — von der
-  Branch-Erstellung über Code, Doku und ADR bis zu Tests, grüner CI und PR. Kapselt die projektweiten
-  DoD-Regeln (Docs-as-Code, Tests, keine neuen Warnungen, XML-Doc, Review) und die Repo-Konventionen.
+  The binding process for every feature or bugfix in EBICO, including the Definition of Done.
+  Use as soon as a change is being implemented that ends up in a PR as a feature/bugfix — from
+  creating the branch through code, docs and ADR to tests, green CI and the PR. Encapsulates the
+  project-wide DoD rules (docs-as-code, tests, no new warnings, XML doc, review) and the repo conventions.
 ---
 
-# Feature-/Bugfix-Workflow (Definition of Done)
+# Feature/bugfix workflow (Definition of Done)
 
-Issue-getrieben, pro Issue ein Branch + ein PR. Reihenfolge:
+Issue-driven, one branch + one PR per issue. Order:
 
 ## 1. Branch
 
-- Von `main` abzweigen. Namensschema: **`feat/<nr>-<slug>`** (z. B. `feat/59-conformance-real-clients`).
-- Commit/Push nur, wenn der Nutzer es verlangt. Auf `main` nie direkt committen.
+- Branch off `main`. Naming scheme: **`feat/<no>-<slug>`** (e.g. `feat/59-conformance-real-clients`).
+- Commit/push only when the user asks for it. Never commit directly on `main`.
 
 ## 2. Code
 
-- Bestehende Muster wiederverwenden (siehe Skills `ebics-order-handler`, `ebics-connector`, `ebics-suite`,
-  `ebics-crypto`). Multi-Version-Dispatch (H003/H004/H005) beachten, wo relevant.
-- `TreatWarningsAsErrors` ist aktiv, zentrale Paketverwaltung (`Directory.Packages.props`), `Nullable enable`.
+- Reuse existing patterns (see skills `ebics-order-handler`, `ebics-connector`, `ebics-suite`,
+  `ebics-crypto`). Mind the multi-version dispatch (H003/H004/H005) where relevant.
+- `TreatWarningsAsErrors` is active, central package management (`Directory.Packages.props`), `Nullable enable`.
 
-## 3. Doku (Docs-as-Code, im **selben** PR)
+## 3. Docs (docs-as-code, in the **same** PR)
 
-- Neue Seite `docs/<bereich>/<name>.md` (`protocol/`, `server/`, `connector/`, `suite/`, `development/`,
+- New page `docs/<area>/<name>.md` (`protocol/`, `server/`, `connector/`, `suite/`, `development/`,
   `deployment/`, `legal/`).
-- **Verlinken in `docs/index.md`** unter der passenden Rubrik (sonst nutzloser Doku-Waise).
-- Betrifft die Änderung Auftragsarten: `docs/server/order-coverage-matrix.md` aktualisieren.
-- „Spec-Vorbehalte" explizit machen, wo Design-Intent statt XSD-verifiziert.
+- **Link it in `docs/index.md`** under the matching rubric (otherwise it is a useless doc orphan).
+- If the change concerns order types: update `docs/server/order-coverage-matrix.md`.
+- Make "spec caveats" explicit wherever something is design intent rather than XSD-verified.
+- **English is the project language** (see CLAUDE.md → "Way of working"): docs, ADRs, code comments,
+  commit messages and PR descriptions are written in English (British spelling).
 
-## 4. ADR (bei Designentscheidungen)
+## 4. ADR (for design decisions)
 
-- Neue Datei `docs/adr/NNNN-<kebab-titel-deutsch>.md` mit der **nächsten freien Nummer** (aktuell endet
-  der Bestand bei 0031). MADR-lite: Kontext / Entscheidung / Konsequenzen / Alternativen, Status `accepted`.
-- Im ADR-Index `docs/adr/README.md` eintragen.
+- New file `docs/adr/NNNN-<kebab-title>.md` with the **next free number** (the stock currently ends
+  at 0031); the slug is **English** (the existing ADRs 0001–0031 still carry German slugs until #134
+  renames them). MADR-lite: context / decision / consequences / alternatives, status `accepted`.
+- Register it in the ADR index `docs/adr/README.md`.
 
 ## 5. Tests
 
-- Jedes Feature: Unit-Tests Happy Path **und** Negativ-/Grenzfälle. Protokoll-/Krypto-Logik gegen
-  Testvektoren und Sample-XML, nicht nur Selbstkonsistenz.
-- Testordner spiegeln die Produktordner (`tests/EBICO.Tests/{Core,Server,Connector,Crypto,Suite,E2E,…}`).
-- E2E/Conformance: siehe Skill `ebics-conformance-test`.
+- Every feature: unit tests for the happy path **and** negative/edge cases. Protocol/crypto logic against
+  test vectors and sample XML, not just self-consistency.
+- The test folders mirror the product folders (`tests/EBICO.Tests/{Core,Server,Connector,Crypto,Suite,E2E,…}`).
+- E2E/conformance: see skill `ebics-conformance-test`.
 
-## 6. CI grün
+## 6. CI green
 
-- `dotnet build` + `dotnet test` (Release), **keine neuen Warnungen**.
-- `docs-link-check` (lychee offline über `**/*.md`) — tote Links vermeiden.
-- Weitere CI-Jobs: `container-build` (Server-Image), `pack` (NuGet Core+Connector, CalVer, build-only).
-- Tag-getriggerter Release (`release.yml`, #62/ADR-0027): Publish nach nuget.org + GHCR, auto-Release-Notes
-  (nur auf `v*.*.*`-Tags; Runbook `docs/development/release.md`).
-- **`main` ist geschützt** (#3/ADR-0028): alle vier `ci.yml`-Jobs sind Required Checks (`strict`),
-  `enforce_admins` ist an. Direkter Push auf `main` und Merge mit roter CI sind blockiert — auch für
-  Admins. Wird ein CI-Job umbenannt/ergänzt, müssen die Liste in `docs/development/ci.md`
-  (Guard-Test `BranchProtectionDocTests`) **und** die Repo-Einstellung nachgezogen werden.
+- `dotnet build` + `dotnet test` (Release), **no new warnings**.
+- `docs-link-check` (lychee offline over `**/*.md`) — avoid dead links.
+- Further CI jobs: `container-build` (server image), `pack` (NuGet Core+Connector, CalVer, build-only).
+- Tag-triggered release (`release.yml`, #62/ADR-0027): publish to nuget.org + GHCR, auto release notes
+  (only on `v*.*.*` tags; runbook `docs/development/release.md`).
+- **`main` is protected** (#3/ADR-0028): all four `ci.yml` jobs are required checks (`strict`),
+  `enforce_admins` is on. Direct pushes to `main` and merges with red CI are blocked — for admins as
+  well. If a CI job is renamed/added, both the list in `docs/development/ci.md`
+  (guard test `BranchProtectionDocTests`) **and** the repo setting have to be brought along.
 
 ## 7. PR
 
-- Body nach `.github/PULL_REQUEST_TEMPLATE.md` (wird von GitHub automatisch vorbefüllt).
-- **Issue-Verlinkung ist Pflicht:** jeder PR enthält **`Closes #<nr>`** und referenziert genau
-  ein Issue — auch reine Tooling-/Doku-Änderungen.
-- Checkliste vollständig abhaken, insbesondere **„Docs/Skills aktualisiert?"** (siehe unten).
-- Code-Review durchführen.
+- Body following `.github/PULL_REQUEST_TEMPLATE.md` (GitHub pre-fills it automatically).
+- **Linking an issue is mandatory:** every PR contains **`Closes #<no>`** and references exactly
+  one issue — including pure tooling/docs changes.
+- Tick the checklist off completely, in particular **"Docs/skills updated?"** (see below).
+- Carry out a code review.
 
-## Kontext-/Doku-Wartung (Teil der Definition of Done)
+## Context/docs maintenance (part of the Definition of Done)
 
-Berührt der PR ein Muster, das in `docs/`, `CLAUDE.md` oder einem Skill beschrieben ist, gehört
-dessen Aktualisierung in **denselben** PR (siehe CLAUDE.md → „Maintaining context, docs & skills").
-Skills verweisen auf konkrete Symbole/Pfade und veralten sonst stillschweigend.
+If the PR touches a pattern described in `docs/`, `CLAUDE.md` or a skill, updating that belongs in
+**the same** PR (see CLAUDE.md → "Maintaining context, docs & skills").
+Skills point at concrete symbols/paths and otherwise go stale silently.
 
-## Meta-/Tooling-Änderungen
+## Meta/tooling changes
 
-Auch Änderungen an `.claude/`, `CLAUDE.md` oder der CI bekommen **ein eigenes Issue** + einen
-eigenen kleinen Branch — nicht in einen fachlichen Feature-Branch mischen.
+Changes to `.claude/`, `CLAUDE.md` or the CI also get **their own issue** + their own small
+branch — do not mix them into a functional feature branch.
 
-## Quellen
+## Sources
 
 `CLAUDE.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/workflows/ci.yml`, `docs/adr/README.md`,
 `docs/development/ci.md`, `docs/development/testing.md`, `docs/index.md`, `docs/ticket-overview.md`.

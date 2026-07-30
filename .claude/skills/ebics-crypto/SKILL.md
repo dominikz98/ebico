@@ -1,63 +1,63 @@
 ---
 name: ebics-crypto
 description: >-
-  Nachschlage- und Erweiterungs-Anleitung für die EBICS-Kryptografie in EBICO.Core (Namespace
-  EBICO.Core.Crypto). Verwenden bei Arbeit an banktechnischer Signatur (A005/A006), Authentifikations-
-  signatur (X002), hybrider Verschlüsselung (E002), Public-Key-Fingerprints, X.509-Zertifikatsverifizierung
-  oder der Schlüsselrepräsentation A/E/X. Deckt die Verfahren, das registry-getriebene Padding-Mapping und
-  die Versionsunterschiede H003/H004 (RSAKeyValue) vs. H005 (X.509) ab.
+  Reference and extension guide for the EBICS cryptography in EBICO.Core (namespace
+  EBICO.Core.Crypto). Use when working on the bank-technical signature (A005/A006), the authentication
+  signature (X002), hybrid encryption (E002), public key fingerprints, X.509 certificate verification
+  or the A/E/X key representation. Covers the procedures, the registry-driven padding mapping and
+  the version differences H003/H004 (RSAKeyValue) vs. H005 (X.509).
 ---
 
-# EBICS-Krypto (A00x / X002 / E002)
+# EBICS crypto (A00x / X002 / E002)
 
-Krypto-Primitive liegen in `src/EBICO.Core/Crypto` und bauen ausschließlich auf
-`System.Security.Cryptography` (ADR-0008, keine Fremd-Krypto-Bibliothek). Vor jeder Änderung die
-passende Protokoll-Doku unter `docs/protocol/` lesen — dort steht das verbindliche Verfahren inkl.
-Spec-Vorbehalten gegen die Annexe.
+The crypto primitives live in `src/EBICO.Core/Crypto` and build exclusively on
+`System.Security.Cryptography` (ADR-0008, no third-party crypto library). Before any change, read the
+matching protocol doc under `docs/protocol/` — that is where the binding procedure including
+spec caveats against the annexes is written down.
 
-## Verfahren im Überblick
+## The procedures at a glance
 
-- **Banktechnische Signatur A005/A006** (`docs/protocol/bank-signature.md`): Order-Hash SHA-256,
-  Signieren/Verifizieren A005 = RSA **PKCS#1 v1.5**, A006 = RSA **PSS**. Padding registry-getrieben nach
-  Schlüsselversion. *Hinweis:* ES/A00x-Signaturprüfung der OrderData ist serverseitig weiterhin
-  zurückgestellt (Spec-Vorbehalt) — beim Erweitern beachten.
-- **Authentifikationssignatur X002** (`docs/protocol/auth-signature-x002.md`): XML-DSig `AuthSignature`
-  über alle `authenticate="true"`-Knoten. Reference-Digest SHA-256 + `SignatureValue` RSA-PKCS#1 v1.5,
-  Dokumentkontext-C14N **inklusiv**. Serverseitig aktiv (`X002EbicsRequestVerifier`, ADR-0023).
-- **Verschlüsselung E002** (`docs/protocol/encryption-e002.md`): hybrid — AES-128-CBC über die
-  Auftragsdaten, RSAES-**OAEP-SHA256** über den Transaktionsschlüssel. Typ `EncryptionE002`.
-- **Public-Key-Fingerprints** (`docs/protocol/public-key-fingerprint.md`): SHA-256 über Exponent+Modulus,
-  Darstellung für INI-Brief und HPB-Antwort; client-gesendete Hashes **konstantzeitig** verifizieren
+- **Bank-technical signature A005/A006** (`docs/protocol/bank-signature.md`): order hash SHA-256,
+  signing/verifying A005 = RSA **PKCS#1 v1.5**, A006 = RSA **PSS**. Padding is registry-driven by
+  key version. *Note:* ES/A00x signature verification of the order data remains deferred on the
+  server side (spec caveat) — keep that in mind when extending.
+- **Authentication signature X002** (`docs/protocol/auth-signature-x002.md`): XML-DSig `AuthSignature`
+  over all `authenticate="true"` nodes. Reference digest SHA-256 + `SignatureValue` RSA-PKCS#1 v1.5,
+  document-context C14N **inclusive**. Active on the server side (`X002EbicsRequestVerifier`, ADR-0023).
+- **Encryption E002** (`docs/protocol/encryption-e002.md`): hybrid — AES-128-CBC over the
+  order data, RSAES-**OAEP-SHA256** over the transaction key. Type `EncryptionE002`.
+- **Public key fingerprints** (`docs/protocol/public-key-fingerprint.md`): SHA-256 over exponent+modulus,
+  representation for the INI letter and the HPB response; verify client-sent hashes in **constant time**
   (`PublicKeyFingerprint.Verify`).
-- **X.509-Verifizierung** (`docs/protocol/certificate-verification-x509.md`): Kette/Vertrauensanker
-  (konfigurierbar, Test-CA), Gültigkeit, KeyUsage je Schlüsselrolle; reine-Schlüssel-Verfahren
-  (H003/H004) als Policy (`CertificateRequirement`).
+- **X.509 verification** (`docs/protocol/certificate-verification-x509.md`): chain/trust anchor
+  (configurable, test CA), validity, KeyUsage per key role; key-only procedures
+  (H003/H004) as a policy (`CertificateRequirement`).
 
-## Querschnittliche Regeln
+## Cross-cutting rules
 
-- **Registry-getriebenes Padding-Mapping:** das Padding (v1.5/PSS/OAEP) hängt an der Schlüsselversion
-  (`KeyVersion`), nicht am Aufrufort — Mapping zentral halten, nicht duplizieren.
-- **Versionsrepräsentation** (`docs/protocol/key-representation.md`): H003/H004 transportieren Schlüssel als
-  `RSAKeyValue`, H005 als X.509. Schlüsselrollen A (Signatur) / E (Enc, E002) / X (Auth, X002).
-  RSA-Container über `RsaKeyMaterial` (RSA-2048 als praktische Untergrenze in Tests).
-- **Kanonische Modulus-Form gilt auch beim Import** (#117, ADR-0029): `ds:Modulus` ist ein
-  `CryptoBinary` ohne führende Null, reale Clients senden trotzdem die ASN.1-INTEGER-Form mit
-  Vorzeichen-Byte. `RsaKeyMaterial` trimmt vor dem Import — sonst entsteht eine 2056-Bit-RSA-Instanz,
-  deren Padding-Operationen scheitern. Beim Anfassen von Schlüssel-Import/-Export nicht rückbauen.
-- **Versions-Permission-Tabelle** (`KeyVersions`) ist die einzige Stelle für „welche Schlüsselversion
-  in welcher Protokollversion" — `A006`/PSS gilt für **H004 und H005**, nicht für H003.
-- **Determinismus/C14N:** serialisierte Ausgabe muss stabil sein (`docs/protocol/serialization-c14n.md`),
-  da Signatur/Digest darauf beruhen.
+- **Registry-driven padding mapping:** the padding (v1.5/PSS/OAEP) hangs off the key version
+  (`KeyVersion`), not off the call site — keep the mapping central, do not duplicate it.
+- **Version representation** (`docs/protocol/key-representation.md`): H003/H004 transport keys as
+  `RSAKeyValue`, H005 as X.509. Key roles A (signature) / E (enc, E002) / X (auth, X002).
+  RSA container via `RsaKeyMaterial` (RSA-2048 as the practical lower bound in tests).
+- **The canonical modulus form applies on import as well** (#117, ADR-0029): `ds:Modulus` is a
+  `CryptoBinary` without a leading zero, yet real clients still send the ASN.1 INTEGER form with a
+  sign byte. `RsaKeyMaterial` trims before importing — otherwise a 2056-bit RSA instance is created
+  whose padding operations fail. Do not undo this when touching key import/export.
+- **The version permission table** (`KeyVersions`) is the single place for "which key version applies
+  in which protocol version" — `A006`/PSS applies to **H004 and H005**, not to H003.
+- **Determinism/C14N:** serialised output must be stable (`docs/protocol/serialization-c14n.md`),
+  because signature/digest rest on it.
 
 ## Definition of Done
 
-Testvektoren + Sample-XML statt Selbstkonsistenz (`tests/EBICO.Tests/Crypto`), Doku aktualisieren,
-ggf. ADR. Ablauf: Skill `ebics-feature-workflow`.
+Test vectors + sample XML instead of self-consistency (`tests/EBICO.Tests/Crypto`), update the docs,
+ADR if applicable. Process: skill `ebics-feature-workflow`.
 
-## Quellen
+## Sources
 
 - Code: `src/EBICO.Core/Crypto`, `src/EBICO.Core/ReturnCodes` (`EbicsReturnCode`/`EbicsReturnCodes`).
-- Doku: `docs/protocol/bank-signature.md`, `docs/protocol/auth-signature-x002.md`,
+- Docs: `docs/protocol/bank-signature.md`, `docs/protocol/auth-signature-x002.md`,
   `docs/protocol/encryption-e002.md`, `docs/protocol/public-key-fingerprint.md`,
   `docs/protocol/certificate-verification-x509.md`, `docs/protocol/key-representation.md`,
-  `docs/protocol/serialization-c14n.md`. ADR: 0008 (Krypto-Bibliothek), 0023 (X002-Verifikation).
+  `docs/protocol/serialization-c14n.md`. ADR: 0008 (crypto library), 0023 (X002 verification).

@@ -1,78 +1,78 @@
 ---
 name: ebics-connector
 description: >-
-  Anleitung zur Arbeit am EBICO.Connector — dem NuGet-Client, mit dem eine Anwendung einen EBICS-Server
-  anspricht (Mediator-Muster). Verwenden beim Erweitern der Client-API/Send-Pipeline, neuen Onboarding-/
-  Upload-/Download-Requests, clientseitiger Sende-Validierung oder beim Packaging/Versionierung der
-  veröffentlichten Pakete (EBICO.Core + EBICO.Connector). Deckt IEbicsClient/EbicsResult, den eigenen
-  Dispatch (kein MediatR), die DI-Erweiterungen, ITransport/IKeyStore und CalVer/SourceLink ab.
+  Guide to working on EBICO.Connector — the NuGet client an application uses to talk to an EBICS
+  server (mediator pattern). Use when extending the client API/send pipeline, for new onboarding/
+  upload/download requests, client-side send validation, or for packaging/versioning of the
+  published packages (EBICO.Core + EBICO.Connector). Covers IEbicsClient/EbicsResult, the own
+  dispatch (no MediatR), the DI extensions, ITransport/IKeyStore and CalVer/SourceLink.
 ---
 
-# EBICO.Connector (NuGet-Client)
+# EBICO.Connector (NuGet client)
 
-Mediator-Muster: die Anwendung kennt nur `IEbicsClient.Send(request)` und bekommt ein typisiertes
-`EbicsResult<T>`; die gesamte EBICS-Komplexität liegt dahinter. Vor Änderungen
-`docs/connector/architecture.md` lesen (Pipeline + „vorhanden vs. geplant"-Tabelle).
+Mediator pattern: the application only knows `IEbicsClient.Send(request)` and gets back a typed
+`EbicsResult<T>`; the entire EBICS complexity sits behind it. Before making changes, read
+`docs/connector/architecture.md` (pipeline + "available vs. planned" table).
 
-## Kernabstraktionen
+## Core abstractions
 
 - `src/EBICO.Connector/IEbicsClient.cs`: `Task<EbicsResult<TResult>> Send<TResult>(IEbicsRequest<TResult>, ct)`.
-  Technische Fehler (Netz/HTTP/Signatur/XML) als Exceptions; fachliche Returncodes im `EbicsResult<T>`.
-- **Eigener Dispatch, kein MediatR** (ADR-0005): der Client löst pro Request den passenden
-  `IEbicsRequestHandler<TRequest, TResult>` zur Laufzeit auf.
-- **Send-Pipeline pro `Send`:** Validierung → Serialisierung → Komprimieren/E002/A00x → X002 → Transport →
-  Verify/Entschlüsseln → Returncode → ggf. Segmente → Deserialisieren.
-- Abstraktionen: `ITransport` (`src/EBICO.Connector/Transport`, HttpClient dahinter) und `IKeyStore`
-  (`src/EBICO.Connector/Keys`). **Stolperstein:** der `HttpClientTransport` postet gegen die *absolute*
-  `EbicsConnection.Url`, nicht die `BaseAddress`.
+  Technical failures (network/HTTP/signature/XML) as exceptions; business return codes in the `EbicsResult<T>`.
+- **Own dispatch, no MediatR** (ADR-0005): per request, the client resolves the matching
+  `IEbicsRequestHandler<TRequest, TResult>` at runtime.
+- **Send pipeline per `Send`:** validation → serialisation → compress/E002/A00x → X002 → transport →
+  verify/decrypt → return code → segments if needed → deserialise.
+- Abstractions: `ITransport` (`src/EBICO.Connector/Transport`, HttpClient behind it) and `IKeyStore`
+  (`src/EBICO.Connector/Keys`). **Pitfall:** the `HttpClientTransport` posts to the *absolute*
+  `EbicsConnection.Url`, not to the `BaseAddress`.
 
-## DI-Erweiterungen (`src/EBICO.Connector/DependencyInjection`)
+## DI extensions (`src/EBICO.Connector/DependencyInjection`)
 
-- `AddEbicoConnector` (Kern + Config, `EbicsConnectionOptions`), `AddEbicoOnboarding` (INI/HIA/HPB),
-  `AddEbicoUpload`, `AddEbicoDownload`. Feature-Requests in der jeweils passenden Extension registrieren.
+- `AddEbicoConnector` (core + config, `EbicsConnectionOptions`), `AddEbicoOnboarding` (INI/HIA/HPB),
+  `AddEbicoUpload`, `AddEbicoDownload`. Register feature requests in whichever extension fits.
 
-## Requests erweitern
+## Extending requests
 
-- **Onboarding** (`docs/connector/onboarding.md`): Schlüsselgenerierung, INI/HIA senden, HPB abrufen +
-  Bankschlüssel-Hash-Abgleich, INI-Brief (Text/PDF).
-- **Upload** (`docs/connector/upload.md`): generische `UploadRequest` + SEPA-Convenience (CCT/CDD/CDB/CIP);
-  zweiphasig (Initialisation → Transfer).
-- **Download** (`docs/connector/download.md`): generische `DownloadRequest` + Convenience (STA/VMK/C5x/…,
-  HAC/HTD/HKD/…), optionale Parsing-Hooks (`DownloadResult.ParsedAs<T>()`); dreiphasig (… → Receipt).
-- **VEU** (`docs/connector/veu.md`, #124): `UploadRequest.DistributedSignature` parkt einen Auftrag;
-  `Hvu`/`Hvz`/`Hvd`/`Hvt`/`Hve`/`HvsRequest` + `VeuOrderReference` fahren den Mehr-Augen-Workflow.
-- **Versions-Dispatch:** H005 `BTU`/`BTD`+BTF · H003/H004 `OrderType`/`FUL`/`FDL`.
-  **Administrative Order-Typen** (HTD/HKD/… und VEU) tragen **keinen** BTF und bleiben auf H005
-  `AdminOrderType` — in **beide** Richtungen, Upload wie Download (seit #124/ADR-0030).
-- **Segmentgröße:** Default ist der geteilte `EbicsSegmentation.DefaultSegmentSizeBytes` (512 KiB). Beim
-  Anheben immer gegen das Body-Limit der Gegenstelle rechnen (`MaxSegmentSizeForRequestBody`), sonst
-  antwortet sie mit HTTP 413 statt mit einem Returncode.
-- **Antworten auswerten:** Code und Report-Text gemeinsam über `EbicsReturnCodes.CombineOutcome(…)` —
-  nie den Header-Text zu einem Body-Code mischen.
+- **Onboarding** (`docs/connector/onboarding.md`): key generation, sending INI/HIA, fetching HPB +
+  comparing the bank key hash, INI letter (text/PDF).
+- **Upload** (`docs/connector/upload.md`): generic `UploadRequest` + SEPA convenience (CCT/CDD/CDB/CIP);
+  two-phase (initialisation → transfer).
+- **Download** (`docs/connector/download.md`): generic `DownloadRequest` + convenience (STA/VMK/C5x/…,
+  HAC/HTD/HKD/…), optional parsing hooks (`DownloadResult.ParsedAs<T>()`); three-phase (… → receipt).
+- **VEU** (`docs/connector/veu.md`, #124): `UploadRequest.DistributedSignature` parks an order;
+  `Hvu`/`Hvz`/`Hvd`/`Hvt`/`Hve`/`HvsRequest` + `VeuOrderReference` drive the multi-eyes workflow.
+- **Version dispatch:** H005 `BTU`/`BTD`+BTF · H003/H004 `OrderType`/`FUL`/`FDL`.
+  **Administrative order types** (HTD/HKD/… and VEU) carry **no** BTF and stay on the H005
+  `AdminOrderType` — in **both** directions, upload as well as download (since #124/ADR-0030).
+- **Segment size:** the default is the shared `EbicsSegmentation.DefaultSegmentSizeBytes` (512 KiB). When
+  raising it, always calculate against the counterparty's body limit (`MaxSegmentSizeForRequestBody`),
+  otherwise it answers with HTTP 413 instead of a return code.
+- **Evaluating responses:** resolve code and report text together via `EbicsReturnCodes.CombineOutcome(…)` —
+  never mix the header text into a body code.
 
-## Clientseitige Sende-Validierung (ADR-0025)
+## Client-side send validation (ADR-0025)
 
-`src/EBICO.Connector/Validation` (`RequestValidator`): Stufe 1 = Struktur/BTF + opt-in Berechtigung
-über `AllowedOrderTypes`. Beim Hinzufügen neuer Requests die Validierungsregeln mitziehen.
+`src/EBICO.Connector/Validation` (`RequestValidator`): stage 1 = structure/BTF + opt-in authorisation
+via `AllowedOrderTypes`. When adding new requests, bring the validation rules along.
 
-## Packaging (nur EBICO.Core + EBICO.Connector werden veröffentlicht)
+## Packaging (only EBICO.Core + EBICO.Connector are published)
 
-- **CalVer** `{JAHR}.{MONAT}.{BUILD}` (ADR-0024), Symbols/SourceLink (`snupkg` + Repo-Commit),
-  Paket-README (`src/EBICO.Connector/README.md`), MIT-Lizenz.
-- **XML-Doc-Pflicht** an öffentlichen APIs (nur Core + Connector; `GenerateDocumentationFile`).
-- Lauffähiges Beispiel: `samples/EBICO.Connector.Quickstart` (startet Server in-process,
-  Onboarding→Upload→Download). CI `pack` ist build-only (Regressionsschutz); der authentifizierte
-  **Publish/Push nach nuget.org** läuft tag-getrieben in `.github/workflows/release.yml`
-  (#62, ADR-0027, Runbook `docs/development/release.md`).
+- **CalVer** `{YEAR}.{MONTH}.{BUILD}` (ADR-0024), symbols/SourceLink (`snupkg` + repo commit),
+  package README (`src/EBICO.Connector/README.md`), MIT licence.
+- **Mandatory XML doc** on public APIs (Core + Connector only; `GenerateDocumentationFile`).
+- Runnable example: `samples/EBICO.Connector.Quickstart` (starts the server in-process,
+  onboarding→upload→download). The CI `pack` job is build-only (regression protection); the authenticated
+  **publish/push to nuget.org** runs tag-triggered in `.github/workflows/release.yml`
+  (#62, ADR-0027, runbook `docs/development/release.md`).
 
 ## Definition of Done
 
-Tests (`tests/EBICO.Tests/Connector`, `.../E2E` für echten Round-Trip — Skill `ebics-conformance-test`),
-Doku unter `docs/connector/` + Verlinkung in `docs/index.md`, ggf. ADR. Ablauf: `ebics-feature-workflow`.
+Tests (`tests/EBICO.Tests/Connector`, `.../E2E` for a real round-trip — skill `ebics-conformance-test`),
+docs under `docs/connector/` + a link in `docs/index.md`, ADR if applicable. Process: `ebics-feature-workflow`.
 
-## Quellen
+## Sources
 
 - Code: `src/EBICO.Connector/*`, `src/EBICO.Connector/README.md`, `samples/EBICO.Connector.Quickstart`.
-- Doku: `docs/connector/architecture.md`, `docs/connector/client-core.md`, `docs/connector/onboarding.md`,
+- Docs: `docs/connector/architecture.md`, `docs/connector/client-core.md`, `docs/connector/onboarding.md`,
   `docs/connector/upload.md`, `docs/connector/download.md`, `docs/connector/packaging.md`.
-  ADR: 0005 (Dispatch ohne MediatR), 0024 (NuGet/CalVer), 0025 (clientseitige Sende-Validierung).
+  ADR: 0005 (dispatch without MediatR), 0024 (NuGet/CalVer), 0025 (client-side send validation).

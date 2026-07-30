@@ -1,79 +1,79 @@
 ---
 name: ebics-order-handler
 description: >-
-  Anleitung zum Anlegen oder Ändern einer serverseitigen EBICS-Auftragsart in EBICO.Server.
-  Verwenden bei neuem/geändertem Order-Handler (Schlüsselmanagement wie INI/HIA/HPB/HCA/HCS/SPR/HSA)
-  ODER neuem Upload-/Download-Processor für Business-Orders (z. B. CCT/CDD/CDB/CIP, STA/VMK/C53/C52/C54,
-  HTD/HKD/HAA/HPD/HAC/PTK, HVU/HVZ/HVD/HVT/HVE/HVS). Deckt DI-Registrierung, Multi-Version-Dispatch,
-  BTF-Auflösung, Berechtigung und die Definition of Done (Tests + Doku + ADR + Coverage-Matrix) ab.
+  Guide to creating or changing a server-side EBICS order type in EBICO.Server.
+  Use for a new/changed order handler (key management such as INI/HIA/HPB/HCA/HCS/SPR/HSA)
+  OR a new upload/download processor for business orders (e.g. CCT/CDD/CDB/CIP, STA/VMK/C53/C52/C54,
+  HTD/HKD/HAA/HPD/HAC/PTK, HVU/HVZ/HVD/HVT/HVE/HVS). Covers DI registration, multi-version dispatch,
+  BTF resolution, authorisation and the Definition of Done (tests + docs + ADR + coverage matrix).
 ---
 
-# EBICS Order-Handler / Processor anlegen
+# Creating an EBICS order handler / processor
 
-Zwei getrennte Erweiterungspunkte — zuerst entscheiden, welcher passt:
+Two separate extension points — decide first which one fits:
 
-- **Order-Handler** (`IEbicsOrderHandler`): die *handle*-Stufe der Pipeline für **Schlüssel-/
-  Verwaltungs-Orders**, die direkt in einer Antwort münden (INI, HIA, HPB, HCA, HCS, SPR, HSA).
-- **Upload-/Download-Processor** (`IUploadOrderProcessor` / `IDownloadOrderProcessor`): die
-  order-typspezifische Verarbeitung **innerhalb der Transaction Engine** für **Business-Orders**
-  (Zahlungsverkehr, Kontoauszüge, Status-/Protokoll-, VEU-Orders).
+- **Order handler** (`IEbicsOrderHandler`): the *handle* stage of the pipeline for **key/administrative
+  orders** that lead straight to a response (INI, HIA, HPB, HCA, HCS, SPR, HSA).
+- **Upload/download processor** (`IUploadOrderProcessor` / `IDownloadOrderProcessor`): the
+  order-type-specific processing **inside the transaction engine** for **business orders**
+  (payments, statements, status/protocol and VEU orders).
 
-Immer zuerst `docs/server/order-coverage-matrix.md` lesen (Source of Truth: welche OrderTypes
-je Version schon existieren und wo die Lücken sind).
+Always read `docs/server/order-coverage-matrix.md` first (source of truth: which order types already
+exist per version and where the gaps are).
 
-## Variante A — Order-Handler (Schlüsselmanagement)
+## Variant A — order handler (key management)
 
 Interface: `src/EBICO.Server/Pipeline/IEbicsOrderHandler.cs`
 - `EbicsVersion Version` · `string OrderType` · `Task<EbicsOrderResult> HandleAsync(EbicsRequestContext, CancellationToken)`.
 - `EbicsOrderResult(EbicsReturnCode ReturnCode, EbicsKeyManagementPayload? Payload = null)` — `Payload`
-  nur bei erfolgreichem Download-Key-Order (HPB), sonst `null`.
+  only for a successful download key order (HPB), otherwise `null`.
 
-Muster (siehe INI/HIA/HPB als Vorlage):
-1. Base-Klasse `<Xxx>OrderHandlerBase` in `src/EBICO.Server/Handlers/` — versionsagnostischer Fluss,
-   Zustandsübergänge, Store-Zugriffe, Returncode-Logik.
-2. Je Version eine Subklasse `H003<Xxx>OrderHandler`, `H004<Xxx>OrderHandler`, `H005<Xxx>OrderHandler` —
-   nur das Versionsspezifische (H003/H004: `RSAKeyValue`; H005: X.509). HSA existiert nur H003/H004.
-3. Registrieren in `src/EBICO.Server/DependencyInjection/EbicoServerServiceCollectionExtensions.cs` mit
-   **`services.AddSingleton<IEbicsOrderHandler, H00xXxxOrderHandler>()`** — je Version eine Zeile.
-   NICHT `TryAdd`: `EbicsOrderHandlerResolver` konsumiert das ganze `IEnumerable<IEbicsOrderHandler>`
-   und matcht nach `(Version, OrderType)`.
+Pattern (see INI/HIA/HPB as templates):
+1. Base class `<Xxx>OrderHandlerBase` in `src/EBICO.Server/Handlers/` — version-agnostic flow,
+   state transitions, store access, return code logic.
+2. One subclass per version, `H003<Xxx>OrderHandler`, `H004<Xxx>OrderHandler`, `H005<Xxx>OrderHandler` —
+   only the version-specific part (H003/H004: `RSAKeyValue`; H005: X.509). HSA exists for H003/H004 only.
+3. Register in `src/EBICO.Server/DependencyInjection/EbicoServerServiceCollectionExtensions.cs` with
+   **`services.AddSingleton<IEbicsOrderHandler, H00xXxxOrderHandler>()`** — one line per version.
+   NOT `TryAdd`: `EbicsOrderHandlerResolver` consumes the whole `IEnumerable<IEbicsOrderHandler>`
+   and matches on `(Version, OrderType)`.
 
-## Variante B — Upload-/Download-Processor (Business-Orders)
+## Variant B — upload/download processor (business orders)
 
 Interfaces: `src/EBICO.Server/Orders/IUploadOrderProcessor.cs`, `IDownloadOrderProcessor.cs`
-- `bool CanProcess(string? effectiveOrderType)` + `ProcessAsync(...)`. Die Engine ruft den **ersten**
-  Processor, dessen `CanProcess` matcht.
-- Vorlagen: `SepaPaymentUploadProcessor`, `VeuSignatureUploadProcessor` (Upload);
+- `bool CanProcess(string? effectiveOrderType)` + `ProcessAsync(...)`. The engine calls the **first**
+  processor whose `CanProcess` matches.
+- Templates: `SepaPaymentUploadProcessor`, `VeuSignatureUploadProcessor` (upload);
   `StatementDownloadProcessor`, `SubscriberInfoDownloadProcessor`, `CustomerProtocolDownloadProcessor`,
-  `VeuOverviewDownloadProcessor` (Download).
+  `VeuOverviewDownloadProcessor` (download).
 
-Registrieren ebenfalls mit **`AddSingleton`** (nicht `TryAdd`) in `AddEbicoServer`, damit die Defaults
-koexistieren und ein Aufrufer eigene Processoren davor hängen kann.
+Register with **`AddSingleton`** as well (not `TryAdd`) in `AddEbicoServer`, so the defaults coexist
+and a caller can put their own processors in front of them.
 
-## BTF/OrderType-Auflösung & Berechtigung
+## BTF/order type resolution & authorisation
 
-- Die generischen Träger (H005 `BTU`/`BTD`+BTF · H003/H004 direkter Code · H003/H004 `FUL`/`FDL`+
-  `FileFormat`) werden über `BtfOrderTypeCatalog.ResolveUploadOrderType` /
-  `ResolveDownloadOrderType` (`src/EBICO.Core/Btf/BtfOrderTypeCatalog.cs`) auf den effektiven
-  klassischen Code (`EffectiveOrderType`, z. B. `CCT`) abgebildet. Neue Order ⇒ Katalogeintrag ergänzen.
-- Strikte Berechtigung: `Subscriber.HasPermissionFor` → bei Fehlschlag Returncode `090003`
-  (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`). Returncodes zentral in `EBICO.Core.ReturnCodes`.
+- The generic carriers (H005 `BTU`/`BTD`+BTF · H003/H004 direct code · H003/H004 `FUL`/`FDL`+
+  `FileFormat`) are mapped onto the effective classic code (`EffectiveOrderType`, e.g. `CCT`) via
+  `BtfOrderTypeCatalog.ResolveUploadOrderType` / `ResolveDownloadOrderType`
+  (`src/EBICO.Core/Btf/BtfOrderTypeCatalog.cs`). New order ⇒ add a catalogue entry.
+- Strict authorisation: `Subscriber.HasPermissionFor` → on failure return code `090003`
+  (`EBICS_AUTHORISATION_ORDER_TYPE_FAILED`). Return codes live centrally in `EBICO.Core.ReturnCodes`.
 
-## Definition of Done (siehe Skill `ebics-feature-workflow`)
+## Definition of Done (see skill `ebics-feature-workflow`)
 
-- **Tests:** je Version + Happy/Negativ. Handler → `tests/EBICO.Tests/Server/<Xxx>OrderHandlerTests.cs`;
-  Business-Orders → passender Ordner unter `tests/EBICO.Tests/{Core,Server}`.
-- **Doku:** neue Seite `docs/server/<name>.md` **und** Eintrag in `docs/index.md`.
-- **Coverage-Matrix:** `docs/server/order-coverage-matrix.md` ergänzen — sonst schlägt der Guard-Test
-  `OrderCoverageMatrixTests` fehl.
-- **ADR:** neue Entscheidung als `docs/adr/NNNN-<kebab-titel>.md` (nächste freie Nummer) + im ADR-Index.
-- **Spec-Vorbehalte** im Doku-/Test-Text explizit machen (ES/A00x ungeprüft, unsignierte Antwort etc.).
+- **Tests:** per version + happy/negative. Handler → `tests/EBICO.Tests/Server/<Xxx>OrderHandlerTests.cs`;
+  business orders → the matching folder under `tests/EBICO.Tests/{Core,Server}`.
+- **Docs:** new page `docs/server/<name>.md` **and** an entry in `docs/index.md`.
+- **Coverage matrix:** extend `docs/server/order-coverage-matrix.md` — otherwise the guard test
+  `OrderCoverageMatrixTests` fails.
+- **ADR:** new decision as `docs/adr/NNNN-<kebab-title>.md` (next free number) + in the ADR index.
+- **Spec caveats** made explicit in the docs/test text (ES/A00x unverified, unsigned response, etc.).
 
-## Quellen
+## Sources
 
 - Code: `src/EBICO.Server/{Handlers,Orders,Pipeline,Transactions,DependencyInjection}`, `src/EBICO.Core/Btf`.
-- Doku: `docs/server/ini.md`, `docs/server/hia.md`, `docs/server/hpb.md`, `docs/server/hca-hcs-spr-hsa.md`,
+- Docs: `docs/server/ini.md`, `docs/server/hia.md`, `docs/server/hpb.md`, `docs/server/hca-hcs-spr-hsa.md`,
   `docs/server/payment-orders.md`, `docs/server/statement-orders.md`, `docs/server/status-protocol-orders.md`,
   `docs/server/veu-orders.md`, `docs/server/btf-framework.md`, `docs/server/order-coverage-matrix.md`.
-- ADRs: 0012 (Returncodes), 0016 (BTF/Berechtigung), 0017 (Zahlungsverkehr), 0018 (Kontoauszüge),
-  0019 (Status/Protokoll), 0020 (VEU).
+- ADRs: 0012 (return codes), 0016 (BTF/authorisation), 0017 (payments), 0018 (statements),
+  0019 (status/protocol), 0020 (VEU).

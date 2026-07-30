@@ -1,99 +1,99 @@
 ---
 name: ebics-suite
 description: >-
-  Anleitung zur Arbeit an der EBICO.Suite — der Blazor-Web-App (Interactive Server) als Admin-/Inspektions-
-  Oberfläche für den Emulator. Verwenden beim Hinzufügen/Ändern von Seiten oder Komponenten: Stammdaten-
-  Verwaltung (Banken/Partner/Teilnehmer), Transaktions-Inspektor, Schlüssel-/Zertifikats-Ansicht. Deckt
-  Render-Modus, den in-process-Zugriff auf den Server-Zustand, die Projektionen (Message-Capture/EventLog)
-  und die bUnit-Test-Konvention ab.
+  Guide to working on EBICO.Suite — the Blazor web app (Interactive Server) that serves as the
+  admin/inspection UI for the emulator. Use when adding/changing pages or components: master data
+  management (banks/partners/subscribers), transaction inspector, key/certificate view. Covers the
+  render mode, in-process access to the server state, the projections (message capture/event log)
+  and the bUnit test convention.
 ---
 
-# EBICO.Suite (Blazor Admin-UI)
+# EBICO.Suite (Blazor admin UI)
 
-Blazor Web App, Render-Modus **Interactive Server** (ADR-0009). Die Suite referenziert `EBICO.Server`
-und nutzt dessen Dienste **in-process** — kein HTTP gegen den Emulator. Vor Änderungen die passende
-Seite unter `docs/suite/` lesen.
+Blazor Web App, render mode **Interactive Server** (ADR-0009). The Suite references `EBICO.Server`
+and uses its services **in-process** — no HTTP against the emulator. Before making changes, read the
+matching page under `docs/suite/`.
 
-## Struktur
+## Structure
 
-- Komponenten: `src/EBICO.Suite/Components/` (`Pages/`, `Stammdaten/`, `Keys/`, Layout).
-- Services/Adapter: `src/EBICO.Suite/Services/` (`IEmulatorStateProvider` + `EmulatorStateProvider` /
+- Components: `src/EBICO.Suite/Components/` (`Pages/`, `Stammdaten/`, `Keys/`, layout).
+- Services/adapters: `src/EBICO.Suite/Services/` (`IEmulatorStateProvider` + `EmulatorStateProvider` /
   `SampleEmulatorStateProvider`, `ITransactionInspectorProvider` + `TransactionInspectorProvider`,
-  Seeder für Beispieldaten).
-- Statik: `src/EBICO.Suite/wwwroot/`.
+  seeders for sample data).
+- Static assets: `src/EBICO.Suite/wwwroot/`.
 
-## Anbindung an den Emulator-Zustand (in-process)
+## Connection to the emulator state (in-process)
 
-- **Stammdaten** (`docs/suite/stammdaten.md`): CRUD über `IMasterDataManager`
-  (`src/EBICO.Server/State/IMasterDataManager.cs`) — Banken/Partner/Teilnehmer inkl. Status &
-  Berechtigungen, referentielle Integrität serverseitig. Beispieldaten via Seeder.
-- **Transaktions-Inspektor** (`docs/suite/transaktions-inspektor.md`): zwei Projektionen —
-  Roh-XML je Phase aus `IMessageCaptureStore` (ADR-0021) und die globale Protokollansicht aus
-  `IEventLog` (alle Kunden, Live-Filter Kunde/Zeitraum/Typ/Severity). In-process (ADR-0015:
-  prozessübergreifende Live-Inspektion bleibt Folgethema).
-- **Schlüssel-/Zertifikats-Ansicht** (`docs/suite/schluessel-ansicht.md`): Fingerprints anzeigen,
-  INI-Brief-Vergleich (`PublicKeyFingerprint.Verify`), Test-CA/Schlüssel-Werkzeuge; PDF via
+- **Master data** (`docs/suite/stammdaten.md`): CRUD through `IMasterDataManager`
+  (`src/EBICO.Server/State/IMasterDataManager.cs`) — banks/partners/subscribers including state &
+  permissions, referential integrity on the server side. Sample data via seeders.
+- **Transaction inspector** (`docs/suite/transaktions-inspektor.md`): two projections —
+  raw XML per phase from `IMessageCaptureStore` (ADR-0021) and the global protocol view from
+  `IEventLog` (all customers, live filters customer/period/type/severity). In-process (ADR-0015:
+  cross-process live inspection remains a follow-up topic).
+- **Key/certificate view** (`docs/suite/schluessel-ansicht.md`): display fingerprints,
+  INI letter comparison (`PublicKeyFingerprint.Verify`), test CA/key tools; PDF via
   QuestPDF (ADR-0010).
 
-> **Die Suite zeigt ihren eigenen Zustand, nicht den eines laufenden Servers.** Sie hostet die
-> Server-Stores in-process und seedet sie; ein separat gestarteter `EBICO.Server`-Prozess bleibt
-> unsichtbar (ADR-0009/ADR-0015). Der `DemoDataBanner` im `MainLayout` sagt das seit #124 in der
-> Oberfläche — bei neuen Ansichten also **keine** Formulierung wählen, die Live-Daten eines fremden
-> Servers suggeriert („Transaktionen des Emulators" o. Ä.).
+> **The Suite shows its own state, not that of a running server.** It hosts the server stores
+> in-process and seeds them; a separately started `EBICO.Server` process stays invisible
+> (ADR-0009/ADR-0015). The `DemoDataBanner` in the `MainLayout` says so in the UI since #124 — so for
+> new views, do **not** choose wording that suggests live data from a foreign server
+> ("the emulator's transactions" or similar).
 
-## Interaktive Inseln bleiben nicht von allein konsistent (ADR-0031)
+## Interactive islands do not stay consistent on their own (ADR-0031)
 
-Mehrere interaktive Inseln auf **einer** Seite (so die Stammdaten-Seite: `BankManager` +
-`PartnerManager` + `SubscriberManager`) sind eigenständige Komponenten mit **je eigener
-Zustandskopie**, schreiben aber durch denselben `IMasterDataManager` — und die Beziehungen kaskadieren.
-Ohne Benachrichtigung entwertet jede Mutation die Geschwister still (#126). Deshalb gilt für **jede**
-Komponente, die Stammdaten anzeigt:
+Several interactive islands on **one** page (as on the master data page: `BankManager` +
+`PartnerManager` + `SubscriberManager`) are self-contained components with **their own copy of the
+state** each, yet they write through the same `IMasterDataManager` — and the relationships cascade.
+Without a notification, every mutation silently invalidates the siblings (#126). Therefore the following
+applies to **every** component that displays master data:
 
 1. `@implements IDisposable` + `@inject IMasterDataChangeNotifier Changes`; in `OnInitializedAsync`
-   `Changes.Subscribe(handler)`, in `Dispose` das Abo zurückgeben.
-2. Nach **jeder** erfolgreichen Mutation `await Changes.NotifyChangedAsync()`.
-3. Im Handler `InvokeAsync(...)` verwenden — die Benachrichtigung kommt auf dem Thread des
-   auslösenden Circuits an (der Notifier ist ein **Singleton**, damit auch Sitzungen konvergieren).
-4. Nach dem Neuladen **transiente UI-Zustände prüfen** (offenes Formular mit gelöschter Bank,
-   Löschbestätigung für kaskadierten Datensatz, Detailbereich ohne Datensatz). Neuladen allein
-   repariert nur die Tabellen.
+   `Changes.Subscribe(handler)`, in `Dispose` return the subscription.
+2. After **every** successful mutation, `await Changes.NotifyChangedAsync()`.
+3. Use `InvokeAsync(...)` in the handler — the notification arrives on the thread of the
+   triggering circuit (the notifier is a **singleton**, so that sessions converge too).
+4. After the reload, **check transient UI state** (an open form with a deleted bank, a delete
+   confirmation for a cascaded record, a detail area without a record). Reloading alone only
+   repairs the tables.
 
-> Kein Wächter erzwingt das Abo — wer es vergisst, veraltet wieder still. `StammdatenIslandSyncTests`
-> ist das Sicherheitsnetz und rendert mehrere Komponenten in **einem** `BunitContext` (geteilter
-> DI-Container ⇒ geteilter Store und Notifier).
+> No guard enforces the subscription — whoever forgets it goes stale silently again.
+> `StammdatenIslandSyncTests` is the safety net and renders several components in **one**
+> `BunitContext` (shared DI container ⇒ shared store and notifier).
 
-**`Save*` ist Upsert, nicht „Anlegen".** Create-Formulare müssen die Identität vorher prüfen
-(`GetBankAsync`/`GetPartnerAsync`/`GetSubscriberAsync`), sonst überschreiben sie stillschweigend
-bestehende Datensätze — beim Teilnehmer inklusive Status und Berechtigungen (#126).
+**`Save*` is an upsert, not "create".** Create forms have to check the identity beforehand
+(`GetBankAsync`/`GetPartnerAsync`/`GetSubscriberAsync`), otherwise they silently overwrite
+existing records — for a subscriber including state and permissions (#126).
 
-**Filter-/Auswahllisten datengetrieben aufbauen**, nicht aus `Enum.GetValues`: Optionen ohne
-Datenbestand führen nur in „keine Treffer" (siehe `GetTypeOptionsAsync`/`GetSeverityOptionsAsync`).
+**Build filter/selection lists data-driven**, not from `Enum.GetValues`: options without any data
+only lead to "no matches" (see `GetTypeOptionsAsync`/`GetSeverityOptionsAsync`).
 
-## Neue Seite/Komponente anlegen
+## Creating a new page/component
 
-1. Razor-Komponente unter `Components/` (bei Seite mit `@page`, an der Navigation registrieren).
-2. Zustandszugriff über die vorhandenen Service-Abstraktionen (`IEmulatorStateProvider` /
-   `ITransactionInspectorProvider` / `IMasterDataManager`), nicht direkt gegen Stores koppeln.
-3. Beispieldaten-Seeding erweitern, wenn die Ansicht sonst leer bliebe.
-4. Bei Stammdaten-Anzeige: Notifier abonnieren (siehe oben).
-5. Seiten setzen ein `<PageTitle>` und tragen genau eine `<h1>` — `Routes.razor` fokussiert per
-   `<FocusOnNavigate Selector="h1" />` darauf.
+1. Razor component under `Components/` (for a page with `@page`, register it in the navigation).
+2. Access state through the existing service abstractions (`IEmulatorStateProvider` /
+   `ITransactionInspectorProvider` / `IMasterDataManager`), do not couple directly to the stores.
+3. Extend the sample data seeding if the view would otherwise stay empty.
+4. When displaying master data: subscribe to the notifier (see above).
+5. Pages set a `<PageTitle>` and carry exactly one `<h1>` — `Routes.razor` focuses on it via
+   `<FocusOnNavigate Selector="h1" />`.
 
 ## Tests (bUnit)
 
 - `tests/EBICO.Tests/Suite`: `BunitContext` + `Render(...)`.
-- **Falle xUnit1051 unter `TreatWarningsAsErrors`:** bei Aufrufen, die einen `CancellationToken`
-  akzeptieren, `TestContext.Current.CancellationToken` übergeben — sonst Build-Fehler.
-- Services vor dem Rendern in den Test-DI registrieren.
+- **The xUnit1051 trap under `TreatWarningsAsErrors`:** for calls that accept a `CancellationToken`,
+  pass `TestContext.Current.CancellationToken` — otherwise it is a build error.
+- Register services in the test DI before rendering.
 
 ## Definition of Done
 
-Doku unter `docs/suite/` + Verlinkung in `docs/index.md`, Tests, ggf. ADR. Ablauf: `ebics-feature-workflow`.
+Docs under `docs/suite/` + a link in `docs/index.md`, tests, ADR if applicable. Process: `ebics-feature-workflow`.
 
-## Quellen
+## Sources
 
 - Code: `src/EBICO.Suite/{Components,Services,wwwroot}`, `src/EBICO.Server/State`
   (`IMasterDataManager`, `IMessageCaptureStore`, `IEventLog`).
-- Doku: `docs/suite/ui-shell.md`, `docs/suite/stammdaten.md`, `docs/suite/transaktions-inspektor.md`,
-  `docs/suite/schluessel-ansicht.md`. ADR: 0009 (Render-Modus/in-process), 0010 (QuestPDF),
-  0021 (Message-Capture), 0031 (Änderungsbenachrichtigung zwischen den Inseln).
+- Docs: `docs/suite/ui-shell.md`, `docs/suite/stammdaten.md`, `docs/suite/transaktions-inspektor.md`,
+  `docs/suite/schluessel-ansicht.md`. ADR: 0009 (render mode/in-process), 0010 (QuestPDF),
+  0021 (message capture), 0031 (change notification between the islands).
