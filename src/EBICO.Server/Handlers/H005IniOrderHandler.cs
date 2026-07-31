@@ -14,7 +14,7 @@ namespace EBICO.Server.Handlers;
 /// stores the RSA public key from that certificate.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> only the public key is taken from the certificate; certificate chain /
+/// <b>⚠️ Spec caveat:</b> only the public key is taken from the certificate; certificate chain /
 /// self-signature validation is a conformance concern (M8) and not performed here.
 /// </remarks>
 public sealed class H005IniOrderHandler : IniOrderHandlerBase

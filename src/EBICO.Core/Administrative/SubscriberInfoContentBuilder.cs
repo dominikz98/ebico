@@ -16,7 +16,7 @@ namespace EBICO.Core.Administrative;
 /// <c>AdminOrderType</c>/<c>Service</c>), so each order type dispatches to a version-specific populate step.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the content is generated from the seeded master data; sub-fields that the domain
+/// <b>⚠️ Spec caveat:</b> the content is generated from the seeded master data; sub-fields that the domain
 /// model does not track (order-format, transfer/authorisation levels, amount limits, X.509 parameters,
 /// per-account usage restrictions) are left at their defaults or omitted. The version-specific field mapping
 /// is best-effort and to be verified against the official EBICS annexes.
@@ -592,7 +592,7 @@ public static class SubscriberInfoContentBuilder
         };
     }
 
-    // A plausible EBICS user status byte derived from the subscriber lifecycle state (Spec-Vorbehalt).
+    // A plausible EBICS user status byte derived from the subscriber lifecycle state (Spec caveat).
     private static byte UserStatus(Subscriber user) => user.State switch
     {
         SubscriberState.Ready => 5,

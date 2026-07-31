@@ -48,9 +48,9 @@ well-formed but unknown code (`"A999"`) is accepted, but does not resolve via
 
 ```csharp
 var v = KeyVersion.Create("A005");      // v.Purpose == KeyPurpose.Signature
-KeyVersion.Create("a005");              // InvalidKeyVersionException (Kleinbuchstabe)
+KeyVersion.Create("a005");              // InvalidKeyVersionException (lowercase)
 KeyVersion.TryCreate("E002", out var e);// non-throwing variant
-default(KeyVersion).Value;              // null — struct-Caveat (vgl. ADR-0007)
+default(KeyVersion).Value;              // null — struct caveat (cf. ADR-0007)
 ```
 
 ## Version mapping per EBICS version
@@ -70,8 +70,8 @@ EBICS protocol version (analogous to the `EbicsVersions` registry).
 
 ```csharp
 KeyVersions.IsPermitted(KeyVersion.Create("A006"), EbicsVersion.H003);     // false
-KeyVersions.EnsurePermitted(KeyVersion.Create("A006"), EbicsVersion.H004); // ok (seit #117)
-KeyVersions.Default(KeyPurpose.Signature, EbicsVersion.H005).Code;         // "A005" (A006 ist Opt-in)
+KeyVersions.EnsurePermitted(KeyVersion.Create("A006"), EbicsVersion.H004); // ok (since #117)
+KeyVersions.Default(KeyPurpose.Signature, EbicsVersion.H005).Code;         // "A005" (A006 is opt-in)
 KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H005);         // A005, A006
 ```
 

@@ -23,7 +23,7 @@ internal abstract class OnboardingEnvelopeBuilderBase : IOnboardingEnvelopeBuild
     protected const string OrderTypeHpb = "HPB";
 
     /// <summary>
-    /// The <c>SecurityMedium</c> value for key-management orders. <b>⚠️ Spec-Vorbehalt:</b>
+    /// The <c>SecurityMedium</c> value for key-management orders. <b>⚠️ Spec caveat:</b>
     /// <c>"0000"</c> ("no medium") is the common reading, not verified against the official Annex.
     /// </summary>
     protected const string SecurityMedium = "0000";

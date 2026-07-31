@@ -19,7 +19,7 @@ namespace EBICO.Core.Administrative;
 /// <see cref="SubscriberInfoContentBuilder"/>).
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the content is projected from the emulator's open-order state; the electronic
+/// <b>⚠️ Spec caveat:</b> the content is projected from the emulator's open-order state; the electronic
 /// signatures themselves are not verified and the digest is a plain SHA-256 over the order data rather than
 /// the canonical EBICS ES hash. HVT is rendered order-summary only (a single <c>OrderInfo</c> carrying the
 /// message name), not a full ISO 20022 per-transaction breakdown. The exact per-version field mapping is
@@ -27,7 +27,7 @@ namespace EBICO.Core.Administrative;
 /// </remarks>
 public static class VeuResponseBuilder
 {
-    // The signature algorithm version stamped on the data digest (Spec-Vorbehalt: fixed placeholder).
+    // The signature algorithm version stamped on the data digest (Spec caveat: fixed placeholder).
     private const string SignatureVersion = "A006";
 
     /// <summary>Builds the HVU (overview of orders awaiting distributed signatures) order data.</summary>

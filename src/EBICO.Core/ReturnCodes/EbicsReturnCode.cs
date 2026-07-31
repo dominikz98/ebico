@@ -12,7 +12,7 @@ namespace EBICO.Core.ReturnCodes;
 /// connector (which reads them); the human-readable descriptions here are worded in our own terms.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> only the nine codes exercised by the host skeleton and the M3 key
+/// <b>⚠️ Spec caveat:</b> only the nine codes exercised by the host skeleton and the M3 key
 /// management handlers (<see cref="Ok"/>, <see cref="AuthenticationFailed"/>,
 /// <see cref="InvalidRequest"/>, <see cref="InternalError"/>, <see cref="InvalidOrderDataFormat"/>,
 /// <see cref="InvalidUserOrUserState"/>, <see cref="InvalidOrderType"/>,
@@ -38,7 +38,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// <summary>
     /// The bank has completed the post-processing of a downloaded order after the receipt (<c>011000</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode DownloadPostprocessDone =
         new("011000", "EBICS_DOWNLOAD_POSTPROCESS_DONE", EbicsReturnCodeKind.Technical);
 
@@ -46,14 +46,14 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// The bank skipped the post-processing of a downloaded order because the client reported a
     /// negative receipt (<c>011001</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode DownloadPostprocessSkipped =
         new("011001", "EBICS_DOWNLOAD_POSTPROCESS_SKIPPED", EbicsReturnCodeKind.Technical);
 
     /// <summary>
     /// A transfer requested fewer segments than were announced during initialisation (<c>011101</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxSegmentNumberUnderrun =
         new("011101", "EBICS_TX_SEGMENT_NUMBER_UNDERRUN", EbicsReturnCodeKind.Technical);
 
@@ -61,7 +61,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// The supplied order parameters were ignored by the bank (<c>031001</c>). Informational; the
     /// order is still processed.
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode OrderParamsIgnored =
         new("031001", "EBICS_ORDER_PARAMS_IGNORED", EbicsReturnCodeKind.Technical);
 
@@ -80,7 +80,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// <summary>
     /// The client must recover the interrupted transaction by re-synchronising with the bank (<c>061101</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxRecoverySync =
         new("061101", "EBICS_TX_RECOVERY_SYNC", EbicsReturnCodeKind.Technical);
 
@@ -89,7 +89,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// <summary>
     /// The subscriber is not authorised for the requested order type (<c>090003</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode AuthorisationOrderTypeFailed =
         new("090003", "EBICS_AUTHORISATION_ORDER_TYPE_FAILED", EbicsReturnCodeKind.Business);
 
@@ -102,7 +102,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
         new("090004", "EBICS_INVALID_ORDER_DATA_FORMAT", EbicsReturnCodeKind.Business);
 
     /// <summary>No downloadable data is available for the requested order (<c>090005</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode NoDownloadDataAvailable =
         new("090005", "EBICS_NO_DOWNLOAD_DATA_AVAILABLE", EbicsReturnCodeKind.Business);
 
@@ -115,12 +115,12 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
         new("091002", "EBICS_INVALID_USER_OR_USER_STATE", EbicsReturnCodeKind.Business);
 
     /// <summary>The subscriber is unknown to the bank (<c>091003</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode UserUnknown =
         new("091003", "EBICS_USER_UNKNOWN", EbicsReturnCodeKind.Business);
 
     /// <summary>The subscriber is known but in a state that does not allow the request (<c>091004</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode InvalidUserState =
         new("091004", "EBICS_INVALID_USER_STATE", EbicsReturnCodeKind.Business);
 
@@ -135,12 +135,12 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// <summary>
     /// The bank's public keys must be fetched/updated (HPB) before the request can be processed (<c>091008</c>).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode BankPubkeyUpdateRequired =
         new("091008", "EBICS_BANK_PUBKEY_UPDATE_REQUIRED", EbicsReturnCodeKind.Business);
 
     /// <summary>A segment exceeds the maximum permitted size (<c>091009</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode SegmentSizeExceeded =
         new("091009", "EBICS_SEGMENT_SIZE_EXCEEDED", EbicsReturnCodeKind.Business);
 
@@ -149,57 +149,57 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
         new("091010", "EBICS_INVALID_XML", EbicsReturnCodeKind.Business);
 
     /// <summary>The <c>HostID</c> in the request is unknown to this server (<c>091011</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode InvalidHostId =
         new("091011", "EBICS_INVALID_HOST_ID", EbicsReturnCodeKind.Business);
 
     /// <summary>The transaction ID is unknown to the bank (<c>091101</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxUnknownTxid =
         new("091101", "EBICS_TX_UNKNOWN_TXID", EbicsReturnCodeKind.Business);
 
     /// <summary>The transaction was aborted (<c>091102</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxAbort =
         new("091102", "EBICS_TX_ABORT", EbicsReturnCodeKind.Business);
 
     /// <summary>A message of an already-processed transaction step was replayed (<c>091103</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxMessageReplay =
         new("091103", "EBICS_TX_MESSAGE_REPLAY", EbicsReturnCodeKind.Business);
 
     /// <summary>A transfer requested more segments than were announced during initialisation (<c>091104</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode TxSegmentNumberExceeded =
         new("091104", "EBICS_TX_SEGMENT_NUMBER_EXCEEDED", EbicsReturnCodeKind.Business);
 
     /// <summary>The request content is not valid for the requested operation (<c>091112</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode InvalidRequestContent =
         new("091112", "EBICS_INVALID_REQUEST_CONTENT", EbicsReturnCodeKind.Business);
 
     /// <summary>The uploaded order data exceeds the maximum permitted size (<c>091113</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode MaxOrderDataSizeExceeded =
         new("091113", "EBICS_MAX_ORDER_DATA_SIZE_EXCEEDED", EbicsReturnCodeKind.Business);
 
     /// <summary>The number of segments exceeds the bank's maximum (<c>091114</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode MaxSegmentsExceeded =
         new("091114", "EBICS_MAX_SEGMENTS_EXCEEDED", EbicsReturnCodeKind.Business);
 
     /// <summary>The number of concurrent transactions exceeds the bank's maximum (<c>091115</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode MaxTransactionsExceeded =
         new("091115", "EBICS_MAX_TRANSACTIONS_EXCEEDED", EbicsReturnCodeKind.Business);
 
     /// <summary>The <c>PartnerID</c> does not match the one bound to the transaction (<c>091116</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode PartnerIdMismatch =
         new("091116", "EBICS_PARTNER_ID_MISMATCH", EbicsReturnCodeKind.Business);
 
     /// <summary>The order attribute is incompatible with the requested order type (<c>091117</c>).</summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode IncompatibleOrderAttribute =
         new("091117", "EBICS_INCOMPATIBLE_ORDER_ATTRIBUTE", EbicsReturnCodeKind.Business);
 
@@ -207,7 +207,7 @@ public readonly record struct EbicsReturnCode(string Code, string SymbolicName, 
     /// The order identifier referenced by a distributed-signature order (HVE/HVS/HVD/HVT) does not
     /// identify an order currently awaiting signatures (<c>091121</c>, issue #42).
     /// </summary>
-    /// <remarks><b>⚠️ Spec-Vorbehalt:</b> to be verified against EBICS Annex 1.</remarks>
+    /// <remarks><b>⚠️ Spec caveat:</b> to be verified against EBICS Annex 1.</remarks>
     public static readonly EbicsReturnCode InvalidOrderIdentifier =
         new("091121", "EBICS_INVALID_ORDER_IDENTIFIER", EbicsReturnCodeKind.Business);
 }

@@ -7,7 +7,7 @@ using EBICO.Server.State;
 namespace EBICO.Server.Handlers;
 
 /// <summary>
-/// Base for the version-specific SPR order handlers. SPR (<c>OrderType == "SPR"</c>, "Sperrung") is the
+/// Base for the version-specific SPR order handlers. SPR (<c>OrderType == "SPR"</c>) is the
 /// suspension order: it moves the subscriber into <see cref="SubscriberState.Suspended"/> so it can no
 /// longer transact until it is reactivated (<see cref="SubscriberState.Suspended"/> →
 /// <see cref="SubscriberState.Ready"/>, via the admin API / <see cref="IMasterDataManager"/>).
@@ -27,7 +27,7 @@ namespace EBICO.Server.Handlers;
 /// <b>not</b> remove the stored keys, so a later reactivation keeps them.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the request's order/authentication signature is <b>not</b> verified
+/// <b>⚠️ Spec caveat:</b> the request's order/authentication signature is <b>not</b> verified
 /// (consistent with INI/HIA/HPB — signatures are M4); SPR maps to the existing
 /// <see cref="SubscriberState.Suspended"/> rather than a dedicated permanent-block state. See
 /// <c>docs/server/hca-hcs-spr-hsa.md</c>.

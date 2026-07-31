@@ -69,7 +69,7 @@ using var cert = /* aus X509Data geladenes Teilnehmerzertifikat */;
 var result = X509CertificateVerifier.Verify(cert, TrustStore(ca), KeyPurpose.Signature);
 if (!result.IsValid)
 {
-    // result.Errors ist ein [Flags]-Wert; result.Diagnostics liefert lesbare Texte.
+    // result.Errors is a [Flags] value; result.Diagnostics yields readable texts.
 }
 ```
 

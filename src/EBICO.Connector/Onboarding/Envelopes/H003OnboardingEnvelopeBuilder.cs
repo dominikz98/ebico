@@ -17,7 +17,7 @@ namespace EBICO.Connector.Onboarding.Envelopes;
 /// </summary>
 internal sealed class H003OnboardingEnvelopeBuilder : OnboardingEnvelopeBuilderBase
 {
-    // ⚠️ Spec-Vorbehalt: OrderAttribute values, as in the H004 builder.
+    // ⚠️ Spec caveat: OrderAttribute values, as in the H004 builder.
     private const string OrderAttributeUnsecured = "DZNNN";
     private const string OrderAttributeHpb = "DZHNN";
 

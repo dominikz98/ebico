@@ -13,7 +13,7 @@ namespace EBICO.Core.Administrative;
 /// namespace.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> EBICS defines HAC via a proprietary schema (a <c>camt.086</c>/<c>pain.002</c>
+/// <b>⚠️ Spec caveat:</b> EBICS defines HAC via a proprietary schema (a <c>camt.086</c>/<c>pain.002</c>
 /// derived acknowledgement format, versioned differently across H004/H005) which is not available in the
 /// repository (licence). This builder therefore emits a structurally plausible, self-describing projection of
 /// the events — one <c>ProtocolEntry</c> per event — not the wire-exact HAC layout. The exact element/attribute

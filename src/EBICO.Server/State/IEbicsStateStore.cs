@@ -4,7 +4,7 @@ namespace EBICO.Server.State;
 
 /// <summary>
 /// The authoritative server-side state of the EBICS emulator: the registered banks, partners
-/// (Kunden) and subscribers (Teilnehmer). This is the read/write counterpart to the Suite's
+/// (customers) and subscribers. This is the read/write counterpart to the Suite's
 /// read-only <c>IEmulatorStateProvider</c>.
 /// </summary>
 /// <remarks>

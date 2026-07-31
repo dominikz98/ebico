@@ -37,7 +37,7 @@ namespace EBICO.Server.Transactions;
 /// again (see <c>docs/server/download-transaction.md</c>).
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the download response is not signed (X002 is M4); no order signature is
+/// <b>⚠️ Spec caveat:</b> the download response is not signed (X002 is M4); no order signature is
 /// produced. The canonical Initialisation/Transfer/Receipt split, the exact segment semantics and the
 /// receipt-code mapping are to be verified against the official EBICS annexes.
 /// </para>

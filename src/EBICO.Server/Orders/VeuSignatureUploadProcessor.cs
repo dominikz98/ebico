@@ -16,7 +16,7 @@ namespace EBICO.Server.Orders;
 /// event log.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the electronic signature carried by an HVE upload is not verified; "signing"
+/// <b>⚠️ Spec caveat:</b> the electronic signature carried by an HVE upload is not verified; "signing"
 /// records that an authorised subscriber (one holding a bank-technical E/A/B permission for the underlying
 /// order type) submitted an HVE. The duplicate-signature and already-complete rejections reuse
 /// <see cref="EbicsReturnCode.InvalidOrderDataFormat"/> as the emulator has no dedicated code for them; an

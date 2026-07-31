@@ -11,7 +11,7 @@ namespace EBICO.Core.Statements;
 /// per entry. Deterministic UTF-8 XML (no BOM).
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the message version is fixed to <c>camt.052.001.08</c>; a report is intraday,
+/// <b>⚠️ Spec caveat:</b> the message version is fixed to <c>camt.052.001.08</c>; a report is intraday,
 /// so it carries an interim balance rather than the booked <c>OPBD</c>/<c>CLBD</c> pair of camt.053. Not
 /// validated against the proprietary XSD.
 /// </remarks>

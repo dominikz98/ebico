@@ -33,7 +33,7 @@ namespace EBICO.Server.Transactions;
 /// consistent with the single-phase order handlers.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the order signature (ES) carried in the initialisation is retained on the
+/// <b>⚠️ Spec caveat:</b> the order signature (ES) carried in the initialisation is retained on the
 /// transaction but <em>not</em> verified in this issue (see <c>docs/server/upload-transaction.md</c>);
 /// the X002 request authentication signature likewise stays unverified (the pipeline verify stage is a
 /// no-op). The canonical Initialisation/Transfer split and the exact segment semantics are to be
@@ -336,7 +336,7 @@ public sealed class UploadTransactionEngine : IUploadTransactionEngine, ITransac
     // processing (issue #39) and records the plaintext on the transaction. Decode failures map to
     // InvalidOrderDataFormat (090004); a payment order whose payload fails validation is rejected with the
     // processor's return code (090004) and is NOT retained. The order signature (ES) is not verified in
-    // this issue (Spec-Vorbehalt).
+    // this issue (Spec caveat).
     private async Task<EbicsReturnCode> FinalizeOrderAsync(
         UploadTransaction transaction, IReadOnlyList<byte[]> orderedSegments, CancellationToken ct)
     {

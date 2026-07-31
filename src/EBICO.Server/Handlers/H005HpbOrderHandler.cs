@@ -13,7 +13,7 @@ namespace EBICO.Server.Handlers;
 /// <c>HPBResponseOrderData</c>.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the certificates are freshly self-signed on each response from the bank
+/// <b>⚠️ Spec caveat:</b> the certificates are freshly self-signed on each response from the bank
 /// key pair (which must carry a private key — the auto-generated default does). Trust is established
 /// via the public-key fingerprint, not a certificate chain (M8). The validity window is derived from
 /// the injected <see cref="TimeProvider"/>.

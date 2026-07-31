@@ -9,7 +9,7 @@ namespace EBICO.Core.Administrative;
 /// <see cref="CustomerProtocolEntry"/> by the server and rendered here, one line per entry.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> EBICS does not prescribe an exact PTK line layout; this is a readable,
+/// <b>⚠️ Spec caveat:</b> EBICS does not prescribe an exact PTK line layout; this is a readable,
 /// deterministic rendering (ISO-8601 timestamp, severity, order type, return code and message). PTK is a
 /// legacy H003/H004 order type — H005 replaces it with HAC.
 /// </remarks>

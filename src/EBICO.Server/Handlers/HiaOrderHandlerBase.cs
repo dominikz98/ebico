@@ -24,7 +24,7 @@ namespace EBICO.Server.Handlers;
 /// <c>X509Data</c> certificate) is <see cref="ExtractHiaOrderData"/>.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> HIA is only accepted once INI has run (state
+/// <b>⚠️ Spec caveat:</b> HIA is only accepted once INI has run (state
 /// <see cref="SubscriberState.Initialized"/>); the INI-before-HIA ordering is thereby enforced and a
 /// re-sent HIA is rejected with <see cref="EbicsReturnCode.InvalidUserOrUserState"/>. The
 /// <see cref="SubscriberState.Ready"/> state is reached without a separate activation step, and the

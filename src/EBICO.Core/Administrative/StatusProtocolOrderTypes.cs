@@ -5,7 +5,7 @@ namespace EBICO.Core.Administrative;
 /// statement (STA/VMK/C5x) and payment (CCT/CDD/…) orders these remain classical <c>AdminOrderType</c>s
 /// in H005 (they are intentionally <b>not</b> modelled as BTF services, see
 /// <see cref="EBICO.Core.Btf.BtfOrderTypeCatalog"/>). They are delivered as downloads (bank→client) over
-/// the download transaction and split into two families: the stammdaten/parameter orders
+/// the download transaction and split into two families: the master-data/parameter orders
 /// (HTD/HKD/HAA/HPD, generated from master data) and the customer-protocol orders (HAC/PTK, projected
 /// from the event log).
 /// </summary>

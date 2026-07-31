@@ -11,7 +11,7 @@ namespace EBICO.Core.Statements;
 /// movements only, so it carries <b>no</b> balances. Deterministic UTF-8 XML (no BOM).
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the message version is fixed to <c>camt.054.001.08</c>; not validated against
+/// <b>⚠️ Spec caveat:</b> the message version is fixed to <c>camt.054.001.08</c>; not validated against
 /// the proprietary XSD.
 /// </remarks>
 public static class Camt054Builder

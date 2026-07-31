@@ -19,7 +19,7 @@ namespace EBICO.Connector;
 /// <c>PartnerID</c>, and the identity fields are resolved from <see cref="OrderType"/> where possible.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the EBICO emulator keys its VEU store on the order id alone and ignores the
+/// <b>⚠️ Spec caveat:</b> the EBICO emulator keys its VEU store on the order id alone and ignores the
 /// remaining fields; they are emitted for conformance with the published order-params schema and are not
 /// verified against a real bank (#124, see <c>docs/connector/veu.md</c>).
 /// </para>

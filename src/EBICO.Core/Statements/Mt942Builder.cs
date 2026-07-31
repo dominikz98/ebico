@@ -10,7 +10,7 @@ namespace EBICO.Core.Statements;
 /// movement and the debit/credit summaries (<c>:90D:</c>/<c>:90C:</c>).
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the tag grammar is a pragmatic, minimal rendering not validated against the
+/// <b>⚠️ Spec caveat:</b> the tag grammar is a pragmatic, minimal rendering not validated against the
 /// official SWIFT MT942 field specification; the exact strings are pinned by tests.
 /// </remarks>
 public static class Mt942Builder

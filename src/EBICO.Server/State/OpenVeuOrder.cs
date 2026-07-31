@@ -13,7 +13,7 @@ namespace EBICO.Server.State;
 /// cancelled (HVS), so it is a mutable aggregate that accumulates signers over time.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the electronic signatures are not verified; a "signature" here is the fact that
+/// <b>⚠️ Spec caveat:</b> the electronic signatures are not verified; a "signature" here is the fact that
 /// an authorised subscriber submitted an HVE for the order. Whether an upload needs distributed signing, and
 /// how many signatures it requires, is approximated (the submission carries a distributed-signature flag and
 /// the server applies a fixed required-signature count); the real bank-side account signature rules are out

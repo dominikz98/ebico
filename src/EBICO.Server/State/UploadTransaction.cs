@@ -49,7 +49,7 @@ public readonly record struct SegmentAppendResult(SegmentAppendStatus Status, IR
 /// an internal lock so concurrent transfers for the same transaction stay consistent.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the raw <see cref="SignatureData"/> (the order signature / ES) is retained
+/// <b>⚠️ Spec caveat:</b> the raw <see cref="SignatureData"/> (the order signature / ES) is retained
 /// but <em>not</em> cryptographically verified in this issue (consistent with the single-phase key
 /// handlers); the electronic-signature verification is a follow-up. Idle expiry (issue #35) is driven by
 /// <see cref="LastActivityAt"/>/<see cref="IsExpired"/>; the store evicts expired and orphaned

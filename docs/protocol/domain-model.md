@@ -47,7 +47,7 @@ var host = HostId.Create("BANKDE01");          // throws InvalidEbicsIdentifierE
 
 if (UserId.TryCreate(input, out var user))     // non-throwing variant
 {
-    // user.Value ist garantiert valide
+    // user.Value is guaranteed to be valid
 }
 
 HostId.Create("A,B=C");                          // ok: comma and equals sign are allowed

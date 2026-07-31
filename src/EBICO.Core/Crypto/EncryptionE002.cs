@@ -32,7 +32,7 @@ namespace EBICO.Core.Crypto;
 /// bank-technical signature (issue #19), not from this layer.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the EBICS encryption version <c>E002</c> has, in some historical spec
+/// <b>⚠️ Spec caveat:</b> the EBICS encryption version <c>E002</c> has, in some historical spec
 /// revisions, encrypted the transaction key with RSAES-PKCS1-v1_5 rather than OAEP. EBICO follows
 /// the registry intent (OAEP-SHA256, per this issue) and the official Annex is to be verified once
 /// available (see <c>CLAUDE.md</c> and <c>docs/protocol/encryption-e002.md</c>). Because the
@@ -212,8 +212,8 @@ public static class EncryptionE002
     /// convention).
     /// </summary>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> the zero IV and the <see cref="SymmetricPadding"/> are EBICS spec
-    /// details not yet verified against the official specs (vgl. <c>CLAUDE.md</c>). They are
+    /// <b>⚠️ Spec caveat:</b> the zero IV and the <see cref="SymmetricPadding"/> are EBICS spec
+    /// details not yet verified against the official specs (cf. <c>CLAUDE.md</c>). They are
     /// confined to this seam; because both <see cref="EncryptOrderData"/> and
     /// <see cref="DecryptOrderData"/> route through here, round-trips stay invariant to the choice.
     /// </remarks>

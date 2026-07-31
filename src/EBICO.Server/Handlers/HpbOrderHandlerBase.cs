@@ -29,7 +29,7 @@ namespace EBICO.Server.Handlers;
 /// H003/H004 as <c>RSAKeyValue</c>, H005 as <c>X509Data</c>).
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the request's X002 authentication signature is <b>not</b> verified and
+/// <b>⚠️ Spec caveat:</b> the request's X002 authentication signature is <b>not</b> verified and
 /// the response is <b>not</b> signed — response/request authentication signatures (X002) are M4,
 /// consistent with INI/HIA. Confidentiality still holds because the payload is encrypted for the
 /// subscriber's E002 key. HPB requires state <see cref="SubscriberState.Ready"/> (INI + HIA done);

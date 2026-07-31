@@ -4,7 +4,7 @@ using EBICO.Core.Domain;
 namespace EBICO.Server.State;
 
 /// <summary>
-/// Identifies the subscriber (Teilnehmer) a stored public key belongs to: the
+/// Identifies the subscriber a stored public key belongs to: the
 /// (<see cref="HostId"/>, <see cref="PartnerId"/>, <see cref="UserId"/>) triple that also keys the
 /// <see cref="IEbicsStateStore"/> subscribers.
 /// </summary>

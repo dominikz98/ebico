@@ -16,7 +16,7 @@ namespace EBICO.Connector.Onboarding.Envelopes;
 /// </summary>
 internal sealed class H004OnboardingEnvelopeBuilder : OnboardingEnvelopeBuilderBase
 {
-    // ⚠️ Spec-Vorbehalt: the OrderAttribute values for unsecured key management (INI/HIA) and for
+    // ⚠️ Spec caveat: the OrderAttribute values for unsecured key management (INI/HIA) and for
     // HPB are the common reading ("DZNNN"/"DZHNN"), not verified against the official Annex.
     private const string OrderAttributeUnsecured = "DZNNN";
     private const string OrderAttributeHpb = "DZHNN";

@@ -16,7 +16,7 @@ namespace EBICO.Connector.Upload;
 /// side's job — set <see cref="UploadRequest.DistributedSignature"/> on the original upload.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the EBICO emulator records <em>that</em> an authorised subscriber submitted
+/// <b>⚠️ Spec caveat:</b> the EBICO emulator records <em>that</em> an authorised subscriber submitted
 /// an HVE and does not verify the signature payload (ADR-0020). <see cref="SignaturePayload"/> therefore
 /// carries a minimal placeholder by default. See <c>docs/connector/veu.md</c>.
 /// </para>
