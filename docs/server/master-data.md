@@ -173,7 +173,7 @@ Error mapping:
   later server issue.
 - **No persistent store:** the default `InMemoryEbicsStateStore` loses the state on
   restart. A persistent store can be plugged in via a `TryAddSingleton` override (the interface
-  is prepared for async). See [ADR-0011](../adr/0011-server-stammdatenverwaltung.md).
+  is prepared for async). See [ADR-0011](../adr/0011-server-master-data-management.md).
 - **Referential integrity lives in the manager, not in the store.** Whoever writes to the store directly
   bypasses the checks — the admin API and onboarding handlers always go through the manager.
 
@@ -201,5 +201,5 @@ holds the offered versions per host (default: all).
 - [Hostable server scaffolding](host.md) — host, pipeline, return codes, the underlying state store
 - [Domain model](../protocol/domain-model.md) — aggregates, IDs, authorisations/signature classes, states
 - [UI shell & navigation](../suite/ui-shell.md) — the read-only Suite counterpart (`IEmulatorStateProvider`)
-- [ADR-0011 — Server master data management](../adr/0011-server-stammdatenverwaltung.md)
-- [ADR-0007 — Domain value objects](../adr/0007-domaenen-value-objects-record-struct.md)
+- [ADR-0011 — Server master data management](../adr/0011-server-master-data-management.md)
+- [ADR-0007 — Domain value objects](../adr/0007-domain-value-objects-record-struct.md)

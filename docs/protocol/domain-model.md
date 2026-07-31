@@ -5,7 +5,7 @@ identifiers, the subscriber lifecycle and the authorisation/signature classes.
 Until now, `HostID`/`PartnerID`/`UserID`/`SystemID` existed only as raw
 `string` fields on the [generated bindings](xsd-bindings.md) (e.g.
 `StaticHeaderType.HostId`). Issue **#16** (Milestone M1),
-convention: [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md).
+convention: [ADR-0007](../adr/0007-domain-value-objects-record-struct.md).
 
 > **Scope:** Deliberately only identity, state and authorisations. Persistence,
 > crypto and key management do not belong here — they follow in M2 (crypto) and M3
@@ -157,6 +157,6 @@ XML namespaces of the schemas differ — that concerns the
 
 ## Related
 
-- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md)
+- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domain-value-objects-record-struct.md)
 - [Version dispatch](version-dispatch.md) — the `EbicsVersion` abstraction that `Bank` builds on
 - [XSD bindings](xsd-bindings.md) — the generated types with the raw ID fields and `AuthorisationLevelType`

@@ -20,7 +20,7 @@ follow-up issues; here it is the load-bearing structure that matters.
 The Suite runs in **Interactive Server** mode ([ADR-0009](../adr/0009-blazor-render-mode.md)).
 Interactivity is activated per component via `@rendermode InteractiveServer`;
 the dashboard stays Static SSR, the master-data page is Static SSR with
-interactive islands ([#53](stammdaten.md)). This keeps access to the
+interactive islands ([#53](master-data.md)). This keeps access to the
 server-side state an in-process call via DI — no separate
 WebAssembly client or contracts project needed.
 
@@ -32,9 +32,9 @@ the Blazor template demo pages (Counter/Weather) were removed.
 | Entry | Route | Content |
 | --- | --- | --- |
 | Dashboard | `/` | Metrics of the emulator state (count of banks/partners/subscribers) |
-| Master Data | `/stammdaten` | Management of banks/partners/subscribers ([#53](stammdaten.md)) |
-| Transactions | `/transaktionen` | Transaction inspector ([#54](transaktions-inspektor.md)) |
-| Keys | `/schluessel` | Fingerprints, INI-letter comparison, test-CA/key tools ([#55](schluessel-ansicht.md)) |
+| Master Data | `/master-data` | Management of banks/partners/subscribers ([#53](master-data.md)) |
+| Transactions | `/transactions` | Transaction inspector ([#54](transaction-inspector.md)) |
+| Keys | `/keys` | Fingerprints, INI-letter comparison, test-CA/key tools ([#55](key-view.md)) |
 
 The `MainLayout` keeps the template's sidebar structure (sidebar + content),
 but shows the EBICO title in the top row instead of the template "About" link.
@@ -47,7 +47,7 @@ in-memory state with seeded master data and transactions and is **not** connecte
 started `EBICO.Server` process.
 
 This separation has been intended since [ADR-0009](../adr/0009-blazor-render-mode.md) and is documented in
-[ADR-0015](../adr/0015-ereignis-protokollspeicher.md) as well as in `docker-compose.yml` — it
+[ADR-0015](../adr/0015-event-log-store.md) as well as in `docker-compose.yml` — it
 was only invisible **in the surface itself**. Whoever runs `docker compose up` sees two services
 side by side and a UI that shows plausible transactions of a server that never saw them.
 The banner closes exactly this gap between documentation and screen.
@@ -99,7 +99,7 @@ or HTTP API) can be plugged in without changes at the call sites.
 > `EmulatorStateProvider` over the in-process `IEbicsStateStore`/`IMasterDataManager`
 > (Suite → Server → Core); `SampleEmulatorStateProvider` now serves only as a seed and
 > key source. The dashboard and key view remained unchanged. Details:
-> [master-data management](stammdaten.md).
+> [master-data management](master-data.md).
 
 ## Tests
 

@@ -102,10 +102,10 @@ public class ContainerArtifactsTests
     [Fact]
     public void Adr0022_ExistsAndIsListedInTheAdrIndex()
     {
-        ReadRepoFile("docs", "adr", "0022-container-image-und-konfiguration.md")
+        ReadRepoFile("docs", "adr", "0022-container-image-and-configuration.md")
             .Should().Contain("# 0022 —", "the ADR follows the MADR heading convention");
 
         var adrIndex = ReadRepoFile("docs", "adr", "README.md");
-        adrIndex.Should().Contain("0022-container-image-und-konfiguration.md", "the ADR must be listed in the index table");
+        adrIndex.Should().Contain("0022-container-image-and-configuration.md", "the ADR must be listed in the index table");
     }
 }

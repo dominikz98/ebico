@@ -172,4 +172,4 @@ The remaining transaction/segment codes come unchanged from the
 - [Upload orders: payments](payment-orders.md) — the mirror image on the upload side (`IUploadOrderProcessor`)
 - [Master data management](master-data.md) — authorisations, admin API (seed the download queue)
 - [EBICS return code catalog](../protocol/return-codes.md) — `090003`/`090005`/`091114`
-- [ADR-0018 (account statement/report download orders)](../adr/0018-kontoauszug-download-orders.md) — synthetic generation, camt `.08`, ZIP container
+- [ADR-0018 (account statement/report download orders)](../adr/0018-account-statement-download-orders.md) — synthetic generation, camt `.08`, ZIP container

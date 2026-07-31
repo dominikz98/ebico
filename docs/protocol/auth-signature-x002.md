@@ -7,7 +7,7 @@ secures **all elements with `authenticate="true"`** — key version **X002**
 and authenticity of the transport. Builds on the key layer from
 [#18](key-representation.md) and the canonicalizer from [#15](serialization-c14n.md).
 Issue **#20** (Milestone M2), crypto library:
-[ADR-0008](../adr/0008-krypto-bibliothek.md) (`System.Security.Cryptography`, no BouncyCastle).
+[ADR-0008](../adr/0008-crypto-library.md) (`System.Security.Cryptography`, no BouncyCastle).
 
 > **Scope:** This layer only provides **creation and verification** of the `AuthSignature`
 > over a serialized request XML. It is delimited from the *bank-technical* signature
@@ -135,4 +135,4 @@ The permitted versions reside centrally in [`KeyVersions`](key-representation.md
 - [Encryption E002](encryption-e002.md) — hybrid transport encryption (#21)
 - [XML serialization & C14N](serialization-c14n.md) — canonicalizer and C14N modes (#15)
 - [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)

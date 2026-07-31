@@ -7,8 +7,8 @@ of server and connector. Issues **#11 (H005)**, **#12 (H004)**, **#13 (H003)**.
 ## Purpose & placement
 
 The bindings reside **committed** under `src/EBICO.Core/Schema/` (decision
-[ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)). The underlying
-**XSDs remain proprietary and untracked** ([ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md));
+[ADR-0006](../adr/0006-commit-generated-xsd-bindings.md)). The underlying
+**XSDs remain proprietary and untracked** ([ADR-0003](../adr/0003-handling-proprietary-schemas.md));
 only the generated `.cs` are in the repo. This lets the CI build and test the
 protocol core without needing the schemas.
 
@@ -49,7 +49,7 @@ after the next schema update. If a fixup does not find its pattern, **the script
 
 | Fixup | File(s) | Why | Guard |
 |---|---|---|---|
-| Remove `abstract` from `OrderDetailsType` | `Schema/{H003,H004,H005}/OrderDetailsType.cs` | xscgen does **not** translate the XSD `<restriction>` that types `OrderDetails` in the static header more concretely. The abstract base type forces the `XmlSerializer` to a `xsi:type` discriminator that real foreign clients do not send → their INI/HIA/HPB are rejected ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md), Issue #117). | `OrderDetailsBindingTests` |
+| Remove `abstract` from `OrderDetailsType` | `Schema/{H003,H004,H005}/OrderDetailsType.cs` | xscgen does **not** translate the XSD `<restriction>` that types `OrderDetails` in the static header more concretely. The abstract base type forces the `XmlSerializer` to a `xsi:type` discriminator that real foreign clients do not send → their INI/HIA/HPB are rejected ([ADR-0029](../adr/0029-interop-fixes-real-clients.md), Issue #117). | `OrderDetailsBindingTests` |
 
 The `[XmlInclude]` attributes and the concrete sub-types remain in place: `xsi:type`
 is still **accepted**, only no longer **required**. The sub-types carry no
@@ -62,7 +62,7 @@ information content.
 
 ## Namespaces & layout
 
-Own C# namespaces per version ([ADR-0004](../adr/0004-multi-version-strategie.md)).
+Own C# namespaces per version ([ADR-0004](../adr/0004-multi-version-strategy.md)).
 The **truly shared** schemas (W3C xmldsig, HEV/H000, signature Sxxx) are
 generated **once** under `Schema/Shared/` and referenced by the versions —
 this avoids three identical copies of the same XML types.
@@ -112,7 +112,7 @@ are identical across all three versions.
 ## Why committed?
 
 In short: so that the CI can build/test the protocol core without proprietary schemas.
-Rationale and licence trade-off: [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)
+Rationale and licence trade-off: [ADR-0006](../adr/0006-commit-generated-xsd-bindings.md)
 and [../legal/ebics-licensing.md](../legal/ebics-licensing.md). The XSDs themselves
 remain untracked.
 

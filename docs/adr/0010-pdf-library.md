@@ -13,7 +13,7 @@ INI/HIA against the letter. The letter is required as **text and PDF**.
 So far the repo contains **no** PDF library (`Directory.Packages.props` lists only
 test, DI and HTTP packages). PDF generation therefore requires a new dependency. The
 project is deliberately restrained about dependencies (BCL-only for crypto —
-[ADR-0008](0008-krypto-bibliothek.md); avoiding the commercially licensed
+[ADR-0008](0008-crypto-library.md); avoiding the commercially licensed
 FluentAssertions v8 in favour of AwesomeAssertions — [ADR-0002](0002-test-stack.md)).
 The license situation of a PDF package must therefore be checked explicitly.
 
@@ -22,7 +22,7 @@ The license situation of a PDF package must therefore be checked explicitly.
 The INI/HIA letter is generated with **QuestPDF** under the **Community license**.
 The version is pinned centrally in `Directory.Packages.props` (`PackageVersion`) and
 referenced without a version in `EBICO.Connector.csproj`
-([ADR-0001](0001-solution-layout-und-paketverwaltung.md)).
+([ADR-0001](0001-solution-layout-and-package-management.md)).
 
 The letter is encapsulated behind the `IInitializationLetterRenderer` abstraction:
 

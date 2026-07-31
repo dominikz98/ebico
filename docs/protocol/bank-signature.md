@@ -4,7 +4,7 @@ The first real crypto **operation** in `EBICO.Core` (`Crypto/`): creating and ve
 bank-technical (authorising) signature over order data — key version **A005**
 (RSASSA-PKCS1-v1.5) and **A006** (RSASSA-PSS), both over **SHA-256**. Builds on the key layer
 from [#18](key-representation.md). Issue **#19** (Milestone M2), crypto library:
-[ADR-0008](../adr/0008-krypto-bibliothek.md)
+[ADR-0008](../adr/0008-crypto-library.md)
 (`System.Security.Cryptography`, no BouncyCastle).
 
 > **Scope:** Deliberately only the **byte level** of the RSA signature plus the order hash
@@ -84,7 +84,7 @@ use exactly the same bytes (same rationale as the canonical modulus/exponent in 
 
 The procedure (SHA-256 order hash + RSA signature) is identical across H003/H004/H005; only the
 **permitted versions** differ (A006 from EBICS 2.5/H004 on, see #117 and
-[ADR-0029](../adr/0029-interop-fixes-reale-clients.md)) and reside centrally in
+[ADR-0029](../adr/0029-interop-fixes-real-clients.md)) and reside centrally in
 [`KeyVersions`](key-representation.md). A004 (legacy) is covered by the same PKCS1-v1.5 mapping,
 but is not the target of this issue.
 
@@ -106,4 +106,4 @@ but is not the target of this issue.
 ## Related
 
 - [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)

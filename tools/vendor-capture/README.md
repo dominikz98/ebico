@@ -28,4 +28,4 @@ npm run capture    # or: node capture.js
 > (fresh throwaway keys, new nonces/timestamps) — only re-commit them deliberately.
 
 Background on how this fits in: [`docs/development/conformance-real-clients.md`](../../docs/development/conformance-real-clients.md)
-and [`docs/adr/0026-konformitaet-gegen-reale-clients.md`](../../docs/adr/0026-konformitaet-gegen-reale-clients.md).
+and [`docs/adr/0026-conformance-against-real-clients.md`](../../docs/adr/0026-conformance-against-real-clients.md).

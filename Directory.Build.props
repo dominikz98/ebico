@@ -33,7 +33,7 @@
   <!--
     NuGet packaging of the published libraries (issue #50). Only EBICO.Core +
     EBICO.Connector are packable; the apps (Server/Suite) and the tests stay unpackable.
-    Underlying decision: docs/adr/0024-nuget-packaging-und-versionierung.md.
+    Underlying decision: docs/adr/0024-nuget-packaging-and-versioning.md.
   -->
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EBICO.Core' or '$(MSBuildProjectName)' == 'EBICO.Connector'">
     <IsPackable>true</IsPackable>

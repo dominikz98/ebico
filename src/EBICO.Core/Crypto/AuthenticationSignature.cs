@@ -11,7 +11,7 @@ namespace EBICO.Core.Crypto;
 /// request — the XML Digital Signature (<c>ds:Signature</c>) that protects every element carrying
 /// the <c>authenticate="true"</c> attribute. Signature key version <b>X002</b> (RSASSA-PKCS1-v1_5
 /// over SHA-256, inclusive Canonical XML 1.0). Stateless BCL wrappers
-/// (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>) that build on the issue #18 key
+/// (<see href="../adr/0008-crypto-library.md">ADR-0008</see>) that build on the issue #18 key
 /// layer (<see cref="RsaKeyMaterial"/>, <see cref="KeyVersions"/>) and the issue #15 canonicalizer
 /// (<see cref="XmlCanonicalizer"/>).
 /// </summary>

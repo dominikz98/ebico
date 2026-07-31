@@ -5,11 +5,11 @@
 
 ## Context
 
-The Suite's transaction inspector (M7, [#54](../suite/transaktions-inspektor.md)) is to
+The Suite's transaction inspector (M7, [#54](../suite/transaction-inspector.md)) is to
 display the **raw XML** of request and response per phase for each transaction. This XML
 arises only **transiently** during the pipeline run: the request lives in
 `EbicsRequestContext.RequestXml`, the response in the serialised response bytes; both are
-discarded afterwards. Neither the [`IEventLog`](0015-ereignis-protokollspeicher.md)
+discarded afterwards. Neither the [`IEventLog`](0015-event-log-store.md)
 (which carries structured events, not envelopes) nor the transaction stores (which carry
 decrypted order data, not XML) hold the raw message. A store for the verbatim envelopes
 is missing.
@@ -34,7 +34,7 @@ and (c) how the store is bounded.
    **not** captured — they still appear in the event log, just without raw XML.
 3. **In-memory default (`InMemoryMessageCaptureStore`), pluggable via `TryAddSingleton`**
    — exactly the store path from
-   [ADR-0011](0011-server-stammdatenverwaltung.md)/[ADR-0015](0015-ereignis-protokollspeicher.md).
+   [ADR-0011](0011-server-master-data-management.md)/[ADR-0015](0015-event-log-store.md).
    Memory bounding on two axes: a **ring buffer** across all captures
    (`EbicoServerOptions.MaxMessageCaptureEntries`, default 200) and **truncation** per XML
    document (`EbicoServerOptions.MaxCapturedMessageBytes`, default 256 KiB). The async

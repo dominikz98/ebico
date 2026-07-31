@@ -12,7 +12,7 @@ collide here:
 1. **CI runs offline** and cannot execute a Java/Node/Python foreign client.
 2. The official EBICS **XSDs and sample XML are proprietary** (EBICS SC) and are not
    committed (`.gitignore`: `schemas/**/*.xsd`, `tests/**/Fixtures/Xml/**/*.xml`, see
-   [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)).
+   [ADR-0003](0003-handling-proprietary-schemas.md)).
 
 A pure "skip-if-missing" solution (as with the proprietary samples) would never run in CI
 and would never deliver the core of #59 — the proof against *real* foreign bytes.
@@ -56,7 +56,7 @@ follow-up work, in
   server rather than a client error). This was captured as a characterisation test and named
   as follow-up work (type the binding concretely; and map non-deserialisable client XML to a
   client error code) — **done in
-  [ADR-0029](0029-interop-fixes-reale-clients.md) / issue #117**, together with two further
+  [ADR-0029](0029-interop-fixes-real-clients.md) / issue #117**, together with two further
   defects that only became visible behind it (`A006` on H004, modulus with an ASN.1 sign
   byte).
 - The corpus is **extensible**: further clients/versions are added via a directory +
@@ -77,7 +77,7 @@ follow-up work, in
   for #59 — affects generated bindings and EBICO's own wire format (broad blast radius) and
   is not verifiable without the official XSDs. Belongs documented as its own,
   spec-supported follow-up work. → Caught up in
-  **[ADR-0029](0029-interop-fixes-reale-clients.md)** (issue #117): binding concrete,
+  **[ADR-0029](0029-interop-fixes-real-clients.md)** (issue #117): binding concrete,
   misclassification fixed, `A006` on H004, modulus normalisation — the vendor replay thereby
   turned from a characterisation into a conformance test.
 - **Only reshape EBICO's own XML (no vendor captures):** rejected — proves only parser

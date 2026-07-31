@@ -4,7 +4,7 @@ The central abstraction in `EBICO.Core`, over which server and connector work
 version-dependently without duplicating the logic three times. It is the
 pivot between the `EbicsVersion` enum and the generated
 [XSD bindings](xsd-bindings.md). Issue **#14** (Milestone M1),
-design: [ADR-0004](../adr/0004-multi-version-strategie.md).
+design: [ADR-0004](../adr/0004-multi-version-strategy.md).
 
 ## Building blocks
 
@@ -131,7 +131,7 @@ var info = EbicsVersionDetector.Detect(rawRequestXml);
 
 ## Related
 
-- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategie.md)
+- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategy.md)
 - [XSD bindings](xsd-bindings.md) — the generated classes on which this builds
 - [Connector architecture](../connector/architecture.md) — the app-side
   `IEbicsRequest<TResult>` abstraction (a different layer than `IEbicsRequestEnvelope`)

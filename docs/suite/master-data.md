@@ -8,7 +8,7 @@
 
 ## Purpose
 
-The `/stammdaten` page manages the emulator's master data: **banks** (credit institutions /
+The `/master-data` page manages the emulator's master data: **banks** (credit institutions /
 EBICS hosts), **partners** (customers) and **subscribers**. It covers creating, editing and
 (cascading) deleting, makes the **subscriber state** visible/changeable and allows
 editing a subscriber's **authorisations**. It replaces the read-only overview of the
@@ -40,7 +40,7 @@ await EmulatorStateSeeder.SeedAsync(app.Services);   // sample master data into 
 
 The store is in-memory (state is lost on restart). Key material is not yet part
 of the server store (a later M3/M4 issue), so `GetKeysAsync` still returns the
-deterministic sample keys for the key view ([#55](schluessel-ansicht.md)).
+deterministic sample keys for the key view ([#55](key-view.md)).
 
 ## Render mode
 
@@ -55,7 +55,7 @@ The three islands are **independent components each with their own state copy**,
 the same `IMasterDataManager` — and the relationships cascade. Without notification, therefore, every
 mutation in one island silently invalidates the other two (a new bank is missing from the selection fields,
 cascade-deleted rows remain as dead entries). For this there is
-**`IMasterDataChangeNotifier`** ([ADR-0031](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)):
+**`IMasterDataChangeNotifier`** ([ADR-0031](../adr/0031-master-data-island-change-notification.md)):
 
 ```csharp
 // Program.cs — singleton, like the stores behind it
@@ -74,7 +74,7 @@ Rules for every component that displays master data:
    detail area without a record closes itself. Reloading alone only repairs the tables.
 
 > **Whoever forgets the subscription goes stale silently again** — there is no guard for this other than the tests in
-> `StammdatenIslandSyncTests`.
+> `MasterDataIslandSyncTests`.
 
 Because the notifier is a singleton, **multiple browser sessions** also converge: the state
 behind it is shared process-wide, and so is the notification.
@@ -158,12 +158,12 @@ the **real** `MasterDataManager` via an `InMemoryEbicsStateStore`):
   authorisation, delete.
 - `MasterDataChangeNotifierTests` — the broadcast contract: every subscriber is reached, `Dispose`
   really unsubscribes (and is idempotent), a failing subscriber does not stop the others.
-- `StammdatenIslandSyncTests` — the #126 regression. Multiple components in **one**
+- `MasterDataIslandSyncTests` — the #126 regression. Multiple components in **one**
   `BunitContext` share the DI container and thus the store and notifier, which reproduces the island layout of the page:
   a new bank appears in both selection fields (even in an *already open*
   form), a deleted bank disappears from them, cascades clear the sibling tables, a
   detail area over a cascaded subscriber closes itself, and the tables are sorted.
-- `StammdatenCreateCollisionTests` — creating onto an occupied identity is rejected and leaves
+- `MasterDataCreateCollisionTests` — creating onto an occupied identity is rejected and leaves
   status/authorisations untouched; editing still saves; the same `PartnerID`/`UserID` at
   a different bank/different partner remains allowed.
 
@@ -173,4 +173,4 @@ the **real** `MasterDataManager` via an `InMemoryEbicsStateStore`):
 - [Server: master-data management (#30)](../server/master-data.md) — the manager/store layer used
 - [Domain model](../protocol/domain-model.md) — aggregates, IDs, authorisations, states
 - [ADR-0009 — Blazor render mode (in-process state)](../adr/0009-blazor-render-mode.md)
-- [ADR-0031 — Change notification between the master-data islands](../adr/0031-stammdaten-inseln-aenderungsbenachrichtigung.md)
+- [ADR-0031 — Change notification between the master-data islands](../adr/0031-master-data-island-change-notification.md)

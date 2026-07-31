@@ -23,7 +23,7 @@ internal enum VendorDirection
 /// committed and this path is <b>not</b> ignored — the replay tests run permanently in CI. The loader
 /// still degrades gracefully (returns an empty list) when no captures are present, so a fresh checkout or
 /// a partial corpus keeps the suite green. See <c>docs/development/conformance-real-clients.md</c> and
-/// <c>docs/adr/0026-konformitaet-gegen-reale-clients.md</c>.
+/// <c>docs/adr/0026-conformance-against-real-clients.md</c>.
 /// </para>
 /// </summary>
 internal static class VendorCaptureCorpus

@@ -5,7 +5,7 @@ the order data is encrypted symmetrically with a one-time **transaction key** (A
 and this transaction key is encrypted asymmetrically with the recipient's public
 encryption key (`E`) via **RSAES-OAEP over SHA-256**.
 Builds on the key layer from [#18](key-representation.md). Issue **#21** (Milestone M2),
-crypto library: [ADR-0008](../adr/0008-krypto-bibliothek.md)
+crypto library: [ADR-0008](../adr/0008-crypto-library.md)
 (`System.Security.Cryptography`, no BouncyCastle).
 
 > **Scope:** Deliberately only the **byte level** of the hybrid encryption — the two
@@ -126,4 +126,4 @@ rejected by the `ResolveEncryptionPadding` place (`InvalidOperationException`).
 
 - [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
 - [Bank-technical signature A005/A006](bank-signature.md) — the sibling crypto operation, provides the integrity (#19)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)

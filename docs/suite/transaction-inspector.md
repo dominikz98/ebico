@@ -9,7 +9,7 @@
 
 ## Purpose
 
-The `/transaktionen` page shows the emulator's upload/download transactions — ongoing as well as
+The `/transactions` page shows the emulator's upload/download transactions — ongoing as well as
 completed — and per transaction the **raw XML** (request/response per phase), the **decrypted
 OrderData** and the **return codes**. Below it lies the **global log view**: the unfiltered
 event stream across **all** customers (including operator-internal events), with live filters and
@@ -26,7 +26,7 @@ read-model provider — the in-process binding envisaged by [ADR-0009](../adr/00
 Since no live traffic arises, sample transactions are seeded.
 
 ```csharp
-// Program.cs — Transaktions-/Ereignis-Zustand in-process (ADR-0009)
+// Program.cs — transaction/event state in-process (ADR-0009)
 builder.Services.AddOptions<EbicoServerOptions>();
 builder.Services.AddSingleton(TimeProvider.System);              // required by the event log / capture store
 builder.Services.AddSingleton<IEventLog, InMemoryEventLog>();
@@ -36,7 +36,7 @@ builder.Services.AddSingleton<IMessageCaptureStore, InMemoryMessageCaptureStore>
 builder.Services.AddScoped<ITransactionInspectorProvider, TransactionInspectorProvider>();
 …
 var app = builder.Build();
-await TransactionInspectorSeeder.SeedAsync(app.Services);        // Beispiel-Transaktionen/-Ereignisse/-Captures
+await TransactionInspectorSeeder.SeedAsync(app.Services);        // sample transactions/events/captures
 ```
 
 | Type | Role |
@@ -49,7 +49,7 @@ await TransactionInspectorSeeder.SeedAsync(app.Services);        // Beispiel-Tra
 
 > **Limit:** In this standalone form the inspector shows seeded data. Real,
 > cross-process live inspection requires a persistent, shared store
-> (SQLite or similar, [ADR-0015](../adr/0015-ereignis-protokollspeicher.md)) — a follow-up topic.
+> (SQLite or similar, [ADR-0015](../adr/0015-event-log-store.md)) — a follow-up topic.
 
 ## Render mode
 
@@ -125,5 +125,5 @@ get stuck on an empty result.
 - [Server: event/audit log (#69)](../server/event-log.md) — the shared event source
 - [Server: host & pipeline](../server/host.md) — the capture write point in the `EbicsRequestPipeline`
 - [ADR-0009 — Blazor render mode (in-process state)](../adr/0009-blazor-render-mode.md)
-- [ADR-0015 — Event/audit log](../adr/0015-ereignis-protokollspeicher.md)
+- [ADR-0015 — Event/audit log](../adr/0015-event-log-store.md)
 - [ADR-0021 — Message-capture store](../adr/0021-message-capture-store.md)

@@ -18,7 +18,7 @@ public class NavMenuTests
         var cut = ctx.Render<NavMenu>();
 
         var hrefs = cut.FindAll("a.nav-link").Select(a => a.GetAttribute("href")).ToArray();
-        hrefs.Should().BeEquivalentTo(["", "stammdaten", "transaktionen", "schluessel"]);
+        hrefs.Should().BeEquivalentTo(["", "master-data", "transactions", "keys"]);
     }
 
     [Fact]

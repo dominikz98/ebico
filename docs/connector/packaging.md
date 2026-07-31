@@ -7,7 +7,7 @@
 > [client core](client-core.md) (#46) and the [Connector architecture](architecture.md). The actual
 > **publish/push** to a feed is deliberately deferred to **M9 / #62**; #50 lays the foundation and
 > validates the packability in the CI. Fundamental decision:
-> [ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md).
+> [ADR-0024](../adr/0024-nuget-packaging-and-versioning.md).
 
 ## Purpose
 
@@ -54,7 +54,7 @@ as `lib/net10.0/<Assembly>.xml` in the package.
 ## Versioning (CalVer)
 
 The version follows the scheme **`{YEAR}.{MONTH}.{BUILD}`** (calendar versioning, deliberately
-**instead of** SemVer — see [ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)):
+**instead of** SemVer — see [ADR-0024](../adr/0024-nuget-packaging-and-versioning.md)):
 
 ```
 VersionPrefix = <UTC-Jahr>.<UTC-Monat>.$(EbicoBuildNumber)
@@ -126,7 +126,7 @@ registry push** (regression protection, analogous to the `container-build` job).
 
 The authenticated **push to nuget.org** has happened since **M9 / #62** in the tag-triggered
 [release pipeline](../development/release.md) (`.github/workflows/release.yml`,
-[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)): a tag `vJAHR.MONAT.N` derives the
+[ADR-0027](../adr/0027-nuget-publish-and-release-pipeline.md)): a tag `vJAHR.MONAT.N` derives the
 version, packs Core + Connector with that version and pushes them (incl. `.snupkg` symbols) to
 nuget.org (secret `NUGET_API_KEY`, `--skip-duplicate`); additionally a GitHub release with
 auto-generated notes is created. A mere merge publishes nothing — the push only fires on the tag.
@@ -143,8 +143,8 @@ auto-generated notes is created. A mere merge publishes nothing — the push onl
 - [Onboarding](onboarding.md) · [Upload](upload.md) · [Download](download.md) — the flows used in the sample
 - [CI pipeline](../development/ci.md) — the `pack` job (build-only)
 - [Release runbook](../development/release.md) — set tag → nuget.org/GHCR push (#62)
-- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-und-versionierung.md)
-- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
+- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-and-versioning.md)
+- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-and-release-pipeline.md)
 - [License & repo policy](../legal/ebics-licensing.md) — proprietary EBICS schemas (not part of the packages)
 
 ---

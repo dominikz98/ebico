@@ -24,8 +24,8 @@ plus receipt on download). If a client aborts in between — lost connection, no
 state is left behind on the server: on upload the segment buffer and the transaction key, on
 download the already **dequeued** order data "in progress". Until #35 this state was **never**
 cleaned up (the upload engine never called `Remove`, the download engine only on receipt) — the in-memory
-store grew unbounded (see [ADR-0013](../adr/0013-upload-transaktions-engine.md)/
-[ADR-0014](../adr/0014-download-transaktions-engine.md)).
+store grew unbounded (see [ADR-0013](../adr/0013-upload-transaction-engine.md)/
+[ADR-0014](../adr/0014-download-transaction-engine.md)).
 
 #35 gives every transaction a **limited lifetime** and evicts expired transactions.
 The same retention is at the same time the **idempotency/replay window**: as long as a (even completed)
@@ -159,4 +159,4 @@ transactions within the retention window. Deliberately accepted for the emulator
 - [Download transaction (initialisation + transfer + receipt)](download-transaction.md) — the three-phase download incl. consumption semantics
 - [Hostable server skeleton](host.md) — pipeline, `EbicoServerOptions`, DI
 - [EBICS return code catalog](../protocol/return-codes.md) — the transaction/segment codes used
-- [ADR-0013](../adr/0013-upload-transaktions-engine.md) / [ADR-0014](../adr/0014-download-transaktions-engine.md) — the engines that #35 extends with eviction/TTL
+- [ADR-0013](../adr/0013-upload-transaction-engine.md) / [ADR-0014](../adr/0014-download-transaction-engine.md) — the engines that #35 extends with eviction/TTL

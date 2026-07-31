@@ -128,7 +128,7 @@ The catalogue and the registry (`EbicsReturnCodes`) have, since **Issue #36 (M4)
 `EBICO.Core.ReturnCodes` and are used by server **and** connector; the
 exception→return code mapping (`IEbicsErrorMapper`/`EbicsErrorMapper`) stays server-side.
 Details, complete code tables and the error behaviour:
-[Return code catalogue](../protocol/return-codes.md) and [ADR-0012](../adr/0012-returncode-katalog.md).
+[Return code catalogue](../protocol/return-codes.md) and [ADR-0012](../adr/0012-return-code-catalogue.md).
 
 ### ⚠️ Spec caveats (to be verified against the official EBICS annexes)
 
@@ -179,7 +179,7 @@ return code. Only transaction-related messages are captured (key management with
 stays out); the in-memory default bounds memory via a ring buffer
 (`EbicoServerOptions.MaxMessageCaptureEntries`) and truncation per document
 (`MaxCapturedMessageBytes`). It is read exclusively by the
-[Suite transaction inspector](../suite/transaktions-inspektor.md) ([ADR-0021](../adr/0021-message-capture-store.md)).
+[Suite transaction inspector](../suite/transaction-inspector.md) ([ADR-0021](../adr/0021-message-capture-store.md)).
 
 ## Tests
 
@@ -210,4 +210,4 @@ For the integration tests `Microsoft.AspNetCore.Mvc.Testing` was added and a
 - [Domain model](../protocol/domain-model.md) — the aggregates behind the state store
 - [Client core & configuration](../connector/client-core.md) — model for DI/options/store and provisional `EbicsResult`
 - [UI skeleton & navigation](../suite/ui-shell.md) — the Suite counterpart (`IEmulatorStateProvider`)
-- [ADR-0004 (multi-version)](../adr/0004-multi-version-strategie.md), [ADR-0009 (Suite render mode)](../adr/0009-blazor-render-mode.md)
+- [ADR-0004 (multi-version)](../adr/0004-multi-version-strategy.md), [ADR-0009 (Suite render mode)](../adr/0009-blazor-render-mode.md)

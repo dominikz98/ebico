@@ -1,7 +1,7 @@
 # Release runbook
 
 How a release of EBICO is cut, and published to nuget.org & GHCR. Implementation of **issue #62** (Milestone M9 — Packaging &
-Docs). Foundational decision: [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md). The
+Docs). Foundational decision: [ADR-0027](../adr/0027-nuget-publish-and-release-pipeline.md). The
 workflow is [`.github/workflows/release.yml`](../../.github/workflows/release.yml).
 
 ## In brief
@@ -27,7 +27,7 @@ The tag push triggers `release.yml`; a normal `main` push or PR triggers **no** 
 
 ## Version scheme
 
-The version follows **CalVer `{YEAR}.{MONTH}.{BUILD}`** ([ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md)).
+The version follows **CalVer `{YEAR}.{MONTH}.{BUILD}`** ([ADR-0024](../adr/0024-nuget-packaging-and-versioning.md)).
 At release the **tag is the source of truth**: `v2026.7.42` → package/image version `2026.7.42`
 (the `v` prefix is removed). The workflow aborts if the tag does not match the pattern
 `v<number>.<number>.<number>`. NuGet normalizes leading zeros (`v2026.07.1` → `2026.7.1`).
@@ -67,5 +67,5 @@ At release the **tag is the source of truth**: `v2026.7.42` → package/image ve
 - [CI pipeline](ci.md) — build/test/pack (build-only) per push/PR
 - [Packaging & examples (NuGet)](../connector/packaging.md) — package metadata, symbols, CalVer
 - [Container image](../deployment/container.md) — image build & GHCR push
-- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-und-release-pipeline.md)
-- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-und-versionierung.md)
+- [ADR-0027 — NuGet publish & release pipeline](../adr/0027-nuget-publish-and-release-pipeline.md)
+- [ADR-0024 — NuGet packaging & versioning](../adr/0024-nuget-packaging-and-versioning.md)

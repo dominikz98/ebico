@@ -46,14 +46,14 @@ as the artifact `nuget` (issue #50). The job validates the real **packability**
 package README would break it, for example, with `NU5039`. The CalVer BUILD component comes from
 `github.run_number` (`-p:EbicoBuildNumber=…`), see
 [packaging.md](../connector/packaging.md) and
-[ADR-0024](../adr/0024-nuget-packaging-und-versionierung.md). **Build-only:** no
+[ADR-0024](../adr/0024-nuget-packaging-and-versioning.md). **Build-only:** no
 registry push — that belongs to the publish pipeline (M9 / #62), analogous to the
 `container-build` job.
 
 ## Release workflow (`release.yml`)
 
 The push/publish runs **separately** from CI in `.github/workflows/release.yml` (M9 / #62,
-[ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). Its trigger is **not** `main`/PR, but
+[ADR-0027](../adr/0027-nuget-publish-and-release-pipeline.md)). Its trigger is **not** `main`/PR, but
 pushing a **tag `v*.*.*`** — the CI jobs above stay unaffected by it. The `release` job:
 
 1. **Derive the version from the tag** and check it against the CalVer pattern (`v2026.7.42` → `2026.7.42`).
@@ -139,5 +139,5 @@ machines with a different SDK patch (NU1004). Details:
 
 > **Done (M9 / #62):** The authenticated **publish/push** has been implemented since #62 in the
 > [release workflow](#release-workflow-releaseyml) (nuget.org + GHCR, tag-driven,
-> [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)). The build-only `pack` job in `ci.yml`
+> [ADR-0027](../adr/0027-nuget-publish-and-release-pipeline.md)). The build-only `pack` job in `ci.yml`
 > remains in place as regression protection.

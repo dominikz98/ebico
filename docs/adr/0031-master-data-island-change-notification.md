@@ -1,4 +1,4 @@
-# ADR-0031 — Change notification between the Suite's master-data islands
+# 0031 — Change notification between the Suite's master-data islands
 
 - **Status:** accepted
 - **Date:** 2026-07-27
@@ -6,7 +6,7 @@
 
 ## Context
 
-The `/stammdaten` page renders `BankManager`, `PartnerManager` and `SubscriberManager` as
+The `/master-data` page renders `BankManager`, `PartnerManager` and `SubscriberManager` as
 **three separate interactive islands** (ADR-0009, "interactivity per component"). Each
 component loads its state once in `OnInitializedAsync` and, after a mutation, updates only
 itself.
@@ -53,7 +53,7 @@ circuit. A subscriber must therefore switch back to its own renderer via
   are collected and reported as an `AggregateException` instead of being silently swallowed.
 - Every new component that displays master data must subscribe to the notifier — otherwise it
   goes stale silently again. That is the flip side of the island architecture and is recorded
-  in [stammdaten.md](../suite/stammdaten.md) as well as in the `ebics-suite` skill.
+  in [master-data.md](../suite/master-data.md) as well as in the `ebics-suite` skill.
 - The notifier carries **no** payload ("what changed"). With three small in-memory lists a
   full reload is cheaper than a differentiated event model; a Blazor `StateHasChanged`
   re-renders the island completely anyway.
@@ -76,6 +76,6 @@ circuit. A subscriber must therefore switch back to its own renderer via
 ## Related
 
 - [ADR-0009 — Blazor render mode (in-process state)](0009-blazor-render-mode.md)
-- [Suite: master-data management](../suite/stammdaten.md)
+- [Suite: master-data management](../suite/master-data.md)
 - [Server: master-data management (#30)](../server/master-data.md) — cascades and upsert
   semantics

@@ -26,7 +26,7 @@ Connector→Core, Server→Core). The mapping, however, must know server-side ex
   connector):
   - `EbicsReturnCode` as a `public readonly record struct` (`Code`, `SymbolicName`,
     `Kind`) with static fields per code and `const OkCode` — pattern like
-    [ADR-0007](0007-domaenen-value-objects-record-struct.md);
+    [ADR-0007](0007-domain-value-objects-record-struct.md);
   - `EbicsReturnCodeKind` (enum `Technical`/`Business`) controls header vs. body
     placement;
   - `EbicsReturnCodes` as a registry (`All`/`Get`/`TryFromCode`/`IsSuccess`) —

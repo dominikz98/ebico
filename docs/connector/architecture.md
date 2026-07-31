@@ -32,7 +32,7 @@ direction and payload handling. A generic handler per direction therefore
 covers the bulk of it; special cases (HPB, INI/HIA) get their own handlers.
 This is the same pattern that made MediatR popular — but here deliberately
 without that library (see [Design decisions](#design-decisions) and
-[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)).
+[ADR-0005](../adr/0005-connector-dispatch-without-mediatr.md)).
 
 ## Layer model
 
@@ -217,7 +217,7 @@ dependency list is a genuine selling point for a public connector.
 
 *Trade-off:* MediatR would save dispatch boilerplate but brings coupling to the
 library and less control over the pipeline. Detailed rationale:
-[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md).
+[ADR-0005](../adr/0005-connector-dispatch-without-mediatr.md).
 
 ### `EbicsResult<T>` instead of exceptions for business return codes
 
@@ -296,7 +296,7 @@ affects envelope namespaces, header structure and partly crypto defaults. The
 selection and detection of the version relies on the Core building blocks
 (`EbicsVersion` registry, `EbicsVersionDetector`, envelope bindings). Background
 and strategy: [Version dispatch](../protocol/version-dispatch.md) and
-[ADR-0004 (multi-version strategy)](../adr/0004-multi-version-strategie.md).
+[ADR-0004 (multi-version strategy)](../adr/0004-multi-version-strategy.md).
 
 ## DI registration
 
@@ -366,8 +366,8 @@ blocks — so the maturity is transparent and no false "done" impression arises.
 
 - [Client core & configuration](client-core.md) — #46: abstractions, options/DI, dispatch, transport, key store
 - [Onboarding flows INI / HIA / HPB](onboarding.md) — #47: key generation, INI/HIA/HPB handlers, version dispatch, INI letter (text/PDF)
-- [ADR-0005 — Connector dispatch without MediatR](../adr/0005-connector-dispatch-ohne-mediatr.md)
-- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategie.md)
+- [ADR-0005 — Connector dispatch without MediatR](../adr/0005-connector-dispatch-without-mediatr.md)
+- [ADR-0004 — Multi-version strategy](../adr/0004-multi-version-strategy.md)
 - [Version dispatch](../protocol/version-dispatch.md)
 - [XML serialization & C14N](../protocol/serialization-c14n.md)
 - [Encryption E002](../protocol/encryption-e002.md)

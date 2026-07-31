@@ -16,7 +16,7 @@ matching page under `docs/suite/`.
 
 ## Structure
 
-- Components: `src/EBICO.Suite/Components/` (`Pages/`, `Stammdaten/`, `Keys/`, layout).
+- Components: `src/EBICO.Suite/Components/` (`Pages/`, `MasterData/`, `Transactions/`, `Keys/`, layout).
 - Services/adapters: `src/EBICO.Suite/Services/` (`IEmulatorStateProvider` + `EmulatorStateProvider` /
   `SampleEmulatorStateProvider`, `ITransactionInspectorProvider` + `TransactionInspectorProvider`,
   seeders for sample data).
@@ -24,14 +24,14 @@ matching page under `docs/suite/`.
 
 ## Connection to the emulator state (in-process)
 
-- **Master data** (`docs/suite/stammdaten.md`): CRUD through `IMasterDataManager`
+- **Master data** (`docs/suite/master-data.md`): CRUD through `IMasterDataManager`
   (`src/EBICO.Server/State/IMasterDataManager.cs`) — banks/partners/subscribers including state &
   permissions, referential integrity on the server side. Sample data via seeders.
-- **Transaction inspector** (`docs/suite/transaktions-inspektor.md`): two projections —
+- **Transaction inspector** (`docs/suite/transaction-inspector.md`): two projections —
   raw XML per phase from `IMessageCaptureStore` (ADR-0021) and the global protocol view from
   `IEventLog` (all customers, live filters customer/period/type/severity). In-process (ADR-0015:
   cross-process live inspection remains a follow-up topic).
-- **Key/certificate view** (`docs/suite/schluessel-ansicht.md`): display fingerprints,
+- **Key/certificate view** (`docs/suite/key-view.md`): display fingerprints,
   INI letter comparison (`PublicKeyFingerprint.Verify`), test CA/key tools; PDF via
   QuestPDF (ADR-0010).
 
@@ -59,7 +59,7 @@ applies to **every** component that displays master data:
    repairs the tables.
 
 > No guard enforces the subscription — whoever forgets it goes stale silently again.
-> `StammdatenIslandSyncTests` is the safety net and renders several components in **one**
+> `MasterDataIslandSyncTests` is the safety net and renders several components in **one**
 > `BunitContext` (shared DI container ⇒ shared store and notifier).
 
 **`Save*` is an upsert, not "create".** Create forms have to check the identity beforehand
@@ -94,6 +94,6 @@ Docs under `docs/suite/` + a link in `docs/index.md`, tests, ADR if applicable. 
 
 - Code: `src/EBICO.Suite/{Components,Services,wwwroot}`, `src/EBICO.Server/State`
   (`IMasterDataManager`, `IMessageCaptureStore`, `IEventLog`).
-- Docs: `docs/suite/ui-shell.md`, `docs/suite/stammdaten.md`, `docs/suite/transaktions-inspektor.md`,
-  `docs/suite/schluessel-ansicht.md`. ADR: 0009 (render mode/in-process), 0010 (QuestPDF),
+- Docs: `docs/suite/ui-shell.md`, `docs/suite/master-data.md`, `docs/suite/transaction-inspector.md`,
+  `docs/suite/key-view.md`. ADR: 0009 (render mode/in-process), 0010 (QuestPDF),
   0021 (message capture), 0031 (change notification between the islands).

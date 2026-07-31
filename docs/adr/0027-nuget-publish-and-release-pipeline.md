@@ -8,10 +8,10 @@
 M9 (#62) requires a **publish pipeline**: "pack + push in CI (nuget.org / GitHub
 Packages)", "versioning/tags" and "release-notes automation". Starting point after
 #50/#61: the two libraries `EBICO.Core` + `EBICO.Connector` have complete package metadata
-and CalVer versioning ([ADR-0024](0024-nuget-packaging-und-versionierung.md)), and CI has a
+and CalVer versioning ([ADR-0024](0024-nuget-packaging-and-versioning.md)), and CI has a
 **build-only** `pack` job as well as a build-only `container-build` job — both deliberately
 **without** a registry push, which was explicitly deferred to this pipeline
-([ADR-0022](0022-container-image-und-konfiguration.md)).
+([ADR-0022](0022-container-image-and-configuration.md)).
 
 Open and to be decided here: the **publish target** (nuget.org vs. GitHub Packages), the
 **release trigger** and the **version origin** at release (ADR-0024 derives BUILD from

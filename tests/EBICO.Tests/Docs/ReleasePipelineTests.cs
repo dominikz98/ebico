@@ -101,11 +101,11 @@ public class ReleasePipelineTests
     [Fact]
     public void Adr0027_ExistsAndIsListedInTheAdrIndex()
     {
-        ReadRepoFile("docs", "adr", "0027-nuget-publish-und-release-pipeline.md")
+        ReadRepoFile("docs", "adr", "0027-nuget-publish-and-release-pipeline.md")
             .Should().Contain("# 0027 —", "the ADR follows the MADR heading convention");
 
         var adrIndex = ReadRepoFile("docs", "adr", "README.md");
-        adrIndex.Should().Contain("0027-nuget-publish-und-release-pipeline.md", "the ADR must be listed in the index table");
+        adrIndex.Should().Contain("0027-nuget-publish-and-release-pipeline.md", "the ADR must be listed in the index table");
     }
 
     [Fact]

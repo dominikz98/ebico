@@ -14,7 +14,7 @@ additional subscribers.
 Already present: the [upload](../server/upload-transaction.md) and
 [download transaction](../server/download-transaction.md) (#32/#33), the processor
 pattern (`IUploadOrderProcessor`/`IDownloadOrderProcessor`), payment processing with
-`pain.002` storage (#39, [ADR-0017](0017-zahlungsverkehr-order-verarbeitung.md)), the
+`pain.002` storage (#39, [ADR-0017](0017-payment-order-processing.md)), the
 [`IEventLog`](../server/event-log.md) (#69) and — committed — the generated VEU
 bindings (`HVU/HVZ/HVD/HVT/HVE/HVS…`) for all three versions. **Not** present: a
 server-side state for "uploaded but not (fully) signed yet" — the previous processing

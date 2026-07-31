@@ -6,7 +6,7 @@ namespace EBICO.Core.Crypto;
 /// <summary>
 /// Produces self-signed X.509 certificates for EBICS 3.0 (H005) onboarding, where the public keys
 /// are exchanged as certificates (<c>X509Data</c>) rather than raw <c>RSAKeyValue</c>. A BCL-only
-/// wrapper around <see cref="CertificateRequest"/> (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>)
+/// wrapper around <see cref="CertificateRequest"/> (<see href="../adr/0008-crypto-library.md">ADR-0008</see>)
 /// built on the issue #18 key layer (<see cref="RsaKeyMaterial"/>).
 /// </summary>
 /// <remarks>

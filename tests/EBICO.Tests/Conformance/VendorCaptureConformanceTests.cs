@@ -39,7 +39,7 @@ using ServerProgram = EbicoServer::Program;
 /// return the bank's encrypted public keys. It is a single sequential test on purpose — the three
 /// captures are one chain and each step is a precondition of the next. The captures live under
 /// <c>tests/EBICO.Tests/Conformance/Vendor/</c> and are committed (an OSS client's output is not EBICS-SC
-/// property — <c>docs/adr/0026-konformitaet-gegen-reale-clients.md</c>); on a checkout without them the
+/// property — <c>docs/adr/0026-conformance-against-real-clients.md</c>); on a checkout without them the
 /// test skips, keeping the suite green.
 /// </para>
 /// <para>

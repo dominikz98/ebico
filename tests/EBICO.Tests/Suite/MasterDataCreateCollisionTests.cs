@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using Bunit;
 using EBICO.Core;
 using EBICO.Core.Domain;
-using EBICO.Suite.Components.Stammdaten;
+using EBICO.Suite.Components.MasterData;
 
 namespace EBICO.Tests.Suite;
 
@@ -13,7 +13,7 @@ namespace EBICO.Tests.Suite;
 /// its permissions, reported with a green success message. The create path must detect the collision
 /// instead; the edit path must stay unaffected.
 /// </summary>
-public class StammdatenCreateCollisionTests
+public class MasterDataCreateCollisionTests
 {
     private readonly CancellationToken _ct = Xunit.TestContext.Current.CancellationToken;
 

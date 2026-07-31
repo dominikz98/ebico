@@ -112,7 +112,7 @@ From the Terms of Use (state at time of recording):
   developer/CI job pulls them locally via `fetch-schemas.sh`. A
   `.gitignore` entry for `schemas/**/*.xsd` prevents accidental commits.
 - **Generated XSD bindings** (via `XmlSerializer` codegen) are **committed**
-  (decision Option B, [../adr/0006-generierte-xsd-bindings-committen.md](../adr/0006-generierte-xsd-bindings-committen.md));
+  (decision Option B, [../adr/0006-commit-generated-xsd-bindings.md](../adr/0006-commit-generated-xsd-bindings.md));
   the XSDs themselves remain untracked. Approval of the EBICS SC is being pursued in parallel at
   `info@ebics.de`. Details: [xsd-bindings.md](xsd-bindings.md).
 - **Copyright notices** of reproduced content: adopt in full.

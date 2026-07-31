@@ -9,12 +9,12 @@ Issue #41 (Milestone M5) requires the **administrative/technical order types**: 
 (subscriber data), HKD (customer data), HAA (available order types), HPD (bank
 parameters) as well as HAC/PTK (customer protocol, machine- and human-readable
 respectively). These stay **AdminOrderTypes** in H005 (no BTF service, see
-[ADR-0016](0016-btf-framework-und-berechtigung.md)) and are bank→client **downloads**.
+[ADR-0016](0016-btf-framework-and-authorisation.md)) and are bank→client **downloads**.
 
 Already present: the generic [download transaction](../server/download-transaction.md)
 (#33), the generate-on-demand pattern `IDownloadOrderProcessor` (#40,
-[ADR-0018](0018-kontoauszug-download-orders.md)) and the append-only
-[`IEventLog`](../server/event-log.md) (#69, [ADR-0015](0015-ereignis-protokollspeicher.md)),
+[ADR-0018](0018-account-statement-download-orders.md)) and the append-only
+[`IEventLog`](../server/event-log.md) (#69, [ADR-0015](0015-event-log-store.md)),
 which is explicitly intended as the source for the HAC projection. Also present:
 generated bindings `HTD/HKD/HAA/HPDResponseOrderData` per version — but **not** for
 HAC/PTK (proprietary/no schema).

@@ -58,7 +58,7 @@ overrides of the emulator options did not take effect at all.
   sample data and does not talk to the server over HTTP
   ([ADR-0009](0009-blazor-render-mode.md)). The compose shows "both run", not "coupled";
   cross-process live inspection remains follow-up work
-  ([ADR-0015](0015-ereignis-protokollspeicher.md)).
+  ([ADR-0015](0015-event-log-store.md)).
 - **Security stays at emulator level:** unsigned EBICS endpoint, unauthenticated admin
   API. The image must not be exposed unprotected on an untrusted network (documented in
   [container.md](../deployment/container.md)).

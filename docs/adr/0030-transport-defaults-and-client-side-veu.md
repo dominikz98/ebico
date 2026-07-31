@@ -83,7 +83,7 @@ could never become `true` there. Only public components are exposed.
 **8. The Suite marks its data set.** A `DemoDataBanner` in the layout says that the UI works
 on its own in-memory state and is **not** connected to a separately running server. The
 separation has been intended and documented since
-[ADR-0009](0009-blazor-render-mode.md)/[ADR-0015](0015-ereignis-protokollspeicher.md) — it was
+[ADR-0009](0009-blazor-render-mode.md)/[ADR-0015](0015-event-log-store.md) — it was
 just invisible in the UI itself, where seeded transactions looked like live data.
 
 **9. The SDK pin names the lowest usable version.** `global.json` pins `10.0.100` instead of
@@ -100,7 +100,7 @@ inconspicuously green because `actions/setup-dotnet` downloads the pinned versio
   client-side error but goes as an `AdminOrderType` to the bank (which rejects it with `091006`
   if it does not know it). The test `H005_upload_with_an_unmapped_order_type_and_no_btf_throws`
   was flipped accordingly. Defensible, because the BTF catalogue is an explicitly **best-effort**
-  seed ([ADR-0016](0016-btf-framework-und-berechtigung.md)) and thus not a reliable "does this
+  seed ([ADR-0016](0016-btf-framework-and-authorisation.md)) and thus not a reliable "does this
   exist?" oracle. Without an order type *and* without a BTF it still throws.
 - **`EbicsResult.ReturnText` can now be `null`**, where previously it wrongly stood at
   `"EBICS_OK"` — namely for a business code the catalogue does not know. A consistent `null` is
@@ -135,18 +135,18 @@ inconspicuously green because `actions/setup-dotnet` downloads the pinned versio
   the *reading* of the fingerprints. An import would need PEM parsing and a decision about private
   components; in-process `IServerBankKeyStore.SetAsync` stays the way.
 - **Remove the SDK pin entirely:** rejected —
-  [ADR-0001](0001-solution-layout-und-paketverwaltung.md) explicitly rests reproducibility without
+  [ADR-0001](0001-solution-layout-and-package-management.md) explicitly rests reproducibility without
   lock files on the pin.
 
 ## Related decisions
 
-- [ADR-0029 — Interop fixes for real clients](0029-interop-fixes-reale-clients.md) — the same
+- [ADR-0029 — Interop fixes for real clients](0029-interop-fixes-real-clients.md) — the same
   mechanism: a test against something real finds what self-consistency tests hide by design.
 - [ADR-0020 — VEU orders](0020-veu-orders.md) — the server-side implementation that is opened up
   client-side here.
-- [ADR-0016 — BTF framework & authorisation](0016-btf-framework-und-berechtigung.md) — why the BTF
+- [ADR-0016 — BTF framework & authorisation](0016-btf-framework-and-authorisation.md) — why the BTF
   catalogue is not a completeness oracle.
-- [ADR-0012 — Return-code catalogue](0012-returncode-katalog.md) — the header/body placement whose
+- [ADR-0012 — Return-code catalogue](0012-return-code-catalogue.md) — the header/body placement whose
   text side is followed up here.
-- [ADR-0015 — Event/audit log store](0015-ereignis-protokollspeicher.md) — the documented separation
+- [ADR-0015 — Event/audit log store](0015-event-log-store.md) — the documented separation
   of Suite and server state that the banner makes visible.

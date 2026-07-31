@@ -1,18 +1,18 @@
 using AwesomeAssertions;
 using Bunit;
 using EBICO.Core.Domain;
-using EBICO.Suite.Components.Stammdaten;
+using EBICO.Suite.Components.MasterData;
 
 namespace EBICO.Tests.Suite;
 
 /// <summary>
-/// Regression tests for issue #126: the Stammdaten page hosts BankManager/PartnerManager/
+/// Regression tests for issue #126: the master-data page hosts BankManager/PartnerManager/
 /// SubscriberManager as three <em>separate</em> interactive islands. A mutation in one has to reach the
 /// other two — otherwise a new bank is missing from their dropdowns and cascade-deleted rows linger
 /// until a full page reload. Rendering several components in one <see cref="BunitContext"/> reproduces
 /// that setup: they share the DI container, hence the same store and the same change notifier.
 /// </summary>
-public class StammdatenIslandSyncTests
+public class MasterDataIslandSyncTests
 {
     private readonly CancellationToken _ct = Xunit.TestContext.Current.CancellationToken;
 

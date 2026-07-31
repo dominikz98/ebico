@@ -1,7 +1,7 @@
 using AwesomeAssertions;
 using Bunit;
 using EBICO.Core.Domain;
-using EBICO.Suite.Components.Stammdaten;
+using EBICO.Suite.Components.MasterData;
 
 namespace EBICO.Tests.Suite;
 

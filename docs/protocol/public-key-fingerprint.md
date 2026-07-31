@@ -7,7 +7,7 @@ of a public RSA key. It is needed in three places — in the **INI letter**
 of the request header (the server verifies the hashes of the bank keys known to it that the
 client sends along). Builds on the key layer from [#18](key-representation.md) and uses the
 SHA-256 building block established in [#19](bank-signature.md). Issue **#22** (Milestone M2),
-crypto library: [ADR-0008](../adr/0008-krypto-bibliothek.md)
+crypto library: [ADR-0008](../adr/0008-crypto-library.md)
 (`System.Security.Cryptography`, no BouncyCastle) — SHA-256 comes natively from the BCL.
 
 > **Scope:** Deliberately only the **byte level** — compute the fingerprint (`Compute`), verify it
@@ -145,4 +145,4 @@ samples; the same fixed 2048-bit key as in `BankSignatureTests`/`EncryptionE002T
 - [Key pairs & representation (A/E/X)](key-representation.md) — the underlying key layer (#18)
 - [Bank-technical signature A005/A006](bank-signature.md) — shares the SHA-256 building block (#19)
 - [Encryption E002](encryption-e002.md) — deferred the `EncryptionPubKeyDigest` building block here (#21)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)

@@ -34,13 +34,13 @@ where/how the cross-transaction state is held.
    stay single-shot.
 3. **In-memory transaction store** `IUploadTransactionStore` (default
    `InMemoryUploadTransactionStore`), analogous to the master-data store from
-   [ADR-0011](0011-server-stammdatenverwaltung.md): thread-safe, pluggable via
+   [ADR-0011](0011-server-master-data-management.md): thread-safe, pluggable via
    `TryAddSingleton`, **keyed on `Convert.ToHexString(TransactionID)`** (a `byte[]` is
    unsuitable as a dictionary key).
 4. **Transaction/segment errors as control flow** (returned directly as a return
    code), not as exceptions; only the decode errors (decryption/decompression) run
    via `OrderDataFault` → `EbicsErrorMapper` (`090004`). **No** new return codes were
-   needed — the catalogue from [ADR-0012](0012-returncode-katalog.md) already contains
+   needed — the catalogue from [ADR-0012](0012-return-code-catalogue.md) already contains
    them.
 
 ## Consequences

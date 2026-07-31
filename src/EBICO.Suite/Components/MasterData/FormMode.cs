@@ -1,4 +1,4 @@
-namespace EBICO.Suite.Components.Stammdaten;
+namespace EBICO.Suite.Components.MasterData;
 
 /// <summary>
 /// The editing mode of a master-data management component (issue #53): whether it currently shows
