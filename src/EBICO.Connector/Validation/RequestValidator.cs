@@ -6,7 +6,7 @@ using EBICO.Core.ReturnCodes;
 namespace EBICO.Connector.Validation;
 
 /// <summary>
-/// The client-side send-pipeline stage 1 (<i>Validierung — Berechtigung, BTF</i>): validates a request
+/// The client-side send-pipeline stage 1 (<i>Validation — authorisation, BTF</i>): validates a request
 /// <b>before</b> any key I/O, crypto, serialisation or transport, so a malformed or unauthorised request
 /// fails fast without a server round-trip. It is a pure, static helper (no DI service, mirroring the
 /// server-side BTF/authorisation decision in ADR-0016) invoked at the top of the upload/download executors.
@@ -17,7 +17,7 @@ namespace EBICO.Connector.Validation;
 /// configured version and direction, a catalogued order type is not used in the wrong direction, the
 /// upload payload is non-empty and an explicit segment size is positive; violations are a
 /// programming/configuration error and throw <see cref="EbicsConfigurationException"/>. (2) opt-in
-/// <b>authorisation</b> ("Berechtigung") — when <see cref="EbicsConnection.AllowedOrderTypes"/> is
+/// <b>authorisation</b> — when <see cref="EbicsConnection.AllowedOrderTypes"/> is
 /// non-empty, a request whose effective classical order type is not listed is denied locally with
 /// <see cref="EbicsReturnCode.AuthorisationOrderTypeFailed"/> (<c>090003</c>), exactly as the bank would.
 /// The allow-list is a convenience guard, not the authorisation authority; the bank remains authoritative.

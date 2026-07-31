@@ -81,7 +81,7 @@ public sealed class HvdDownloadRequest : IEbicsRequest<DownloadResult>, IDownloa
 /// <see cref="DownloadRequest.OrderType"/> = <c>"HVT"</c> and <see cref="DownloadRequest.Veu"/> set.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the EBICO emulator answers HVT order-summarily and does not decompose the
+/// <b>⚠️ Spec caveat:</b> the EBICO emulator answers HVT order-summarily and does not decompose the
 /// underlying ISO 20022 message into single transactions (see
 /// <c>docs/server/order-coverage-matrix.md</c>).
 /// </remarks>

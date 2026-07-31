@@ -114,7 +114,7 @@ repo setting must be updated.
 The state can be set or checked via the API:
 
 ```bash
-gh api repos/:owner/:repo/branches/main/protection            # Ist-Zustand
+gh api repos/:owner/:repo/branches/main/protection            # current state
 gh api repos/:owner/:repo/branches/main/protection --method PUT --input protection.json
 ```
 

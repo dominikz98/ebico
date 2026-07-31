@@ -150,7 +150,7 @@ public readonly record struct BusinessTransactionFormat
         service.Scope = Scope;
 
         // The container's SVC/XML/ZIP value lives on an untyped attribute in the generated binding
-        // (see docs/server/btf-framework.md — Spec-Vorbehalt); only its presence is projected here.
+        // (see docs/server/btf-framework.md — Spec caveat); only its presence is projected here.
         if (Container.HasValue)
         {
             service.Container = new ContainerFlagType();

@@ -108,16 +108,27 @@ rule. All of them locate the repository root by walking up to `EBICO.sln` and re
 | `BranchProtectionDocTests` | Required-check list in [ci.md](ci.md) ↔ the job display names in `ci.yml` |
 | `ConformanceMatrixTests` | [Conformance doc](conformance-real-clients.md) ↔ the vendor-capture corpus |
 | `GettingStartedDocTests` | [Getting started](../getting-started.md) ↔ the doc index and root `README.md` |
-| `DocumentationNamingTests` | English file names, ADR index ↔ ADR files on disk, Suite routes ↔ `NavMenu` |
+| `DocumentationNamingTests` | English file names **and prose**, ADR index ↔ ADR files on disk, Suite routes ↔ `NavMenu` |
 
-`DocumentationNamingTests` (#134, epic #128) is the youngest of them and guards what a diff does not
-show: a **name**. It asserts that no tracked file name under `docs/`, `src/`, `tests/` or `.claude/`
-carries a German token (generated XSD bindings excluded, ADR-0006), that the index table in
-`docs/adr/README.md` lists exactly the ADRs present on disk and that every ADR opens with its
-`# NNNN — ` heading, and that the three routable Suite pages declare `/master-data`, `/transactions`
-and `/keys` — the same set `NavMenuTests` asserts on the rendered markup. The CI link checker sees only
-relative links inside `*.md`; a German slug reintroduced in an XML-doc reference, in
-`Directory.Build.props` or in a route would pass it unnoticed.
+`DocumentationNamingTests` (#134/#141, epic #128) is the youngest of them and guards what a diff does
+not show. It asserts that no tracked file name under `docs/`, `src/`, `tests/` or `.claude/` carries a
+German token (generated XSD bindings excluded, ADR-0006), that the index table in `docs/adr/README.md`
+lists exactly the ADRs present on disk and that every ADR opens with its `# NNNN — ` heading, that the
+three routable Suite pages declare `/master-data`, `/transactions` and `/keys` — the same set
+`NavMenuTests` asserts on the rendered markup — and that no `.cs`/`.razor`/`.md` file **contains**
+German prose.
+
+The CI link checker sees only relative links inside `*.md`; a German slug reintroduced in an XML-doc
+reference, in `Directory.Build.props` or in a route passes it unnoticed. The prose check exists for the
+same reason one level down: #141 found a complete German sentence inside an
+`EbicsSegmentation` XML-doc block, which ships in the published NuGet package, and the marker term
+`Spec-Vorbehalt` in 89 places across 57 files. Nothing flagged either.
+
+> Two things to know before extending the word list in that file. It is **narrow on purpose** — `der`
+> collides with DER encoding, and `die`, `man` and `links` are ordinary English words; run a candidate
+> over the repository and read the hit list first. And German **test data** is legitimate (this emulates
+> German banks), so `SyntheticStatementGenerator` and the statement fixtures are allowlisted by file;
+> the singular `Kunde` is left out of the word list for the same reason.
 
 ## Counterpart: fake vs. real
 

@@ -222,7 +222,7 @@ public static class X509CertificateVerifier
         if (extension is null)
         {
             // Strict: EBICS certificates are expected to carry a KeyUsage extension. Gated by the
-            // Spec-Vorbehalt on EBICO.Core.Crypto.EbicsCertificateProfile.
+            // Spec caveat on EBICO.Core.Crypto.EbicsCertificateProfile.
             errors |= CertificateVerificationError.InvalidKeyUsage;
             diagnostics.Add($"Certificate has no KeyUsage extension (expected for {purpose}).");
             return;

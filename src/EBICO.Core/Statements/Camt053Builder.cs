@@ -11,7 +11,7 @@ namespace EBICO.Core.Statements;
 /// entry. Deterministic UTF-8 XML (no BOM), mirroring <see cref="PainStatusReportBuilder"/>.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the message version is fixed to <c>camt.053.001.08</c> (the modern ISO/CGI-MP
+/// <b>⚠️ Spec caveat:</b> the message version is fixed to <c>camt.053.001.08</c> (the modern ISO/CGI-MP
 /// profile; the classic Deutsche-Kreditwirtschaft profile is <c>.02</c> and uses a plain <c>&lt;Sts&gt;BOOK&lt;/Sts&gt;</c>
 /// instead of the structured <c>&lt;Sts&gt;&lt;Cd&gt;BOOK&lt;/Cd&gt;&lt;/Sts&gt;</c> emitted here). Not validated against the proprietary XSD.
 /// </remarks>

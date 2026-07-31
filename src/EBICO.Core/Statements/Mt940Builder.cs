@@ -9,7 +9,7 @@ namespace EBICO.Core.Statements;
 /// <c>:61:</c>/<c>:86:</c> pair per booking and the closing <c>:62F:</c> balance.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the tag grammar (especially the <c>:61:</c> field and the free-text
+/// <b>⚠️ Spec caveat:</b> the tag grammar (especially the <c>:61:</c> field and the free-text
 /// <c>:86:</c> narrative) is a pragmatic, minimal rendering and is not validated against the official
 /// SWIFT MT940 field specification. There is no XSD for MT messages; the exact strings are pinned by tests.
 /// </remarks>

@@ -16,7 +16,7 @@ namespace EBICO.Server.Orders;
 /// The generation itself is logged only as an <see cref="EbicsEventVisibility.Internal"/> event so it is not
 /// double-counted as a customer-visible order acceptance. (The download transaction's own
 /// <c>DownloadStarted</c>/<c>DownloadCompleted</c> lifecycle events stay customer-visible, like any download,
-/// so a protocol fetch is itself visible in later protocols.) See the Spec-Vorbehalte on the two builders.
+/// so a protocol fetch is itself visible in later protocols.) See the Spec caveats on the two builders.
 /// </remarks>
 public sealed class CustomerProtocolDownloadProcessor : IDownloadOrderProcessor
 {

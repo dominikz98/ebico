@@ -17,7 +17,7 @@ namespace EBICO.Server.Orders;
 /// <see cref="IOpenVeuStore"/> to await further signatures. Accept/park/reject is recorded on the event log.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the validation is structural/semantic, not a full ISO 20022 XSD check, and
+/// <b>⚠️ Spec caveat:</b> the validation is structural/semantic, not a full ISO 20022 XSD check, and
 /// the electronic signature (ES) over the order data is still not verified (consistent with #32). Whether
 /// an upload needs distributed signing is taken from the request's signature flag / order attribute rather
 /// than from bank-side account signature rules. See <c>docs/server/payment-orders.md</c>,

@@ -6,7 +6,7 @@ namespace EBICO.Core.ReturnCodes;
 /// </summary>
 /// <remarks>
 /// The catalogue reflects EBICS Annex 1; entries beyond the nine codes used by the running code are
-/// provided for completeness and flagged with <c>⚠️ Spec-Vorbehalt</c> on their <see cref="EbicsReturnCode"/>
+/// provided for completeness and flagged with <c>⚠️ Spec caveat</c> on their <see cref="EbicsReturnCode"/>
 /// field, to be verified against the official annexes.
 /// </remarks>
 public static class EbicsReturnCodes

@@ -11,7 +11,7 @@ namespace EBICO.Core.Serialization;
 /// replacing it.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> EBICS specifies the order data as "ZIP-compressed". In practice this is
+/// <b>⚠️ Spec caveat:</b> EBICS specifies the order data as "ZIP-compressed". In practice this is
 /// the zlib data stream (RFC 1950, a DEFLATE stream wrapped with a 2-byte header and an Adler-32
 /// checksum) as produced by Java's <c>Deflater</c> defaults, which <see cref="ZLibStream"/> is
 /// byte-compatible with. The exact framing (zlib vs. raw DEFLATE vs. gzip) is not yet verified
@@ -51,7 +51,7 @@ public static class EbicsCompression
         return output.ToArray();
     }
 
-    // The single seam that decides the compression framing (see the Spec-Vorbehalt above).
+    // The single seam that decides the compression framing (see the Spec caveat above).
     private static Stream Wrap(Stream inner, bool compress) => compress
         ? new ZLibStream(inner, Level, leaveOpen: true)
         : new ZLibStream(inner, CompressionMode.Decompress, leaveOpen: true);

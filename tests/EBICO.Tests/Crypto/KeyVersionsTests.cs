@@ -50,7 +50,7 @@ public class KeyVersionsTests
     [InlineData("A004", EbicsVersion.H005, false)]
     [InlineData("A005", EbicsVersion.H003, true)]
     [InlineData("A005", EbicsVersion.H005, true)]
-    // A006/PSS: EBICS 2.5 (H004) onwards — see the Spec-Vorbehalt on KeyVersions (issue #117).
+    // A006/PSS: EBICS 2.5 (H004) onwards — see the Spec caveat on KeyVersions (issue #117).
     [InlineData("A006", EbicsVersion.H003, false)]
     [InlineData("A006", EbicsVersion.H004, true)]
     [InlineData("A006", EbicsVersion.H005, true)]

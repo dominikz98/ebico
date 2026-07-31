@@ -13,7 +13,7 @@ namespace EBICO.Server.Orders;
 /// is applied. The generation outcome is recorded on the event log.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the content is synthetic test data (the "generierbare Testdaten serverseitig"),
+/// <b>⚠️ Spec caveat:</b> the content is synthetic test data (server-side generatable test data),
 /// not drawn from a real account/booking store, and the produced MT/camt formats are minimal, structurally
 /// plausible renderings (see the individual builders). See <c>docs/server/statement-orders.md</c> and ADR-0018.
 /// </remarks>

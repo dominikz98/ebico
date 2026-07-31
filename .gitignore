@@ -56,7 +56,7 @@ CodeCoverage/
 TestResult.xml
 nunit-*.xml
 
-# Coverage / Test-Ergebnisse
+# Coverage / test results
 TestResults/
 coverage*.xml
 coverage*.json
@@ -67,14 +67,14 @@ coverage*.json
 .idea/
 
 #############################################################################
-# EBICS-Schemas/Specs sind proprietaeres Eigentum der EBICS SC und duerfen
-# NICHT ungeprueft ins Repo. Lokal via scripts/fetch-schemas.sh beziehen.
-# Siehe docs/protocol/schema-sources.md und Lizenz-Issue #5.
+# The EBICS schemas/specs are the proprietary property of the EBICS SC and must
+# NOT enter the repo unchecked. Obtain them locally via scripts/fetch-schemas.sh.
+# See docs/protocol/schema-sources.md and licence issue #5.
 #############################################################################
 schemas/**/*.xsd
 schemas/**/MANIFEST.sha256
 schemas/manifest.json
 
-# Offizielle EBICS-Beispiel-XML (ebics.org/examples) sind ebenfalls proprietaer.
-# Verzeichnisstruktur + README werden eingecheckt, die Beispiel-Payloads nicht.
+# The official EBICS sample XML (ebics.org/examples) is proprietary as well.
+# Directory structure + README are committed, the sample payloads are not.
 tests/**/Fixtures/Xml/**/*.xml

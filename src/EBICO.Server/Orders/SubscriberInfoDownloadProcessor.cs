@@ -13,7 +13,7 @@ namespace EBICO.Server.Orders;
 /// <see cref="SubscriberInfoContentBuilder"/>. The generation outcome is recorded on the event log.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the content reflects the seeded master data only; see
+/// <b>⚠️ Spec caveat:</b> the content reflects the seeded master data only; see
 /// <see cref="SubscriberInfoContentBuilder"/> and <c>docs/server/status-protocol-orders.md</c>.
 /// </remarks>
 public sealed class SubscriberInfoDownloadProcessor : IDownloadOrderProcessor

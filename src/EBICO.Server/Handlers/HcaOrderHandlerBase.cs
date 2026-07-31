@@ -28,7 +28,7 @@ namespace EBICO.Server.Handlers;
 /// (H003/H004 <c>RSAKeyValue</c>, H005 <c>X509Data</c>).
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the order data is only <em>decrypted</em>, not authenticated — the order
+/// <b>⚠️ Spec caveat:</b> the order data is only <em>decrypted</em>, not authenticated — the order
 /// signature (ES, signed with the current signature key) and the X002 authentication signature are
 /// <b>not</b> verified (M4, consistent with INI/HIA/HPB). This is a simplified single-phase handling of
 /// the signed upload (the generic upload transaction with segmentation is M4). See

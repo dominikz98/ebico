@@ -35,7 +35,7 @@ namespace EBICO.Core.Crypto;
 /// clean rejection on the server.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the exact canonicalization method (inclusive vs exclusive), the
+/// <b>⚠️ Spec caveat:</b> the exact canonicalization method (inclusive vs exclusive), the
 /// reference selector (the <c>#xpointer(//*[@authenticate='true'])</c> URI and its XPath
 /// realization) and the SignedInfo canonicalization context are EBICS spec details not yet verified
 /// against the official Annexe (the XSDs are proprietary and not in the repo — see <c>CLAUDE.md</c>

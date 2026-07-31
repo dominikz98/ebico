@@ -36,7 +36,7 @@ public static class CertificateRequirements
     /// <returns>The certificate requirement for <paramref name="version"/>.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is not a defined value.</exception>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> the per-version certificate requirement reflects the common
+    /// <b>⚠️ Spec caveat:</b> the per-version certificate requirement reflects the common
     /// reading (H005 introduced certificate-based key management). Per the project's conventions
     /// this is to be verified against the official EBICS specs/Annexe once available and adjusted
     /// here in this one place if needed.

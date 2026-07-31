@@ -12,7 +12,7 @@ namespace EBICO.Connector.Upload.Envelopes;
 internal abstract class UploadEnvelopeBuilderBase : IUploadEnvelopeBuilder
 {
     /// <summary>
-    /// The <c>SecurityMedium</c> value for transaction orders. <b>⚠️ Spec-Vorbehalt:</b> <c>"0000"</c>
+    /// The <c>SecurityMedium</c> value for transaction orders. <b>⚠️ Spec caveat:</b> <c>"0000"</c>
     /// ("no medium") mirrors the value the server tests and onboarding builders use; not verified
     /// against the official Annex.
     /// </summary>

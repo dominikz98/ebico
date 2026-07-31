@@ -53,10 +53,16 @@ complete BTF/order palette possible.
   new terms (e.g. *master data*, *subscriber*, *order type*, *bank-technical signature*, *return
   code*, *spec caveat*). This covers **names, not just prose**: file names, doc slugs, ADR slugs and
   Suite routes are English too (#134 renamed the last German ones; `DocumentationNamingTests` guards
-  it). Known exceptions: the generated XSD bindings keep the German `<xs:documentation>` text of the
-  proprietary schemas (ADR-0006, do not hand-edit); the INI/HIA letter
-  (`InitializationLetterTextBuilder`) stays German because the subscriber prints and posts it to a
-  German-speaking bank; the one-off bootstrap scripts `scripts/create-ebico-plan.sh` and
+  both names and prose). **Spec caveat** in particular is the marker for an assumption not yet verified
+  against the official annexes — written `⚠️ Spec caveat:` in XML doc and comments (#141 renamed it from
+  the former German `Spec-Vorbehalt` in 89 places). Do **not** gloss English terms with their German
+  original (`subscriber (Teilnehmer)`, `partner (Kunden)`) — `docs/protocol/domain-model.md` holds the
+  German↔English mapping for anyone reading the spec alongside. Known exceptions: the generated XSD
+  bindings keep the German `<xs:documentation>` text of the proprietary schemas (ADR-0006, do not
+  hand-edit); the INI/HIA letter (`InitializationLetterTextBuilder`) stays German because the subscriber
+  prints and posts it to a German-speaking bank; **German test data** is legitimate and intentional (this
+  emulates German banks — fixtures carry names like `Kunde AG`, MT940 booking texts are German by
+  construction); the one-off bootstrap scripts `scripts/create-ebico-plan.sh` and
   `scripts/add-event-log-tickets.sh` keep their German issue texts as a historical record of how the
   ticket plan was seeded.
 - Issues/milestones live on GitHub (`gh issue list`). Overview:

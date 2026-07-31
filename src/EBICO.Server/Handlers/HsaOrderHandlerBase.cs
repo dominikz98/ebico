@@ -28,7 +28,7 @@ namespace EBICO.Server.Handlers;
 /// <see cref="ExtractHsaOrderData"/>.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> HSA is, per the schema, signed with the subscriber's FTAM signature key;
+/// <b>⚠️ Spec caveat:</b> HSA is, per the schema, signed with the subscriber's FTAM signature key;
 /// that order signature is <b>not</b> verified (consistent with INI/HIA/HPB — request/response
 /// signatures are M4). HSA is only accepted once INI has run (state
 /// <see cref="SubscriberState.Initialized"/>); a re-sent HSA is rejected with

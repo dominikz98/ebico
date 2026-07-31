@@ -55,7 +55,7 @@ public sealed class EbicsErrorMapper : IEbicsErrorMapper
             EbicsEnvelopeFormatException => EbicsReturnCode.InvalidXml,
 
             // Root namespace belongs to no supported version, or strict version mismatch.
-            // ⚠️ Spec-Vorbehalt: ein ebicsResponse hat keinen dedizierten "unsupported version"-Code.
+            // ⚠️ Spec caveat: an ebicsResponse has no dedicated "unsupported version" return code.
             EbicsVersionNotSupportedException => EbicsReturnCode.InvalidRequest,
             EbicsVersionMismatchException => EbicsReturnCode.InvalidRequest,
 

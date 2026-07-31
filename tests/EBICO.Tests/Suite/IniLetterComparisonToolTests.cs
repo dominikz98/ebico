@@ -49,7 +49,7 @@ public class IniLetterComparisonToolTests
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
         var cut = ctx.Render<IniLetterComparisonTool>();
-        cut.Find("#expected-fingerprint").Change("nicht-hex!");
+        cut.Find("#expected-fingerprint").Change("not-hex!");
         cut.Find("button").Click();
 
         cut.Find(".alert-warning").TextContent.Should().Contain("hexadecimal");

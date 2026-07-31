@@ -27,7 +27,7 @@ namespace EBICO.Server.Handlers;
 /// The signature key travels in the <c>S001</c> namespace for H003/H004 and <c>S002</c> for H005.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> as with HCA the order data is only <em>decrypted</em>, not authenticated —
+/// <b>⚠️ Spec caveat:</b> as with HCA the order data is only <em>decrypted</em>, not authenticated —
 /// the order signature and the X002 authentication signature are <b>not</b> verified (M4, consistent
 /// with INI/HIA/HPB). See <c>docs/server/hca-hcs-spr-hsa.md</c>.
 /// </para>

@@ -1,7 +1,7 @@
 namespace EBICO.Core.Domain;
 
 /// <summary>
-/// The lifecycle state of an EBICS subscriber (Teilnehmer) at a bank. The states advance
+/// The lifecycle state of an EBICS subscriber at a bank. The states advance
 /// through onboarding (<see cref="New"/> → <see cref="Initialized"/> → <see cref="Ready"/>);
 /// a subscriber can be <see cref="Suspended"/> from any active state and reactivated.
 /// </summary>

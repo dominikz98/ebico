@@ -27,7 +27,7 @@ namespace EBICO.Core.Crypto;
 /// bytes and therefore the same fingerprint.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the exact hash-input formatting (exponent-before-modulus order,
+/// <b>⚠️ Spec caveat:</b> the exact hash-input formatting (exponent-before-modulus order,
 /// lowercase hex, leading-zero-<i>nibble</i> stripping, single-space separator) is an EBICS spec
 /// detail not yet verified against the official specs (see the project conventions in
 /// <c>CLAUDE.md</c> and <c>docs/protocol/public-key-fingerprint.md</c>). It is confined to the
@@ -125,7 +125,7 @@ public static class PublicKeyFingerprint
     /// with a single space.
     /// </summary>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> exponent-before-modulus order, lowercase hex and the
+    /// <b>⚠️ Spec caveat:</b> exponent-before-modulus order, lowercase hex and the
     /// leading-zero-nibble stripping are the unverified EBICS spec details; this is the one place
     /// to adjust them once the official specs are available. Both <see cref="Compute"/> and
     /// <see cref="BuildHashInput"/> route through here.

@@ -24,7 +24,7 @@ namespace EBICO.Server.Handlers;
 /// is <see cref="ExtractIniOrderData"/>.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> re-sending INI once the subscriber is no longer <c>New</c> is rejected
+/// <b>⚠️ Spec caveat:</b> re-sending INI once the subscriber is no longer <c>New</c> is rejected
 /// with <see cref="EbicsReturnCode.InvalidUserOrUserState"/>; the response is unsigned (response
 /// AuthSignature/X002 is M4). See <c>docs/server/ini.md</c>.
 /// </para>

@@ -75,7 +75,7 @@ diverge. Previously every business error reported `EBICS_OK` as the text
 
 Values and symbolic names follow EBICS Annex 1. The nine codes used by the running code
 count as verified; all further entries were included for completeness and are marked in the XML doc
-with `⚠️ Spec-Vorbehalt` (to be verified against the official annexes).
+with `⚠️ Spec caveat` (to be verified against the official annexes).
 
 **Technical** (header, `header/mutable/ReturnCode`):
 

@@ -3,8 +3,8 @@ using EBICO.Core.Domain;
 namespace EBICO.Server.State;
 
 /// <summary>
-/// The master-data management layer of the emulator (Stammdatenverwaltung): full CRUD over the
-/// banks, partners (Kunden) and subscribers (Teilnehmer) held by the <see cref="IEbicsStateStore"/>,
+/// The master-data management layer of the emulator: full CRUD over the
+/// banks, partners (customers) and subscribers held by the <see cref="IEbicsStateStore"/>,
 /// enforcing referential integrity, cascading deletes and the subscriber permission/lifecycle rules.
 /// </summary>
 /// <remarks>

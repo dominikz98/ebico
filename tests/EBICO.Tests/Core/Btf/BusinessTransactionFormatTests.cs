@@ -108,7 +108,7 @@ public class BusinessTransactionFormatTests
         var roundTripped = BusinessTransactionFormat.FromSchema(original.ToServiceType());
 
         // Container is deliberately excluded — its value is not round-tripped through the schema flag
-        // attribute (see docs/server/btf-framework.md, Spec-Vorbehalt).
+        // attribute (see docs/server/btf-framework.md, Spec caveat).
         roundTripped.Should().Be(original);
     }
 

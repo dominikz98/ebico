@@ -45,7 +45,7 @@ public readonly record struct HostId
 }
 
 /// <summary>
-/// The EBICS partner identifier (<c>PartnerID</c>): the customer (Kunde) a subscriber
+/// The EBICS partner identifier (<c>PartnerID</c>): the customer a subscriber
 /// belongs to, administered on the server side.
 /// </summary>
 /// <remarks>
@@ -88,7 +88,7 @@ public readonly record struct PartnerId
 }
 
 /// <summary>
-/// The EBICS user identifier (<c>UserID</c>): the user (Teilnehmer) assigned to a given
+/// The EBICS user identifier (<c>UserID</c>): the user assigned to a given
 /// customer, administered on the server side.
 /// </summary>
 /// <remarks>

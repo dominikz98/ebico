@@ -17,7 +17,7 @@ namespace EBICO.Server.ReturnCodes;
 /// <remarks>
 /// A technical code lands in <c>header/mutable/ReturnCode</c>, a business code in
 /// <c>body/ReturnCode</c>; the respective other slot is filled with <see cref="EbicsReturnCode.OkCode"/>.
-/// <b>⚠️ Spec-Vorbehalt:</b> the response is <em>not</em> signed (AuthSignature) — the response
+/// <b>⚠️ Spec caveat:</b> the response is <em>not</em> signed (AuthSignature) — the response
 /// authentication signature (X002) is M4. Strict clients may reject unsigned responses. The
 /// exact header/body placement and the mandatory-but-empty static header are still to be verified
 /// against the official EBICS annexes.
@@ -111,7 +111,7 @@ public sealed class EbicsResponseFactory
     /// <returns>The transaction response envelope, ready for serialization.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is undefined.</exception>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> <c>NumSegments</c> is deliberately not set (the schema restricts it to
+    /// <b>⚠️ Spec caveat:</b> <c>NumSegments</c> is deliberately not set (the schema restricts it to
     /// download initialisation). Whether the transfer response must echo <c>SegmentNumber</c> is to be
     /// verified against the official EBICS annexes; it is emitted when supplied.
     /// </remarks>
@@ -207,7 +207,7 @@ public sealed class EbicsResponseFactory
     /// <returns>The download response envelope, ready for serialization.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="version"/> is undefined.</exception>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> the canonical placement (NumSegments + segment 1 in the initialisation
+    /// <b>⚠️ Spec caveat:</b> the canonical placement (NumSegments + segment 1 in the initialisation
     /// response, segments 2..N in the transfer responses, DataEncryptionInfo in the initialisation
     /// response only) is to be verified against the official EBICS annexes. The response is not signed
     /// (X002 is M4).

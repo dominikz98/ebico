@@ -351,7 +351,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
             ct).ConfigureAwait(false);
     }
 
-    // Subscriber (Kunde/Teilnehmer) ids from the request static header. A signed ebicsRequest in the
+    // Subscriber ids from the request static header. A signed ebicsRequest in the
     // transfer/receipt phase carries only HostID (PartnerID/UserID are bound to the transaction), so those
     // come back null; the transaction engines' lifecycle events carry the full triple in that case.
     private static (HostId? Host, PartnerId? Partner, UserId? User) TryExtractSubscriber(IEbicsRequestEnvelope request)

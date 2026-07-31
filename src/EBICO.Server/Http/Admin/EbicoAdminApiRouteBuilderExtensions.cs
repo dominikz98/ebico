@@ -11,7 +11,7 @@ namespace EBICO.Server.Http.Admin;
 /// <summary>
 /// Maps the emulator's master-data admin API: a small REST/JSON surface over
 /// <see cref="IMasterDataManager"/> to create, read, update and delete banks, partners and
-/// subscribers (Stammdatenverwaltung, issue #30).
+/// subscribers (master-data management, issue #30).
 /// </summary>
 /// <remarks>
 /// The API is <b>unauthenticated</b> by design — it targets local/emulator use (like Azurite).

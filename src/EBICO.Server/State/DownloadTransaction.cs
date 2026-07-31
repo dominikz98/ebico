@@ -24,7 +24,7 @@ namespace EBICO.Server.State;
 /// <em>positive</em> receipt consumes it (the initialisation already dequeued it).
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the download response is not signed (X002 is M4) and no order signature is
+/// <b>⚠️ Spec caveat:</b> the download response is not signed (X002 is M4) and no order signature is
 /// produced. Idle expiry (issue #35) is driven by <see cref="LastActivityAt"/>/<see cref="IsExpired"/>;
 /// an expired or orphaned download is evicted (lazily on access and via the background cleanup service)
 /// and its (already dequeued) order data is re-enqueued so it is not lost.

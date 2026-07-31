@@ -23,7 +23,7 @@ namespace EBICO.Core.Serialization;
 /// before calling in.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the configured segment size is measured in <i>raw</i> (pre-base64)
+/// <b>⚠️ Spec caveat:</b> the configured segment size is measured in <i>raw</i> (pre-base64)
 /// bytes; the base64 wire size is roughly 4/3 of it. Whether EBICS applies its ~1&#160;MB segment
 /// ceiling to the raw or the base64-encoded size — and whether the segments are portions of one
 /// shared base64 stream rather than an independently base64-encoded <c>byte[]</c> per segment as the
@@ -49,7 +49,7 @@ public static class EbicsSegmentation
     /// <c>ebicsRequest</c> (header, <c>AuthSignature</c>, order params).
     /// </para>
     /// <para>
-    /// <b>Nicht</b> auf die theoretische Obergrenze setzen (#124): 768&#160;KiB raw base64-encodes to
+    /// <b>Do not</b> raise this to the theoretical upper bound (#124): 768&#160;KiB raw base64-encodes to
     /// <em>exactly</em> 1&#160;MiB, which consumes the whole default body limit and leaves nothing for
     /// the envelope — every full segment is then rejected with HTTP 413 before the server can answer
     /// with an EBICS return code. <see cref="MaxSegmentSizeForRequestBody"/> derives a safe size for a

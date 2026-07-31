@@ -15,7 +15,7 @@ namespace EBICO.Server.Handlers;
 /// from those certificates.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> only the public key is taken from each certificate; certificate chain /
+/// <b>⚠️ Spec caveat:</b> only the public key is taken from each certificate; certificate chain /
 /// self-signature validation is a conformance concern (M8) and not performed here.
 /// </remarks>
 public sealed class H005HcsOrderHandler : HcsOrderHandlerBase

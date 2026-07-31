@@ -24,7 +24,7 @@ namespace EBICO.Core.Crypto;
 /// rejects versions that are not a known <see cref="KeyPurpose.Signature"/> version.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt:</b> the exact order-data normalisation that precedes the hash is an
+/// <b>⚠️ Spec caveat:</b> the exact order-data normalisation that precedes the hash is an
 /// EBICS spec detail not yet verified against the official specs (see the project conventions in
 /// <c>CLAUDE.md</c> and <c>docs/protocol/bank-signature.md</c>). It is confined to the single
 /// <c>NormalizeOrderData</c> seam; self-consistent sign &#8594; verify round-trips hold
@@ -147,7 +147,7 @@ public static class BankSignature
     /// identity (pass-through).
     /// </summary>
     /// <remarks>
-    /// <b>⚠️ Spec-Vorbehalt:</b> if the official EBICS specs mandate a canonicalisation before
+    /// <b>⚠️ Spec caveat:</b> if the official EBICS specs mandate a canonicalisation before
     /// hashing (e.g. line-ending normalisation for certain formats), this is the one place to
     /// implement it. Both <see cref="Sign"/> and <see cref="Verify"/> route through here, so
     /// round-trips stay invariant to the choice.

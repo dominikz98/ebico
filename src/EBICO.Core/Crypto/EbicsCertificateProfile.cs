@@ -10,7 +10,7 @@ namespace EBICO.Core.Crypto;
 /// certificate always satisfies the check the verifier applies — the two cannot drift apart.
 /// </summary>
 /// <remarks>
-/// <b>⚠️ Spec-Vorbehalt:</b> the EBICS X.509 key-usage profile per purpose is not yet verified
+/// <b>⚠️ Spec caveat:</b> the EBICS X.509 key-usage profile per purpose is not yet verified
 /// against the official EBICS Annex (the XSDs/specs are proprietary and not in the repo — see
 /// <c>CLAUDE.md</c>). This is the one place to adjust it. Signature and authentication certificates
 /// are required to assert <c>DigitalSignature</c>; <c>NonRepudiation</c> is permitted but not

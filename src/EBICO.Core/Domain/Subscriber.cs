@@ -1,7 +1,7 @@
 namespace EBICO.Core.Domain;
 
 /// <summary>
-/// An EBICS subscriber (Teilnehmer): a user acting for a partner against a bank,
+/// An EBICS subscriber: a user acting for a partner against a bank,
 /// identified by the (<see cref="HostId"/>, <see cref="PartnerId"/>, <see cref="UserId"/>)
 /// triple, optionally carrying a <see cref="SystemId"/> for technical / multi-user setups.
 /// </summary>

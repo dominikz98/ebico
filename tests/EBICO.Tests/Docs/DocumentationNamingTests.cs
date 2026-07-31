@@ -4,13 +4,14 @@ using AwesomeAssertions;
 namespace EBICO.Tests.Docs;
 
 /// <summary>
-/// Guard tests for the English naming of files, doc slugs and Suite routes (issue #134, epic #128).
-/// The prose translation is visible in every diff; the <em>names</em> are not — a German slug or route
-/// only shows up as a broken link somewhere else, and the CI link checker (lychee, relative links in
+/// Guard tests for the English project language in <em>names</em> and in <em>prose</em> (issues #134
+/// and #141, epic #128). A translated sentence is visible in every diff; a German name is not — it only
+/// shows up as a broken link somewhere else, and the CI link checker (lychee, relative links in
 /// <c>*.md</c>) sees neither the non-markdown references (XML doc, <c>Directory.*.props</c>, the
 /// absolute GitHub URL in <c>DemoDataBanner.razor</c>) nor a file that was renamed without being
-/// re-registered in the ADR index. These tests make the naming rule from <c>CLAUDE.md</c> executable so
-/// the renames of #134 cannot silently rot back.
+/// re-registered in the ADR index. Nor does anything otherwise notice a single German sentence left
+/// behind in an XML-doc block that ships inside the published NuGet package — which is exactly what
+/// #141 found in <c>EbicsSegmentation</c>. These tests make the rule from <c>CLAUDE.md</c> executable.
 /// </summary>
 public class DocumentationNamingTests
 {
@@ -27,6 +28,51 @@ public class DocumentationNamingTests
         "konformitaet", "anbindung", "aenderung", "verschluesselung", "uebersicht", "pruefung",
         "sicherheit", "entscheidung", "anleitung", "generierte", "committen", "domaenen",
         "proprietaeren", "serverseitige", "clientseitige", "-und-", "-ohne-", "-mit-",
+    ];
+
+    /// <summary>
+    /// German words that must not appear in the <em>content</em> of a tracked source or doc file.
+    /// Kept deliberately <b>narrow</b>: it only holds words that cannot occur in English prose. The
+    /// obvious additions are traps — <c>der</c> collides with DER encoding, whose name litters the
+    /// PKCS#8 / SubjectPublicKeyInfo comments, and <c>die</c>, <c>man</c> and <c>links</c> are ordinary
+    /// English words. Before extending the list, run the candidate over the repository and read the hit
+    /// list; a guard that cries wolf gets silenced rather than heeded.
+    /// </summary>
+    /// <remarks>
+    /// The singular <c>Kunde</c> is deliberately absent. German <em>test data</em> is legitimate — this is
+    /// an emulator for German banks, so fixtures carry names like <c>"Kunde AG"</c> or
+    /// <c>"Stadtwerke Musterstadt"</c> and MT940 booking texts are German by construction. Including it
+    /// would mean allowlisting five test files plus a doc page, which would blunt the guard for the
+    /// <em>prose</em> it exists to police. A future German gloss spelled <c>(Kunde)</c> would therefore
+    /// slip through; that is the accepted trade-off.
+    /// </remarks>
+    private static readonly string[] GermanProseWords =
+    [
+        "nicht", "werden", "muss", "müssen", "keine", "damit", "jedoch", "bereits", "sowie",
+        "während", "Teilnehmer", "Kunden", "Stammdaten", "Berechtigung", "Validierung",
+        "Verschluesselung", "Schluessel", "Zustand", "Beispiel", "Obergrenze",
+        // "Spec-Vorbehalt" was the marker term for an unverified spec assumption in 89 places across
+        // 57 files — the single largest German remnant #141 found. It is "spec caveat" now (CLAUDE.md).
+        "Vorbehalt", "Vorbehalte", "Testdaten",
+        // German abbreviations read as noise in English prose and are easy to type by reflex.
+        "vgl", "bzw", "ggf", "Kleinbuchstabe", "Grossbuchstabe", "Sperrung",
+        // These hid in the `// comment` lines of the C# samples inside the docs, where the eye skips
+        // over them because the surrounding code is language-neutral.
+        "garantiert", "valide", "gueltig", "ungueltig", "liefert", "lesbare",
+    ];
+
+    /// <summary>
+    /// Files whose German content is deliberate and documented in <c>CLAUDE.md</c>. Everything here is a
+    /// decision, not an oversight — do not extend this list to make a new finding go away.
+    /// </summary>
+    private static readonly string[] GermanContentAllowlist =
+    [
+        // The INI/HIA letter is printed and posted to a German-speaking bank.
+        "src/EBICO.Connector/Onboarding/Letter/InitializationLetterTextBuilder.cs",
+        // Synthetic statement data for a German bank emulator — German company names are the point.
+        "src/EBICO.Core/Statements/SyntheticStatementGenerator.cs",
+        // This file: the token lists above are its data.
+        "tests/EBICO.Tests/Docs/DocumentationNamingTests.cs",
     ];
 
     /// <summary>The Suite's routable pages with the route each one has to declare.</summary>
@@ -161,6 +207,53 @@ public class DocumentationNamingTests
             "the project language is English including file names, doc slugs and folder names (CLAUDE.md, "
             + "#133/#134) — generated XSD bindings (ADR-0006) and build output are excluded");
     }
+
+    [Fact]
+    public void NoTrackedSourceOrDoc_ContainsGermanProse()
+    {
+        var offenders = new List<string>();
+        var pattern = new Regex(
+            @"\b(" + string.Join('|', GermanProseWords.Select(Regex.Escape)) + @")\b",
+            RegexOptions.IgnoreCase);
+
+        foreach (var relativePath in ProseScanPaths()
+            .Where(path => !GermanContentAllowlist.Contains(path, StringComparer.OrdinalIgnoreCase)))
+        {
+            var content = StripQuotedIdentifiers(File.ReadAllText(Path.Combine(RepoRoot(), relativePath)));
+
+            offenders.AddRange(pattern.Matches(content)
+                .Select(match => match.Value)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(word => $"{relativePath}: '{word}'"));
+        }
+
+        offenders.Should().BeEmpty(
+            "prose is English too, not only names (CLAUDE.md, #141) — XML doc travels into the published "
+            + "NuGet package, so a German sentence there reaches every consumer. Deliberate exceptions "
+            + "belong in GermanContentAllowlist with a reason, not in the prose");
+    }
+
+    /// <summary>
+    /// Removes markdown inline code spans (<c>`…`</c>) and XML-doc <c>&lt;c&gt;</c> elements. Inside
+    /// those, a German word <em>names a thing</em> — a former identifier, an old slug, a German fixture
+    /// value — rather than being prose, and documentation has to be able to discuss the very terms it
+    /// forbids. Fenced code blocks are deliberately <b>not</b> stripped: the <c>// comment</c> lines of
+    /// the C# samples in <c>docs/protocol/</c> are exactly where #141 found untranslated German.
+    /// </summary>
+    private static string StripQuotedIdentifiers(string content)
+        => Regex.Replace(Regex.Replace(content, "`[^`\r\n]*`", "``"), @"<c>.*?</c>", "<c/>",
+            RegexOptions.Singleline);
+
+    /// <summary>
+    /// Files whose content is authored prose or code. Data-ish formats are excluded (sample XML, JSON
+    /// fixtures, CSS, JS bundles) — a German word there is payload, not prose. The repository-root
+    /// markdown is included explicitly: <c>CLAUDE.md</c> is the most-read contributor document of all.
+    /// </summary>
+    private static IReadOnlyList<string> ProseScanPaths()
+        => [.. RepoFiles().Where(path => ScannedContentExtensions.Contains(Path.GetExtension(path))),
+            "CLAUDE.md", "README.md"];
+
+    private static readonly string[] ScannedContentExtensions = [".cs", ".razor", ".md"];
 
     private static IReadOnlyList<string> RepoFiles()
         => [.. RepoFiles("docs"), .. RepoFiles("src"), .. RepoFiles("tests"), .. RepoFiles(".claude")];

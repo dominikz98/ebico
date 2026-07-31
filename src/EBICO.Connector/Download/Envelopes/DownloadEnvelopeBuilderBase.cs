@@ -13,7 +13,7 @@ namespace EBICO.Connector.Download.Envelopes;
 internal abstract class DownloadEnvelopeBuilderBase : IDownloadEnvelopeBuilder
 {
     /// <summary>
-    /// The <c>SecurityMedium</c> value for transaction orders. <b>⚠️ Spec-Vorbehalt:</b> <c>"0000"</c>
+    /// The <c>SecurityMedium</c> value for transaction orders. <b>⚠️ Spec caveat:</b> <c>"0000"</c>
     /// ("no medium") mirrors the value the server tests, onboarding and upload builders use; not
     /// verified against the official Annex.
     /// </summary>

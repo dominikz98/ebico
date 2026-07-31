@@ -5,7 +5,7 @@ namespace EBICO.Core.Statements;
 
 /// <summary>
 /// Produces a deterministic, synthetic <see cref="AccountStatement"/> for a subscriber and a reporting
-/// period — the "generierbare Testdaten serverseitig" of issue #40. The output is a pure function of the
+/// period — the server-side generatable test data of issue #40. The output is a pure function of the
 /// inputs: the same subscriber triple + period + creation timestamp always yields byte-identical statements
 /// (and therefore byte-identical MT940/MT942/camt output), which is what makes the emulator's downloads
 /// testable without pre-seeded fixtures.

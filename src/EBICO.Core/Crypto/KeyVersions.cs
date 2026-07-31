@@ -15,7 +15,7 @@ namespace EBICO.Core.Crypto;
 /// available, and adjusted here in one place if needed.
 /// </para>
 /// <para>
-/// <b>⚠️ Spec-Vorbehalt (issue #117):</b> A006 is permitted for <b>H004 and H005</b>. EBICS 2.5
+/// <b>⚠️ Spec caveat (issue #117):</b> A006 is permitted for <b>H004 and H005</b>. EBICS 2.5
 /// Annex 1 lists both A005 and A006, and a real third-party client (node-ebics-client) signs its
 /// H004 INI order data with A006 by default — the captured evidence behind the change (see
 /// <c>docs/development/conformance-real-clients.md</c>, ADR-0029). It is <em>not</em> verified
