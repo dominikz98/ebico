@@ -8,10 +8,10 @@ using Microsoft.Extensions.DependencyInjection;
 namespace EBICO.Tests.Suite;
 
 /// <summary>
-/// bUnit tests for the key/certificate view page (<see cref="Schluessel"/>, issue #55): it renders
+/// bUnit tests for the key/certificate view page (<see cref="Keys"/>, issue #55): it renders
 /// the known-key fingerprints from <see cref="IEmulatorStateProvider"/> and the key-version catalog.
 /// </summary>
-public class SchluesselPageTests
+public class KeysPageTests
 {
     [Fact]
     public void Page_RendersKnownKeyFingerprints()
@@ -20,7 +20,7 @@ public class SchluesselPageTests
         var key = FakeEmulatorStateProvider.SampleKey("Subscriber TESTKEY", KeyPurpose.Signature, "A006");
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([key]));
 
-        var cut = ctx.Render<Schluessel>();
+        var cut = ctx.Render<Keys>();
 
         cut.Markup.Should().Contain("Subscriber TESTKEY");
         cut.Markup.Should().Contain(key.FingerprintText.Split('\n')[0]);
@@ -32,7 +32,7 @@ public class SchluesselPageTests
         using var ctx = new BunitContext();
         ctx.Services.AddScoped<IEmulatorStateProvider>(_ => new FakeEmulatorStateProvider([]));
 
-        var cut = ctx.Render<Schluessel>();
+        var cut = ctx.Render<Keys>();
 
         // The static KeyVersions catalog lists all known versions.
         cut.Markup.Should()

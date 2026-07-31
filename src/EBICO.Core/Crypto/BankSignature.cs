@@ -6,7 +6,7 @@ namespace EBICO.Core.Crypto;
 /// Computes and verifies the EBICS bank-technical (authorising) signature over order data,
 /// for the signature key versions <c>A005</c> (RSASSA-PKCS1-v1_5) and <c>A006</c>
 /// (RSASSA-PSS), both over SHA-256. Stateless BCL wrappers
-/// (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>) that build on the issue #18
+/// (<see href="../adr/0008-crypto-library.md">ADR-0008</see>) that build on the issue #18
 /// key layer (<see cref="RsaKeyMaterial"/>, <see cref="KeyVersions"/>).
 /// </summary>
 /// <remarks>

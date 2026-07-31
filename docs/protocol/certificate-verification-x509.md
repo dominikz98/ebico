@@ -8,7 +8,7 @@ certificate-based** — there the public RSA key is read from an X.509 certifica
 (`PubKeyInfoType/X509Data`); **H003/H004 use pure RSA keys** (trust via the
 INI-letter fingerprint, [#22](public-key-fingerprint.md)). Builds on the key layer from
 [#18](key-representation.md). Issue **#23** (Milestone M2), crypto library:
-[ADR-0008](../adr/0008-krypto-bibliothek.md) (`System.Security.Cryptography.X509Certificates`,
+[ADR-0008](../adr/0008-crypto-library.md) (`System.Security.Cryptography.X509Certificates`,
 no BouncyCastle) — `X509Chain`/`X509ChainPolicy` come natively from the BCL.
 
 > **Scope:** This primitive checks a **single, fully loaded** `X509Certificate2`
@@ -138,4 +138,4 @@ should not check.
 - [Key pairs & representation (A/E/X)](key-representation.md) — underlying key layer (#18)
 - [Public-key fingerprints (HPB/INI/HIA)](public-key-fingerprint.md) — trust in the pure-key procedure (#22)
 - [Bank-technical signature A005/A006](bank-signature.md) — shares the `Verify` convention (#19)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)

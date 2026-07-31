@@ -95,7 +95,7 @@ on the multi-version dispatch: [Version dispatch](protocol/version-dispatch.md).
 ## Schemas & license
 
 For the quickstart and operation you need **no** official EBICS schemas: the generated C# bindings
-are committed to the repo ([ADR-0006](adr/0006-generierte-xsd-bindings-committen.md)), so the
+are committed to the repo ([ADR-0006](adr/0006-commit-generated-xsd-bindings.md)), so the
 server, sample and tests build and run without any further setup. The scripts
 [`scripts/fetch-schemas.sh`](../scripts/fetch-schemas.sh) /
 [`scripts/generate-bindings.sh`](../scripts/generate-bindings.sh) are purely **maintainer tooling** for

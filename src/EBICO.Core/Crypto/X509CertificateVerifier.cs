@@ -6,7 +6,7 @@ namespace EBICO.Core.Crypto;
 /// Verifies an X.509 certificate for EBICS (H005) use: builds and validates the chain against a
 /// configurable trust-anchor set, checks the validity period and the EBICS key-usage profile, and
 /// optionally binds the certificate to a known subscriber public key. A BCL-only wrapper around
-/// <see cref="X509Chain"/> (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>).
+/// <see cref="X509Chain"/> (<see href="../adr/0008-crypto-library.md">ADR-0008</see>).
 /// </summary>
 /// <remarks>
 /// <para>

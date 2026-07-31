@@ -26,7 +26,7 @@ persistence approach, and (c) where events are written.
    and `Message`. **Visibility** (`CustomerVisible` vs. `Internal`) is the field on
    which the two projections separate.
 2. **`IEventLog` = append + query**, asynchronous, pluggable via `TryAddSingleton` —
-   **exactly the store path** from [ADR-0011](0011-server-stammdatenverwaltung.md).
+   **exactly the store path** from [ADR-0011](0011-server-master-data-management.md).
    Query filters by customer/time range/type/visibility (`EbicsEventQuery`, `From`
    inclusive / `To` exclusive, optional `Limit`).
 3. **In-memory default (`InMemoryEventLog`), persistence deferred.** This is "the same
@@ -38,7 +38,7 @@ persistence approach, and (c) where events are written.
    [`EbicsRequestPipeline`](../server/host.md) writes a `RequestReceived` event per
    request (subscriber/order type/phase/return code) — this also covers key
    management. The transaction engines
-   ([#32](0013-upload-transaktions-engine.md)/[#33](0014-download-transaktions-engine.md))
+   ([#32](0013-upload-transaction-engine.md)/[#33](0014-download-transaction-engine.md))
    add **semantic lifecycle events** (upload/download started/completed, negative
    acknowledgement, eviction in the background sweep), since these span a transaction
    across multiple requests or arise request-less in cleanup.

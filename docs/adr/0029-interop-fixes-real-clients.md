@@ -5,7 +5,7 @@
 
 ## Context
 
-[ADR-0026](0026-konformitaet-gegen-reale-clients.md) introduced the vendor-capture tier and
+[ADR-0026](0026-conformance-against-real-clients.md) introduced the vendor-capture tier and
 deliberately **only documented rather than fixed** (decision 3 there, "document deviations
 instead of fixing the protocol"). The replay of the node-ebics-client captures showed: EBICO
 accepts **not a single** onboarding request from a real foreign client. Issue **#117**
@@ -85,7 +85,7 @@ response.
   `SchemaValidationConformanceTests` (skip-if-missing).
 - **The spec caveat remains.** Neither the concretisation of `OrderDetails` nor `A006` on H004
   is verified against the official XSDs/annexes (proprietary, not in the repo —
-  [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md)). The evidence is a real client plus
+  [ADR-0003](0003-handling-proprietary-schemas.md)). The evidence is a real client plus
   the common reading (EBICS 2.5 Annex 1 knows A005 **and** A006). Both are centralised in
   exactly one place (`apply_binding_fixups()` and `KeyVersions` respectively) and revisable in
   one step given better facts.
@@ -115,9 +115,9 @@ response.
 
 ## Related decisions
 
-- [ADR-0026 — Conformance against real clients](0026-konformitaet-gegen-reale-clients.md) —
+- [ADR-0026 — Conformance against real clients](0026-conformance-against-real-clients.md) —
   produced these findings and explicitly deferred the fix as follow-up work.
-- [ADR-0006 — Commit generated XSD bindings](0006-generierte-xsd-bindings-committen.md) — why
+- [ADR-0006 — Commit generated XSD bindings](0006-commit-generated-xsd-bindings.md) — why
   the bindings are in the repo at all and a fixup step is needed.
-- [ADR-0003 — Handling proprietary schemas](0003-umgang-mit-proprietaeren-schemas.md) — why
+- [ADR-0003 — Handling proprietary schemas](0003-handling-proprietary-schemas.md) — why
   verification against the XSDs/annexes is not possible here.

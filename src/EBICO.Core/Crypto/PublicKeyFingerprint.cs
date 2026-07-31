@@ -7,7 +7,7 @@ namespace EBICO.Core.Crypto;
 /// Computes, renders and verifies the EBICS <i>public-key fingerprint</i> — the SHA-256 hash
 /// of an RSA public key that appears in the INI initialisation letter, the HPB response and the
 /// request header's <c>BankPubKeyDigests</c>. Stateless BCL wrappers
-/// (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>) that build on the issue #18
+/// (<see href="../adr/0008-crypto-library.md">ADR-0008</see>) that build on the issue #18
 /// key layer (<see cref="RsaKeyMaterial"/>).
 /// </summary>
 /// <remarks>

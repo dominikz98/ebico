@@ -17,10 +17,10 @@ authorisation is and (b) how BTF authorisations are expressed.
 ## Decision
 
 1. **Typed model in `EBICO.Core.Btf`.** `BusinessTransactionFormat`
-   (`readonly record struct`, [ADR-0007](0007-domaenen-value-objects-record-struct.md))
+   (`readonly record struct`, [ADR-0007](0007-domain-value-objects-record-struct.md))
    as a hand-written projection of the generated `ServiceType` binding; the generated
    `Schema/H005/*` types are mapped, not edited
-   ([ADR-0006](0006-generierte-xsd-bindings-committen.md)).
+   ([ADR-0006](0006-commit-generated-xsd-bindings.md)).
 
 2. **Bridge via the order-type code.** The static `BtfOrderTypeCatalog` maps BTF ↔ the
    classic code. Authorisation uses a single **effective order-type key**: for H005 the
@@ -43,7 +43,7 @@ authorisation is and (b) how BTF authorisations are expressed.
 ## Consequences
 
 - The catalogue seed is **representative and best-effort** (the authoritative External
-  Code List is proprietary, [ADR-0003](0003-umgang-mit-proprietaeren-schemas.md));
+  Code List is proprietary, [ADR-0003](0003-handling-proprietary-schemas.md));
   #39–#43 extend and verify it.
 - Existing upload/download tests that created `Ready` subscribers without authorisations
   were migrated (matching authorisations seeded) — a consequence of strict enforcement.

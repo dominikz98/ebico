@@ -27,7 +27,7 @@ enforced. This framework closes the gap.
 
 ## BTF parameter model
 
-`EBICO.Core.Btf.BusinessTransactionFormat` (a `readonly record struct`, [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md))
+`EBICO.Core.Btf.BusinessTransactionFormat` (a `readonly record struct`, [ADR-0007](../adr/0007-domain-value-objects-record-struct.md))
 maps the BTF parameters in typed form:
 
 | Property | Origin (`ServiceType`) | Meaning |
@@ -84,7 +84,7 @@ Flow in the upload/download init (`UploadTransactionEngine.BeginUploadAsync` /
 2. `effectiveOrderType = BtfOrderTypeCatalog.ResolveOrderType(context.OrderType, context.Btf)`.
 3. `subscriber.HasPermissionFor(effectiveOrderType)` → otherwise **`090003`**.
 
-**Enforcement is strict** (see [ADR-0016](../adr/0016-btf-framework-und-berechtigung.md)): a
+**Enforcement is strict** (see [ADR-0016](../adr/0016-btf-framework-and-authorisation.md)): a
 `Ready` subscriber **must** hold a matching authorisation; without an authorisation the order is rejected with
 `090003` (no "empty set = everything allowed").
 
@@ -168,5 +168,5 @@ from committed Core bindings, no proprietary fixtures):
 - [Master data management](master-data.md) — `SubscriberPermission`, grant/revoke, admin API
 - [Domain model](../protocol/domain-model.md) — subscriber aggregate, signature classes
 - [EBICS return-code catalog](../protocol/return-codes.md) — `090003` EBICS_AUTHORISATION_ORDER_TYPE_FAILED
-- [ADR-0016 (BTF framework & authorisation)](../adr/0016-btf-framework-und-berechtigung.md) — decisions *strict* & *bridge via OrderType code*
+- [ADR-0016 (BTF framework & authorisation)](../adr/0016-btf-framework-and-authorisation.md) — decisions *strict* & *bridge via OrderType code*
 - [License & repo policy](../legal/ebics-licensing.md) — proprietary schemas/External Code List

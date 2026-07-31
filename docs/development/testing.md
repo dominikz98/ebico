@@ -33,6 +33,7 @@ tests/EBICO.Tests/
 ├── E2E/                        # connector ↔ server round-trips (#57, #58)
 ├── Conformance/                # conformance against real third-party clients (#59)
 │   └── Vendor/<client>/<VERSION>/request/  # committed OSS client captures (not gitignored)
+├── Docs/                       # guard tests over the repository content (docs ↔ code ↔ naming)
 ├── Infrastructure/             # harness helpers + their tests
 │   ├── CanonicalXmlComparer.cs
 │   ├── TestCertificates.cs
@@ -90,6 +91,33 @@ examples are proprietary and **not checked in**, `TryLoad` returns `false` when 
 missing; tests then skip themselves via `Assert.Skip` — the
 suite stays green even without examples (e.g. in CI). Details:
 [Fixtures/Xml/README](../../tests/EBICO.Tests/Fixtures/Xml/README.md).
+
+## `Docs/` — guard tests over the repository itself
+
+The tests in `tests/EBICO.Tests/Docs/` have no subject in the product code: their subject is the
+**repository content**. They keep artefacts in sync that nothing else couples — documentation against
+code, workflow files against their documented target state, file names against the project's naming
+rule. All of them locate the repository root by walking up to `EBICO.sln` and read the file via a local
+`ReadRepoFile(...)` helper; follow that pattern when adding one.
+
+| Test | Keeps in sync |
+| --- | --- |
+| `OrderCoverageMatrixTests` | [Order/BTF coverage matrix](../server/order-coverage-matrix.md) ↔ the code catalogues |
+| `ContainerArtifactsTests` | [Container docs](../deployment/container.md) ↔ `Dockerfile`/`docker-compose.yml` (+ ADR-0022 registration) |
+| `ReleasePipelineTests` | [Release runbook](release.md) ↔ `.github/workflows/release.yml` (+ ADR-0027 registration) |
+| `BranchProtectionDocTests` | Required-check list in [ci.md](ci.md) ↔ the job display names in `ci.yml` |
+| `ConformanceMatrixTests` | [Conformance doc](conformance-real-clients.md) ↔ the vendor-capture corpus |
+| `GettingStartedDocTests` | [Getting started](../getting-started.md) ↔ the doc index and root `README.md` |
+| `DocumentationNamingTests` | English file names, ADR index ↔ ADR files on disk, Suite routes ↔ `NavMenu` |
+
+`DocumentationNamingTests` (#134, epic #128) is the youngest of them and guards what a diff does not
+show: a **name**. It asserts that no tracked file name under `docs/`, `src/`, `tests/` or `.claude/`
+carries a German token (generated XSD bindings excluded, ADR-0006), that the index table in
+`docs/adr/README.md` lists exactly the ADRs present on disk and that every ADR opens with its
+`# NNNN — ` heading, and that the three routable Suite pages declare `/master-data`, `/transactions`
+and `/keys` — the same set `NavMenuTests` asserts on the rendered markup. The CI link checker sees only
+relative links inside `*.md`; a German slug reintroduced in an XML-doc reference, in
+`Directory.Build.props` or in a route would pass it unnoticed.
 
 ## Counterpart: fake vs. real
 

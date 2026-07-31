@@ -7,7 +7,7 @@ namespace EBICO.Core.Crypto;
 /// that encrypts the order data symmetrically with a one-time AES-128-CBC <i>transaction key</i>
 /// and encrypts that transaction key asymmetrically with the recipient's public encryption key
 /// using RSAES-OAEP over SHA-256. Stateless BCL wrappers
-/// (<see href="../adr/0008-krypto-bibliothek.md">ADR-0008</see>) that build on the issue #18 key
+/// (<see href="../adr/0008-crypto-library.md">ADR-0008</see>) that build on the issue #18 key
 /// layer (<see cref="RsaKeyMaterial"/>, <see cref="KeyVersions"/>).
 /// </summary>
 /// <remarks>

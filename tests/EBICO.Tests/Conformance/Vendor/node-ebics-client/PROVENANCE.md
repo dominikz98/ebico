@@ -20,7 +20,7 @@ local throwaway sink (never at a real bank).
 
 These files are the **output of the OSS client**, not property of the EBICS SC and not a derivative of a
 proprietary XSD/sample file — unlike the official ebics.org sample XML (which stays
-`.gitignore`d). Rationale: [ADR-0026](../../../../../docs/adr/0026-konformitaet-gegen-reale-clients.md).
+`.gitignore`d). Rationale: [ADR-0026](../../../../../docs/adr/0026-conformance-against-real-clients.md).
 
 ## Security
 

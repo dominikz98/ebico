@@ -137,4 +137,4 @@ auth key per subscriber cover all three versions.
 - [Authentication signature X002](../protocol/auth-signature-x002.md) — the checked crypto primitive
 - [EBICS return code catalog](../protocol/return-codes.md) — `061001`/`090004` and the segment codes
 - [Upload transaction](../server/upload-transaction.md) / [Download transaction](../server/download-transaction.md) — the segment return codes
-- [ADR-0023 — Server-side X002 verification](../adr/0023-serverseitige-x002-verifikation.md)
+- [ADR-0023 — Server-side X002 verification](../adr/0023-server-side-x002-verification.md)

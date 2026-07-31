@@ -28,7 +28,7 @@ Full classification: [../legal/ebics-licensing.md](../legal/ebics-licensing.md).
 - Contributors/CI must obtain the schemas (and possibly samples) locally to
   build/test the schema-dependent parts.
 - **Follow-up decision (M1 gate) — decided:** whether generated **bindings** are
-  committed — resolved in [ADR-0006](0006-generierte-xsd-bindings-committen.md)
+  committed — resolved in [ADR-0006](0006-commit-generated-xsd-bindings.md)
   (Option B: commit bindings, XSDs stay untracked).
 
 ## Alternatives

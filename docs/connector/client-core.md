@@ -5,7 +5,7 @@
 > the configuration, the DI registration and the own request dispatch. The
 > overarching design is in the [Connector architecture](architecture.md); the
 > decision *no MediatR* in
-> [ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md).
+> [ADR-0005](../adr/0005-connector-dispatch-without-mediatr.md).
 
 ## Purpose
 
@@ -119,7 +119,7 @@ connection; multi-subscriber scoping follows later.
 `Send<TResult>(IEbicsRequest<TResult>)` statically knows only the result type,
 not the concrete request type. The client therefore resolves the appropriate
 `IEbicsRequestHandler<TRequest, TResult>` via an **own** dispatch (no MediatR,
-[ADR-0005](../adr/0005-connector-dispatch-ohne-mediatr.md)):
+[ADR-0005](../adr/0005-connector-dispatch-without-mediatr.md)):
 
 1. At runtime, a type-bound wrapper
    (`RequestHandlerWrapper<TRequest, TResult>`) is created via
@@ -169,7 +169,7 @@ responsibilities with deliberately separated error semantics:
 
 Fundamental decision (static helper, error-semantics asymmetry, deliberate
 divergence from the strict server enforcement of ADR-0016):
-[ADR-0025](../adr/0025-clientseitige-sende-validierung.md).
+[ADR-0025](../adr/0025-client-side-send-validation.md).
 
 ## `EbicsResult<T>` — preliminary
 

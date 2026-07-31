@@ -105,7 +105,7 @@ overrides the start command with `EBICO.Suite.dll`.
 > **No shared live state:** the suite and server share **no** state today. The suite runs
 > its own in-memory store with seeded sample data and does **not** talk to the server over HTTP
 > ([ADR-0009](../adr/0009-blazor-render-mode.md)); cross-process live inspection against
-> a running server is a documented follow-up topic ([ADR-0015](../adr/0015-ereignis-protokollspeicher.md)).
+> a running server is a documented follow-up topic ([ADR-0015](../adr/0015-event-log-store.md)).
 > So the compose shows "both are running", not "coupled".
 
 The suite calls `UseHttpsRedirection()`; without a configured HTTPS port it logs a
@@ -135,7 +135,7 @@ CI (`.github/workflows/ci.yml`) builds the server image on every push/PR in a de
 `container-build` (**build-only**, no registry push), so that the `Dockerfile` does not rot.
 
 The **push to GHCR** happens in the tag-triggered **release pipeline**
-(`.github/workflows/release.yml`, #62 / [ADR-0027](../adr/0027-nuget-publish-und-release-pipeline.md)):
+(`.github/workflows/release.yml`, #62 / [ADR-0027](../adr/0027-nuget-publish-and-release-pipeline.md)):
 when a tag `vYEAR.MONTH.N` is pushed, the server image is built and pushed to GHCR as
 `ghcr.io/dominikz98/ebico-server:{VERSION}` **and** `:latest` — authenticated via
 the automatic `GITHUB_TOKEN` (no external secret). Procedure: [Release runbook](../development/release.md).
@@ -163,5 +163,5 @@ curl -i http://localhost:5014/health        # -> 200 "Healthy"
 
 - [Hostable server skeleton](../server/host.md) — `Program.cs`, `AddEbicoServer`, `EbicoServerOptions`, pipeline
 - [CI pipeline (GitHub Actions)](../development/ci.md) — build/test, container-build job
-- [ADR-0022 — Container image & ENV configuration](../adr/0022-container-image-und-konfiguration.md)
+- [ADR-0022 — Container image & ENV configuration](../adr/0022-container-image-and-configuration.md)
 - [ADR-0009 — Blazor render mode](../adr/0009-blazor-render-mode.md)

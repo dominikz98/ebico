@@ -1,6 +1,6 @@
 # Connector: Distributed electronic signature (HVU/HVZ/HVD/HVT/HVE/HVS)
 
-> Implementation of **issue #124** ([ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md)).
+> Implementation of **issue #124** ([ADR-0030](../adr/0030-transport-defaults-and-client-side-veu.md)).
 > On the server side the VEU has existed since **#42** ([VEU orders](../server/veu-orders.md), ADR-0020) — this
 > page describes the **client** side, which was missing up to #124.
 
@@ -124,7 +124,7 @@ generic `091121`.
   VEU store solely on the `OrderID`. Unverified against a real bank.
 - **The park trigger is design intent.** That `OZHNN` or `SignatureFlag` are the decisive signals is
   not verified against the official annexes (schemas proprietary,
-  [ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md)).
+  [ADR-0003](../adr/0003-handling-proprietary-schemas.md)).
 - **The HVE signature is not checked.** `HveUploadRequest.SignaturePayload` carries a minimal
   placeholder by default; the emulator logs *that* an authorised party signed (ADR-0020).
 - **HVT is order-summary** — no ISO-20022 single-transaction decomposition.
@@ -149,4 +149,4 @@ Additionally `UploadValidationTests` for the H005 `AdminOrderType` path.
 - [VEU orders (server)](../server/veu-orders.md) — the server-side implementation and the state machine
 - [Upload API](upload.md) · [Download API](download.md) — the families the VEU fits into
 - [Order/BTF coverage matrix](../server/order-coverage-matrix.md) — server and client availability
-- [ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md) · [ADR-0020](../adr/0020-veu-orders.md)
+- [ADR-0030](../adr/0030-transport-defaults-and-client-side-veu.md) · [ADR-0020](../adr/0020-veu-orders.md)

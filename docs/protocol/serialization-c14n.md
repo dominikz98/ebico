@@ -89,7 +89,7 @@ byte[] exc  = XmlCanonicalizer.Canonicalize(xml, C14nMode.Exclusive);   // exklu
 > ⚠️ **Spec caveat (default = inclusive).** The issue text names "exclusive C14N", but the
 > EBICS authentication signature very probably uses **inclusive**
 > Canonical XML 1.0. The official XSDs/annexes are not in the repo (cf.
-> [Schema sources](schema-sources.md) and [ADR-0003](../adr/0003-umgang-mit-proprietaeren-schemas.md)),
+> [Schema sources](schema-sources.md) and [ADR-0003](../adr/0003-handling-proprietary-schemas.md)),
 > so the primitive is deliberately designed for **both** algorithms and the default is set to
 > `Inclusive`. The exact algorithm is to be **verified** against the official EBICS annex,
 > as soon as the schemas are available; M2 (crypto/signatures) then selects the method
@@ -120,5 +120,5 @@ compares serializer determinism, not producing signed bytes.
 - [Version dispatch](version-dispatch.md) — `EbicsVersionDetector`/registry, on which the
   deserialization builds
 - [Test harness](../development/testing.md) — `CanonicalXmlComparer` (delegates here)
-- [ADR-0003 — proprietary schemas](../adr/0003-umgang-mit-proprietaeren-schemas.md) ·
-  [ADR-0006 — commit bindings](../adr/0006-generierte-xsd-bindings-committen.md)
+- [ADR-0003 — proprietary schemas](../adr/0003-handling-proprietary-schemas.md) ·
+  [ADR-0006 — commit bindings](../adr/0006-commit-generated-xsd-bindings.md)

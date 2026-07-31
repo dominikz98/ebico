@@ -118,7 +118,7 @@ bank keys are **not** stored.
 `IInitializationLetterRenderer` generates the letter from a pure `InitializationLetterModel`
 (date injected via `TimeProvider`, therefore deterministic). The `TextInitializationLetterRenderer`
 is dependency-free; the `PdfInitializationLetterRenderer` registered via `AddEbicoOnboarding()`
-additionally produces a PDF via **QuestPDF** (community license, [ADR-0010](../adr/0010-pdf-bibliothek.md)).
+additionally produces a PDF via **QuestPDF** (community license, [ADR-0010](../adr/0010-pdf-library.md)).
 The fingerprint appears in the letter in the grouped hex representation of
 `PublicKeyFingerprint.ToLetterFormat` (8 bytes per line).
 

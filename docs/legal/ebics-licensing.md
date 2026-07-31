@@ -45,12 +45,12 @@ This policy is already implemented (M0): `.gitignore`, `fetch-schemas.sh`,
 
 M1 generates **C# bindings** (classes) from the XSDs. Whether these count as a **derivative use**
 of the proprietary schemas was the M1 gate. **Decided (Option B,
-[../adr/0006-generierte-xsd-bindings-committen.md](../adr/0006-generierte-xsd-bindings-committen.md)):
+[../adr/0006-commit-generated-xsd-bindings.md](../adr/0006-commit-generated-xsd-bindings.md)):
 the bindings are committed, the XSDs themselves stay untracked.** This way CI builds/tests
 the protocol core without proprietary schemas; the written approval
 of the EBICS SC is pursued in parallel.
 
-Options (for classification, details in [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md)):
+Options (for classification, details in [ADR-0006](../adr/0006-commit-generated-xsd-bindings.md)):
 
 - **(A) Do not commit the bindings — generate them at build time from locally obtained XSDs.**
   Conservative, no generated derivatives in the repo. Drawback: contributor/CI
@@ -63,7 +63,7 @@ Options (for classification, details in [ADR-0006](../adr/0006-generierte-xsd-bi
 
 **Decision:** **(B)** — the generated bindings are committed (XSDs
 stay untracked), approval of the EBICS SC pursued in parallel. Rationale and
-consequences: [ADR-0006](../adr/0006-generierte-xsd-bindings-committen.md). Only
+consequences: [ADR-0006](../adr/0006-commit-generated-xsd-bindings.md). Only
 generated artifacts are committed, not the original XSD text; should the
 EBICS SC not permit this, the bindings can be removed/regenerated.
 

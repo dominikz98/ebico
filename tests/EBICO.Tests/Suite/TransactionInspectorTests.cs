@@ -2,7 +2,7 @@ using AwesomeAssertions;
 using Bunit;
 using EBICO.Server.State;
 using EBICO.Server.Transactions;
-using EBICO.Suite.Components.Transaktionen;
+using EBICO.Suite.Components.Transactions;
 using EBICO.Suite.Services;
 using Microsoft.Extensions.DependencyInjection;
 

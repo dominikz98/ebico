@@ -5,7 +5,7 @@ namespace EBICO.Tests.Suite;
 
 /// <summary>
 /// Unit tests for <see cref="MasterDataChangeNotifier"/> (issue #126): the broadcast contract the
-/// Stammdaten islands rely on — every subscriber is reached, disposal really unsubscribes, and a
+/// master-data islands rely on — every subscriber is reached, disposal really unsubscribes, and a
 /// failing subscriber does not silence the others.
 /// </summary>
 public class MasterDataChangeNotifierTests

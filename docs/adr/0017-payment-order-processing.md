@@ -5,8 +5,8 @@
 
 ## Context
 
-After the [BTF framework (#38)](0016-btf-framework-und-berechtigung.md) and the
-[upload transaction engine (#32)](0013-upload-transaktions-engine.md), an upload ended
+After the [BTF framework (#38)](0016-btf-framework-and-authorisation.md) and the
+[upload transaction engine (#32)](0013-upload-transaction-engine.md), an upload ended
 with the reassembled, decrypted, decompressed plaintext order data being held on the
 `UploadTransaction` — without **business** processing. Issue #39 delivers the first
 concrete order processing: SEPA payments (CCT/CIP → `pain.001`, CDD/CDB → `pain.008`)
@@ -25,7 +25,7 @@ submission conventions the emulator accepts.
    the two cross-checks (`NbOfTxs` = number of transactions, `CtrlSum` = sum of the
    `InstdAmt`). **No** ISO 20022 XSDs in the repo — consistent with the handling of
    proprietary/external schemas
-   ([ADR-0003](0003-umgang-mit-proprietaeren-schemas.md), [ADR-0006](0006-generierte-xsd-bindings-committen.md)).
+   ([ADR-0003](0003-handling-proprietary-schemas.md), [ADR-0006](0006-commit-generated-xsd-bindings.md)).
    Elements are matched via **local names**, so every `pain.00x.001.NN` revision is
    accepted. (Rejected: full XSD validation — schema-acquisition infrastructure + CI
    dependency with no benefit for the emulator; the pluggable processor abstraction

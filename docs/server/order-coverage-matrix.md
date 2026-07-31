@@ -138,7 +138,7 @@ The **Connector** column was added with **#124**. Until then the VEU was complet
 (since #42) but **not drivable from the bundled client in any version** — the matrix described only the
 server and thereby presented a coverage that did not exist from a user's perspective. Details and park
 trigger: [Connector: VEU](../connector/veu.md),
-[ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md).
+[ADR-0030](../adr/0030-transport-defaults-and-client-side-veu.md).
 
 ## Schema binding only (not wired)
 
@@ -180,7 +180,7 @@ Consolidated list of the deliberately not-yet-covered items (the "gaps" to be fl
   ([conformance against real clients](../development/conformance-real-clients.md)). The deviations
   uncovered there (`xsi:type` on `OrderDetails`, misclassification as `061099`, `A006`/PSS on H004,
   modulus with an ASN.1 sign byte) are fixed with **#117**
-  ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md)); the vendor replay now drives a real client's
+  ([ADR-0029](../adr/0029-interop-fixes-real-clients.md)); the vendor replay now drives a real client's
   onboarding chain through to `Ready`. Spec conformance against the official annexes generally
   remains only partially verified (schemas proprietary).
 
@@ -217,5 +217,5 @@ The *business* order tests per family live in the respective feature docs (see b
 - [VEU orders (HVU/HVZ/HVD/HVT/HVE/HVS)](veu-orders.md)
 - [INI](ini.md) / [HIA](hia.md) / [HPB](hpb.md) / [HCA/HCS/SPR/HSA](hca-hcs-spr-hsa.md) — key management
 - [Ticket overview](../ticket-overview.md) — milestones and issues (M5: #38–#43)
-- [ADR-0016 (BTF framework & authorisation)](../adr/0016-btf-framework-und-berechtigung.md)
+- [ADR-0016 (BTF framework & authorisation)](../adr/0016-btf-framework-and-authorisation.md)
 - [Licence & repo policy](../legal/ebics-licensing.md) — proprietary External Code List

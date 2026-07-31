@@ -47,7 +47,7 @@ authorisation check ([#38](btf-framework.md)) and also stored on the `UploadTran
 
 > **Note on FUL FileFormat resolution:** CDD (CORE) and CDB (B2B) both carry `pain.008`; from the
 > FileFormat alone the service option cannot be derived — the un-optioned default (CDD) wins.
-> For B2B via FUL an explicit marker would be needed (best-effort, see [ADR-0017](../adr/0017-zahlungsverkehr-order-verarbeitung.md)).
+> For B2B via FUL an explicit marker would be needed (best-effort, see [ADR-0017](../adr/0017-payment-order-processing.md)).
 
 ## Flow
 
@@ -164,4 +164,4 @@ The remaining transaction/segment codes (`091101`/`091104`/…) come unchanged f
 - [Event/log store (IEventLog)](event-log.md) — `OrderAccepted`/`OrderRejected` events
 - [Master data management](master-data.md) — authorisations, admin API (download queue)
 - [EBICS return code catalog](../protocol/return-codes.md) — `090004`/`090003`
-- [ADR-0017 (payments order processing)](../adr/0017-zahlungsverkehr-order-verarbeitung.md) — validation depth, status report storing, routing
+- [ADR-0017 (payments order processing)](../adr/0017-payment-order-processing.md) — validation depth, status report storing, routing

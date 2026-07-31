@@ -12,7 +12,7 @@
 > Deliberately **not yet**: a complete third-party client palette.
 >
 > **Addendum [#117](#fixed-deviations-117):** the deviations found by #59 are **fixed**
-> ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md)). The vendor replay is thereby no longer a
+> ([ADR-0029](../adr/0029-interop-fixes-real-clients.md)). The vendor replay is thereby no longer a
 > characterization test of a defect, but the **positive conformance evidence**: the
 > committed third-party client bytes drive the full onboarding chain INI → HIA → HPB through.
 
@@ -80,7 +80,7 @@ skip-if-missing (see [Capture guide](#capture-guide)).
 
 The findings lay **one behind the other on the same path**: each masked the next, which is why #59
 knew only the first (and its misclassification). Decisions and rejected alternatives:
-[ADR-0029](../adr/0029-interop-fixes-reale-clients.md).
+[ADR-0029](../adr/0029-interop-fixes-real-clients.md).
 
 #### 1. `OrderDetails` required an `xsi:type` (critical, blocked real clients)
 
@@ -169,7 +169,7 @@ Details/license/throwaway keys: the
 
 **Adding another client:** place its requests under
 `Conformance/Vendor/<client>/<version>/request/*.xml` (the path is **not** `.gitignore`d, see
-[ADR-0026](../adr/0026-konformitaet-gegen-reale-clients.md)), enclose a `PROVENANCE.md` and add a
+[ADR-0026](../adr/0026-conformance-against-real-clients.md)), enclose a `PROVENANCE.md` and add a
 replay in `VendorCaptureConformanceTests` with the expected return codes. The
 `HostID`/`PartnerID`/`UserID` used in the capture must be seeded as master data — the replay
 onboards a real subscriber, it does not stub it. If the corpus is missing, the replays skip — CI
@@ -202,8 +202,8 @@ stays green.
 - [E2E: negative & security cases](negative-security-cases.md) — X002 verification, tampering (#58)
 - [Test harness & fixtures](testing.md) — Tier A/B, `Conformance/`, `SampleXml`, `CanonicalXmlComparer`
 - [Order/BTF coverage matrix](../server/order-coverage-matrix.md) — order × version × status
-- [ADR-0026 — Conformance against real clients](../adr/0026-konformitaet-gegen-reale-clients.md)
-- [ADR-0029 — Interop fixes for real clients](../adr/0029-interop-fixes-reale-clients.md) — the
+- [ADR-0026 — Conformance against real clients](../adr/0026-conformance-against-real-clients.md)
+- [ADR-0029 — Interop fixes for real clients](../adr/0029-interop-fixes-real-clients.md) — the
   remediation of the deviations found here (#117)
 - [XSD bindings](../protocol/xsd-bindings.md) — the fixup step at the generator
 - [License & repo policy](../legal/ebics-licensing.md) — proprietary schemas/examples vs. OSS output

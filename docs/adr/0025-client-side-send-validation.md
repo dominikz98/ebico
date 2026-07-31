@@ -16,7 +16,7 @@ round-trip). Issue #44 (connector epic, M6) closes this gap.
 
 To be decided: (a) where the stage is anchored, (b) how errors are expressed, (c) whether
 and how a client-side "authorisation" is configured — and how that relates to the
-**server-side** authorisation check from [ADR-0016](0016-btf-framework-und-berechtigung.md).
+**server-side** authorisation check from [ADR-0016](0016-btf-framework-and-authorisation.md).
 
 ## Decision
 
@@ -24,7 +24,7 @@ and how a client-side "authorisation" is configured — and how that relates to 
    is called as the first statement in `UploadExecutor.ExecuteAsync`/
    `DownloadExecutor.ExecuteAsync` — before any key I/O, crypto, serialisation and
    transport. Deliberately the same pattern as server-side
-   ([ADR-0016](0016-btf-framework-und-berechtigung.md), point 4: static check logic instead
+   ([ADR-0016](0016-btf-framework-and-authorisation.md), point 4: static check logic instead
    of an `IOrderAuthorizationService`) and consistent with the existing static helpers
    (`UploadSupport`, `EncryptionE002`). The executors are the only choke point for the
    generic **and** all convenience handlers; that avoids duplication across the handler

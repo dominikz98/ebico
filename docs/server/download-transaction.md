@@ -229,4 +229,4 @@ no proprietary fixtures):
 - [Master data management & admin API](master-data.md) — pattern of the unauthenticated admin API
 - [Hostable server skeleton](host.md) — pipeline, error mapping, `EbicoServerOptions`
 - [EBICS return-code catalog](../protocol/return-codes.md) — the triggered transaction/acknowledgement codes
-- [ADR-0014 (download transaction engine)](../adr/0014-download-transaktions-engine.md) — dedicated engine, routing disambiguation, provider & consumption semantics
+- [ADR-0014 (download transaction engine)](../adr/0014-download-transaction-engine.md) — dedicated engine, routing disambiguation, provider & consumption semantics

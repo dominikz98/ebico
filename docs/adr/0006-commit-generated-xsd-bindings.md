@@ -6,7 +6,7 @@
 ## Context
 
 M1 generates C# bindings from the EBICS XSDs (issues #11–#13).
-[ADR-0003](0003-umgang-mit-proprietaeren-schemas.md) excluded the XSDs themselves
+[ADR-0003](0003-handling-proprietary-schemas.md) excluded the XSDs themselves
 from the repo and **left the follow-up question open**: whether the generated
 bindings count as a *derivative work* and may be committed. The options are
 described in [../legal/ebics-licensing.md](../legal/ebics-licensing.md):

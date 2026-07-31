@@ -8,7 +8,7 @@
 
 ## Purpose
 
-The `/schluessel` page is the key/certificate view of the inspector UI. It makes the
+The `/keys` page is the key/certificate view of the inspector UI. It makes the
 public keys of the bank and subscribers visible along with their SHA-256 fingerprints and
 provides two tools: the **INI-letter comparison** (the manual fingerprint check that
 a bank performs when an INI arrives) and **test-CA/key tools** for generating
@@ -108,7 +108,7 @@ target H005 (EBICS 3.0), where keys are exchanged as certificates.
   stored keys or a non-seeded bank produces no entry.
 - `FingerprintFormatTests` — parsing hex with whitespace/case, round-trip against
   `ToLetterFormat`, rejection of invalid input.
-- `SchluesselPageTests` (bUnit) — the page renders the key fingerprints and the
+- `KeysPageTests` (bUnit) — the page renders the key fingerprints and the
   KeyVersions catalogue.
 - `IniLetterComparisonToolTests` (bUnit) — matching fingerprint → success, mismatching → error,
   invalid → warning.

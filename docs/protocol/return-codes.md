@@ -5,7 +5,7 @@ business codes as constants, a registry for lookup and the server-side
 exception→return-code mapping. Until now there was only a deliberately provisional, server-local
 set of nine codes (skeleton #25) and a parallel `EbicsResult<T>` in the connector. Issue
 **#36** (Milestone M4) brings both together into a central catalogue. Conventions:
-[ADR-0012](../adr/0012-returncode-katalog.md) and [ADR-0007](../adr/0007-domaenen-value-objects-record-struct.md).
+[ADR-0012](../adr/0012-return-code-catalogue.md) and [ADR-0007](../adr/0007-domain-value-objects-record-struct.md).
 
 > **Scope:** The catalogue provides the codes as constants and maps exceptions onto them.
 > The actual response creation (`EbicsResponseFactory`) and the request pipeline remain
@@ -69,7 +69,7 @@ var outcome = EbicsReturnCodes.CombineOutcome("000000", "EBICS_OK", "090005");
 The connector uses this in both envelope base classes (`DownloadEnvelopeBuilderBase` /
 `UploadEnvelopeBuilderBase`), so that `EbicsResult.ReturnCode` and `EbicsResult.ReturnText` never
 diverge. Previously every business error reported `EBICS_OK` as the text
-([ADR-0030](../adr/0030-defaults-und-clientseitige-veu-anbindung.md)).
+([ADR-0030](../adr/0030-transport-defaults-and-client-side-veu.md)).
 
 ## Catalogue
 
@@ -144,7 +144,7 @@ unambiguously, regardless of the cause.
 > (well-formed but not schema-conformant client XML) into `EbicsEnvelopeFormatException` → `091010`,
 > instead of letting them fall through as a bare `InvalidOperationException` onto `061099`. The mapper
 > did **not** have to be softened for this — only the place that knows whose bytes they are makes
-> the assignment ([ADR-0029](../adr/0029-interop-fixes-reale-clients.md)).
+> the assignment ([ADR-0029](../adr/0029-interop-fixes-real-clients.md)).
 
 ## EBICS version relation
 
@@ -171,6 +171,6 @@ Tests are Tier A (CI-safe, without proprietary samples).
 ## Related
 
 - [Hostable server skeleton](../server/host.md) — pipeline, response creation, HTTP status mapping
-- [ADR-0012 — Return-code catalogue](../adr/0012-returncode-katalog.md)
-- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md)
+- [ADR-0012 — Return-code catalogue](../adr/0012-return-code-catalogue.md)
+- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domain-value-objects-record-struct.md)
 - [Connector architecture](../connector/architecture.md) — `EbicsResult<T>` uses `EbicsReturnCode.OkCode`

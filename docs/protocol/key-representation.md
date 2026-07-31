@@ -3,7 +3,7 @@
 The first crypto layer in `EBICO.Core` (`Crypto/`): type-safe key versions
 (A00x/E002/X002), an RSA key container and import/export via PKCS#8, X.509/SPKI,
 PEM and the EBICS `RSAKeyValue` representation. Issue **#18** (Milestone M2),
-crypto library: [ADR-0008](../adr/0008-krypto-bibliothek.md)
+crypto library: [ADR-0008](../adr/0008-crypto-library.md)
 (`System.Security.Cryptography`, no BouncyCastle).
 
 > **Scope:** Deliberately only **representation, import/export and version mapping**.
@@ -83,7 +83,7 @@ KeyVersions.PermittedFor(KeyPurpose.Signature, EbicsVersion.H005);         // A0
 > For **A006 on H004** there is at least hard evidence from practice: the real OSS client
 > node-ebics-client signs its H004 INI order data with A006 by default (vendor capture,
 > see [Conformance against real clients](../development/conformance-real-clients.md) and
-> [ADR-0029](../adr/0029-interop-fixes-reale-clients.md)). H003 remains deliberately excluded.
+> [ADR-0029](../adr/0029-interop-fixes-real-clients.md)). H003 remains deliberately excluded.
 
 ## Key material: `RsaKeyMaterial`
 
@@ -108,7 +108,7 @@ later fingerprints (#22) and the order-data layer see the same bytes.
 
 ## Import / export — `RsaKeyImportExport`
 
-Thin wrappers around the BCL ([ADR-0008](../adr/0008-krypto-bibliothek.md)); BCL `CryptographicException`
+Thin wrappers around the BCL ([ADR-0008](../adr/0008-crypto-library.md)); BCL `CryptographicException`
 is uniformly translated into `KeyMaterialException`.
 
 | Format | Import | Export |
@@ -148,7 +148,7 @@ version-independent binding `XmlDsig.RsaKeyValueType`.
 ## Related
 
 - [Bank-technical signature A005/A006](bank-signature.md) — the first crypto operation that builds on this layer (#19)
-- [ADR-0008 — Crypto library](../adr/0008-krypto-bibliothek.md)
-- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domaenen-value-objects-record-struct.md) — pattern for `KeyVersion`
+- [ADR-0008 — Crypto library](../adr/0008-crypto-library.md)
+- [ADR-0007 — Domain value objects as `readonly record struct`](../adr/0007-domain-value-objects-record-struct.md) — pattern for `KeyVersion`
 - [Version dispatch](version-dispatch.md) — the `EbicsVersion` registry that `KeyVersions` refers to
 - [XSD bindings](xsd-bindings.md) — `RsaKeyValueType` and the (to-be-bound-later) `PubKeyInfoType` types

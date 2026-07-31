@@ -5,7 +5,7 @@
 
 ## Context
 
-After the [upload transaction](0013-upload-transaktions-engine.md) (#32), the EBICS
+After the [upload transaction](0013-upload-transaction-engine.md) (#32), the EBICS
 **download** (#33) is the second multi-phase transaction — and the first in the
 **send direction** (server→client). It has **three** phases: **initialisation**
 (provide data, compress, E002-encrypt, segment, assign transaction ID, first
@@ -14,7 +14,7 @@ Compared with the upload, three points were new to decide:
 
 1. **Routing collision upload ↔ download.** A transfer request carries only the
    `TransactionID`, no order type. The pipeline must route it to the **correct**
-   engine — the [ADR-0013 rule](0013-upload-transaktions-engine.md) ("`TransactionID`
+   engine — the [ADR-0013 rule](0013-upload-transaction-engine.md) ("`TransactionID`
    present → upload") would wrongly route download transfers to the upload engine. In
    addition, the **receipt** phase is new (upload does not have it).
 2. **Origin of the order data** ("data provisioning server-side"). So far there was
@@ -45,14 +45,14 @@ Compared with the upload, three points were new to decide:
    (default `InMemoryDownloadDataProvider`) holds a **FIFO queue** of plaintext order
    data per (subscriber, order type); the initialisation takes the next element (empty
    → `090005`). Data is fed in via the existing
-   [admin API](0011-server-stammdatenverwaltung.md) (`POST …/downloads/{orderType}`),
+   [admin API](0011-server-master-data-management.md) (`POST …/downloads/{orderType}`),
    analogous to master-data management. A real data store is swappable via
    `TryAddSingleton`.
 4. **Consumption semantics.** The initialisation removes the data. A **positive**
    acknowledgement (`011000`) leaves it consumed; a **negative** one (`011001`)
    re-enqueues it. Both acknowledgement codes are **technical** → header (via
    `EbicsReturnCode.Kind`). **No** new return codes were needed — the catalogue from
-   [ADR-0012](0012-returncode-katalog.md) already contains them.
+   [ADR-0012](0012-return-code-catalogue.md) already contains them.
 
 ## Consequences
 

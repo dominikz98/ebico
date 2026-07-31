@@ -176,4 +176,4 @@ The remaining transaction/segment codes come unchanged from the
 - [Master data management](master-data.md) — banks/partners/subscribers incl. address/accounts/name/URL, authorisations, admin API
 - [BTF framework (H005)](btf-framework.md) — admin vs. BTF order types, authorisation check
 - [Download orders: account statements & reports](statement-orders.md) — the sister feature (#40) of the same engine
-- [ADR-0019 (status & protocol orders)](../adr/0019-status-protokoll-orders.md) — domain extension, HAC as an IEventLog projection
+- [ADR-0019 (status & protocol orders)](../adr/0019-status-and-protocol-orders.md) — domain extension, HAC as an IEventLog projection

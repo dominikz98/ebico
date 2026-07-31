@@ -51,11 +51,14 @@ complete BTF/order palette possible.
   comments and XML doc, Suite UI strings, `CLAUDE.md` and `.claude/skills/`, commit messages, PR
   descriptions and new issues. Reuse the terminology of the merged translations instead of coining
   new terms (e.g. *master data*, *subscriber*, *order type*, *bank-technical signature*, *return
-  code*, *spec caveat*). Known exceptions: German file names, doc slugs and Suite routes stay until
-  #134 renames them; the generated XSD bindings keep the German `<xs:documentation>` text of the
+  code*, *spec caveat*). This covers **names, not just prose**: file names, doc slugs, ADR slugs and
+  Suite routes are English too (#134 renamed the last German ones; `DocumentationNamingTests` guards
+  it). Known exceptions: the generated XSD bindings keep the German `<xs:documentation>` text of the
   proprietary schemas (ADR-0006, do not hand-edit); the INI/HIA letter
   (`InitializationLetterTextBuilder`) stays German because the subscriber prints and posts it to a
-  German-speaking bank.
+  German-speaking bank; the one-off bootstrap scripts `scripts/create-ebico-plan.sh` and
+  `scripts/add-event-log-tickets.sh` keep their German issue texts as a historical record of how the
+  ticket plan was seeded.
 - Issues/milestones live on GitHub (`gh issue list`). Overview:
   `docs/ticket-overview.md` (10 milestones M0–M9, 63 issues, 12 epics).
 - Roadmap: M0 (foundation) → M1 (core/protocol) → M2 (crypto) → M3–M5 (server)

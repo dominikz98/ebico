@@ -12,7 +12,7 @@
 > transaction engines ([upload](upload-transaction.md)/[download](download-transaction.md)).
 > Deliberately **not yet**: the two **projections** themselves — **HAC** (Customer Protocol, M5) and the
 > **Suite inspector** (M7) — consume `IEventLog` only, but are separate issues; a **persistent**
-> implementation (SQLite or similar, [ADR-0015](../adr/0015-ereignis-protokollspeicher.md)); events from
+> implementation (SQLite or similar, [ADR-0015](../adr/0015-event-log-store.md)); events from
 > the **signature check** (the verify stage is a no-op). VEU events
 > (`VeuPending`/`VeuSigned`/`VeuReleased`/`VeuCancelled`) exist since #42 (see [VEU orders](veu-orders.md)).
 
@@ -104,7 +104,7 @@ subscriber binding of the transaction:
 - **Suite inspector (M7):** reads **raw and global** across all customers (without a visibility filter), with
   live filters (customer/period/type/severity) and jump event → transaction. Also sees the internal
   details. The Suite accesses the store in-process ([ADR-0009](../adr/0009-blazor-render-mode.md)).
-  **Implemented in [#54](../suite/transaktions-inspektor.md)**; the raw XML per transaction phase comes
+  **Implemented in [#54](../suite/transaction-inspector.md)**; the raw XML per transaction phase comes
   additionally from the [message-capture store](../adr/0021-message-capture-store.md).
 
 ## Example events
@@ -130,7 +130,7 @@ process restarts). The sequence numbers keep growing independently of the evicti
 ## Persistence
 
 The default `InMemoryEventLog` retains nothing beyond a process restart — the same approach as the
-rest of the server state ([ADR-0011](../adr/0011-server-stammdatenverwaltung.md)). The interface is
+rest of the server state ([ADR-0011](../adr/0011-server-master-data-management.md)). The interface is
 **asynchronous**, so that a persistent store (SQLite or similar) can later be plugged in via
 `TryAddSingleton<IEventLog, …>` before `AddEbicoServer`, **without** changing a caller.
-Details and scope: [ADR-0015](../adr/0015-ereignis-protokollspeicher.md).
+Details and scope: [ADR-0015](../adr/0015-event-log-store.md).

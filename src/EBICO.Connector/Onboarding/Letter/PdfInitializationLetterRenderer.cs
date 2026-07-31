@@ -11,7 +11,7 @@ namespace EBICO.Connector.Onboarding.Letter;
 /// </summary>
 /// <remarks>
 /// Uses the QuestPDF <b>Community</b> license (set once in the static constructor), which is free for
-/// organisations below the revenue threshold — see <c>docs/adr/0010-pdf-bibliothek.md</c>.
+/// organisations below the revenue threshold — see <c>docs/adr/0010-pdf-library.md</c>.
 /// </remarks>
 internal sealed class PdfInitializationLetterRenderer : IInitializationLetterRenderer
 {

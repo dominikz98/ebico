@@ -176,4 +176,4 @@ no proprietary fixtures):
 - [Hostable server skeleton](host.md) — pipeline, error mapping, `EbicoServerOptions`
 - [Key change & suspension (HCA/HCS/SPR/HSA)](hca-hcs-spr-hsa.md) — model for the single-phase, encrypted upload
 - [EBICS return code catalog](../protocol/return-codes.md) — the triggered transaction/segment codes
-- [ADR-0013 (upload transaction engine)](../adr/0013-upload-transaktions-engine.md) — dedicated engine instead of resolver, in-memory transaction store
+- [ADR-0013 (upload transaction engine)](../adr/0013-upload-transaction-engine.md) — dedicated engine instead of resolver, in-memory transaction store

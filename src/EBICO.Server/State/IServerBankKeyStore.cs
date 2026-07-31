@@ -33,7 +33,7 @@ public sealed record BankKeyPair(
 /// persistent or pre-seeded implementation can be substituted via <c>TryAddSingleton</c> before
 /// <c>AddEbicoServer</c>; <see cref="SetAsync"/> lets a caller inject a known pair (tests, fixed
 /// emulator identities). Mirrors the pluggable-store pattern of the master data
-/// (<see href="../adr/0011-server-stammdatenverwaltung.md">ADR-0011</see>).
+/// (<see href="../adr/0011-server-master-data-management.md">ADR-0011</see>).
 /// </remarks>
 public interface IServerBankKeyStore
 {
