@@ -58,6 +58,7 @@ but marked as superseded and pointed to the successor ADR.
 | [0029](0029-interop-fixes-real-clients.md) | Interop fixes for real clients (`OrderDetails` without `xsi:type`, `A006` on H004, modulus normalisation) | accepted |
 | [0030](0030-transport-defaults-and-client-side-veu.md) | Aligned transport defaults (segment size ↔ body limit), consistent return-code texts and client-side VEU wiring | accepted |
 | [0031](0031-master-data-island-change-notification.md) | Change notification between the Suite's master-data islands (`IMasterDataChangeNotifier`, singleton) | accepted |
+| [0032](0032-response-authentication-signature.md) | Authentication signature on the server response (X002 outbound, connector verifies, `IEbicsResponseSigner`) | accepted |
 
 ## Open/planned decisions (backlog)
 

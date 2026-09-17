@@ -75,7 +75,7 @@ flowchart TD
     S3 --> S4[4. X002 authentication signature]
     S4 --> S5[5. HttpClient.Send]
     S5 --> S6[6. HTTP response]
-    S6 --> S7[7. Verify + decrypt]
+    S6 --> S7["7. Verify X002 response signature + decrypt"]
     S7 --> S8[8. Check return code]
     S8 --> S9[9. further segments if needed]
     S9 --> S10[10. Deserialise → TResult]
@@ -89,6 +89,11 @@ the crypto stages is described on their own doc pages:
 [XML serialization & C14N](../protocol/serialization-c14n.md),
 [Encryption E002](../protocol/encryption-e002.md) and
 [Bank-technical signature A005/A006](../protocol/bank-signature.md).
+
+Stage 7 begins with the **bank's X002 signature over the response**, verified against the bank key
+HPB stored (`ResponseSignatureVerifier`, on by default, per-connection opt-out
+`VerifyResponseSignature`): nothing further — return code included — is acted upon until the
+response is attributable to the bank. See [Response signature](../protocol/response-signature.md).
 
 ## Core abstractions
 
@@ -355,6 +360,7 @@ blocks — so the maturity is transparent and no false "done" impression arises.
 | 8. Return code handling (`EbicsResult<T>`) | `Connector/EbicsResult<T>` (preliminary) | 🟡 #46, catalog #36 |
 | 3. Compression | `Core/Serialization/EbicsCompression` (ZIP/zlib) | ✅ #47 |
 | 4. X002 authentication signature | `Core/Crypto/AuthenticationSignature` (wired in the HPB flow) | ✅ #47 (HPB) |
+| 7. Verify X002 response signature | `Connector/Security/ResponseSignatureVerifier` (in the shared `ExchangeAsync`) | ✅ #143 |
 | Onboarding handler (INI/HIA/HPB) | `Connector/Onboarding` (requests/handler/builder, `AddEbicoOnboarding`) | ✅ #47 |
 | Key generation + INI/HIA letter | `Connector/Onboarding` (`ISubscriberKeyGenerator`, `IInitializationLetterRenderer`) | ✅ #47 |
 | 9. Segmentation | `Core/Serialization/EbicsSegmentation` (wired in the upload) | ✅ #48 |

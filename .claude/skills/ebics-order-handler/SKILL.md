@@ -67,7 +67,7 @@ and a caller can put their own processors in front of them.
 - **Coverage matrix:** extend `docs/server/order-coverage-matrix.md` — otherwise the guard test
   `OrderCoverageMatrixTests` fails.
 - **ADR:** new decision as `docs/adr/NNNN-<kebab-title>.md` (next free number) + in the ADR index.
-- **Spec caveats** made explicit in the docs/test text (ES/A00x unverified, unsigned response, etc.).
+- **Spec caveats** made explicit in the docs/test text (ES/A00x unverified, X002 interop unevidenced against a real client, etc.). Note the response *is* signed since #143 — do not carry the old "unsigned response" caveat into new docs.
 
 ## Sources
 

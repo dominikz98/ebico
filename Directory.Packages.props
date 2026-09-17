@@ -67,9 +67,12 @@
   <!--
     NuGet packaging (issue #50): SourceLink for EBICO.Core + EBICO.Connector. Build-only
     (PrivateAssets=all in Directory.Build.props), does not flow into the package as a runtime dependency.
+    Kept on the 10.x line: 8.0.0 pulls in Microsoft.Build.Tasks.Git 8.0.0, which has a moderate-severity
+    advisory (GHSA-23fw-v26w-5fgq). Under TreatWarningsAsErrors that surfaces as NU1902 = build error, so
+    the plain `dotnet build` broke as soon as the advisory was published — CI included.
   -->
   <ItemGroup>
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
   </ItemGroup>
 
   <!--

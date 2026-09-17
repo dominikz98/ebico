@@ -27,6 +27,20 @@ public sealed class EbicsConnectionOptions
     public EbicsVersion Version { get; set; } = EbicsVersion.H005;
 
     /// <summary>
+    /// Whether to verify the bank's X002 authentication signature on every transaction
+    /// <c>ebicsResponse</c> against the bank key stored during HPB. Defaults to <see langword="true"/>
+    /// — an unverified response is one an attacker on the wire could have written, so a return code or
+    /// a downloaded statement is only trustworthy once the signature holds.
+    /// </summary>
+    /// <remarks>
+    /// The key-management responses (INI/HIA/HPB) are never verified: their schema carries no
+    /// <c>AuthSignature</c>, because they precede or bootstrap the very key exchange a signature would
+    /// be checked against. Set this to <see langword="false"/> only to talk to a server that does not
+    /// sign its responses (and accept that the response is then unauthenticated).
+    /// </remarks>
+    public bool VerifyResponseSignature { get; set; } = true;
+
+    /// <summary>
     /// An optional client-side allow-list of the (classical) order-type codes the subscriber may submit
     /// (e.g. <c>"CCT"</c>, <c>"C53"</c>). When non-empty, the connector rejects a request whose effective
     /// order type is not listed <em>before</em> contacting the server (a fast-fail that saves a round-trip),

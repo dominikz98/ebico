@@ -1,5 +1,8 @@
 using EBICO.Connector;
 using EBICO.Connector.Transport;
+using EBICO.Core.Crypto;
+using EBICO.Core.Serialization;
+using EBICO.Core.Versioning;
 
 namespace EBICO.Tests.Connector;
 
@@ -131,4 +134,42 @@ public sealed class MutableTimeProvider : TimeProvider
     /// <summary>Moves the current instant forward by <paramref name="by"/>.</summary>
     /// <param name="by">The amount to advance.</param>
     public void Advance(TimeSpan by) => _now += by;
+}
+
+/// <summary>
+/// The bank identity the Tier-A connector harnesses answer as. A real bank signs its
+/// <c>ebicsResponse</c> with its X002 key and the connector verifies that signature, so a fake server
+/// that did not sign would only be testable with verification switched off — which is exactly the check
+/// these suites should keep exercising. One key pair is generated lazily per test run (RSA-2048 is an
+/// enforced floor and dominates the cost); the material is immutable, so sharing leaks no state.
+/// </summary>
+internal static class FakeBankIdentity
+{
+    private static readonly Lazy<RsaKeyMaterial> AuthenticationKey =
+        new(static () => RsaKeyMaterial.Generate(), LazyThreadSafetyMode.ExecutionAndPublication);
+
+    /// <summary>The bank's authentication key pair, including its private part (the server side).</summary>
+    public static RsaKeyMaterial AuthenticationKeyPair => AuthenticationKey.Value;
+
+    /// <summary>The bank's public authentication key, as a client holds it after HPB.</summary>
+    public static RsaKeyMaterial PublicAuthenticationKey => AuthenticationKey.Value.ToPublicOnly();
+
+    /// <summary>
+    /// Serializes <paramref name="envelope"/> the way the server does: an <c>ebicsResponse</c> is signed
+    /// with the bank's X002 key, a key-management response (which has no <c>AuthSignature</c> element)
+    /// goes out as built.
+    /// </summary>
+    /// <param name="envelope">The response envelope to serialize.</param>
+    /// <returns>The serialized (and, where applicable, signed) response bytes.</returns>
+    public static byte[] SerializeSigned(IEbicsResponseEnvelope envelope)
+    {
+        if (envelope is IAuthSignedResponseEnvelope signable)
+        {
+            var version = KeyVersions.Default(KeyPurpose.Authentication, envelope.ProtocolVersion).Version;
+            signable.AuthSignature = AuthenticationSignature.Sign(
+                EbicsXmlSerializer.SerializeToString(envelope), AuthenticationKeyPair, version);
+        }
+
+        return EbicsXmlSerializer.SerializeToUtf8Bytes(envelope);
+    }
 }

@@ -119,8 +119,11 @@ transitions (`Initialized → Ready`).
 - The concrete codes (`091002` for state errors, `090004` for order-data format) are
   to be verified against the official EBICS Annex 1; the complete, central
   return code catalogue arrives with **#36 (M4)**.
-- The response is **unsigned** — the response authentication signature (X002) is **M4**;
-  strict clients might reject unsigned responses (consistent with `EbicsResponseFactory`).
+- The `ebicsKeyManagementResponse` is **unsigned, and stays that way**: its schema carries no
+  `AuthSignature` element, because these responses precede or bootstrap the key exchange a signature
+  would be checked against. Real clients skip verification for exactly these orders. The transaction
+  `ebicsResponse` **is** signed since #143 — see
+  [Response signature](../protocol/response-signature.md).
 - **H005:** only the public key is extracted from the transmitted certificates and
   stored; a certificate-chain/self-signature check is a conformance topic (**M8**).
 - `OrderAttribute`/`SecurityMedium` are not enforced (unverified, as in the connector).

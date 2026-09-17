@@ -65,7 +65,7 @@ The endpoint handler stays thin: it reads the body transport-safely and delegate
 | **Version dispatch** | root namespace → version, root element → envelope type; cast to `IEbicsRequestEnvelope` | unsupported version / no request envelope → `061002` |
 | **Verify** | `IEbicsRequestVerifier.VerifyAsync` (default: No-Op → success) | failure → `061001` |
 | **Handle** | `IEbicsOrderHandlerResolver.Resolve(version, orderType)` (skeleton: no handler) | no handler → `091006`; empty/unknown order type → `091005` |
-| **Respond** | `EbicsResponseFactory.BuildErrorResponse(version, code)` → `SerializeToUtf8Bytes` | — |
+| **Respond** | `EbicsResponseFactory.Build…Response(version, …)` → `IEbicsResponseSigner.SerializeAsync` (signs the `ebicsResponse` with the bank's X002 key, #143) | — |
 
 Parsing and version dispatch are reused from `EBICO.Core`
 ([Version dispatch](../protocol/version-dispatch.md)); the parsing is hardened against
@@ -80,6 +80,7 @@ M3/M4 features dock:
 | Type | Role | Skeleton default |
 | --- | --- | --- |
 | `IEbicsRequestVerifier` | signature/state checking (X002, HostID/User, subscriber state) | since #58 `X002EbicsRequestVerifier` (checks the X002 signature of signed `ebicsRequest`, [details](../development/negative-security-cases.md)); the original skeleton was `NoOpEbicsRequestVerifier` |
+| `IEbicsResponseSigner` | serialising the response, and signing the `ebicsResponse` with the bank's own X002 key ([details](../protocol/response-signature.md)) | since #143 `X002EbicsResponseSigner`; `UnsignedEbicsResponseSigner` to opt out |
 | `IEbicsOrderHandler` | processing exactly one order type of one version | *no registration* |
 | `IEbicsOrderHandlerResolver` | resolution `(Version, OrderType) → Handler` | `EbicsOrderHandlerResolver` over `IEnumerable<IEbicsOrderHandler>` (empty) |
 
@@ -137,8 +138,10 @@ Details, complete code tables and the error behaviour:
 - **"Unsupported version"** has no dedicated code in the `ebicsResponse`
   (spec-conformant is version negotiation via HEV); the skeleton maps pragmatically onto
   `061002` in the fallback version.
-- The **response signature (X002)** is deliberately absent in the skeleton (= M4); strict clients
-  might reject unsigned responses.
+- The **response signature (X002)** was absent in the skeleton; since #143 the respond stage runs
+  through `IEbicsResponseSigner` (default `X002EbicsResponseSigner`), which signs every transaction
+  `ebicsResponse` with the bank's own key — see [Response signature](../protocol/response-signature.md).
+  The `ebicsKeyManagementResponse` has no `AuthSignature` element and stays unsigned by protocol.
 - `TransactionPhaseType` serialises, lacking a `*Specified` flag, always `Initialisation` —
   to be checked against schema/spec for a transaction-free error response.
 

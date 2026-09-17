@@ -99,8 +99,10 @@ against a verify-skipped subscriber):
   (M3/M4) and deliberately not part of #58.
 - **ES/A00x order signature stays unchecked.** The *authorising* bank-technical signature of the
   order data is still only carried along, not verified.
-- **Server responses are unsigned.** #58 checks the request direction; the signature of the
-  `ebicsResponse` remains an open caveat (M4/M6).
+- ~~**Server responses are unsigned.**~~ **Closed by #143** (ADR-0032): the server signs every
+  transaction `ebicsResponse` with the bank's own X002 key and the connector verifies it — see
+  [response signature](../protocol/response-signature.md). The `ebicsKeyManagementResponse`
+  (INI/HIA/HPB) has no `AuthSignature` element and stays unsigned by protocol.
 - **C14N caveat persists:** the byte-exact canonicalization/reference detail of X002 is still
   not verified against the official annexes (see [X002 documentation](../protocol/auth-signature-x002.md)).
   The connector↔server roundtrip is consistent in itself (the happy-path E2E tests evidence it), the

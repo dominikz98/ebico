@@ -49,6 +49,13 @@ Mediator pattern: the application only knows `IEbicsClient.Send(request)` and ge
   otherwise it answers with HTTP 413 instead of a return code.
 - **Evaluating responses:** resolve code and report text together via `EbicsReturnCodes.CombineOutcome(…)` —
   never mix the header text into a body code.
+- **Response signature (ADR-0032/#143):** the shared `ExchangeAsync` of `UploadSupport`/`DownloadSupport`
+  runs `ResponseSignatureVerifier` over every transaction `ebicsResponse` **before** the caller sees it
+  (bank X002 key from the key store, as HPB left it). A new send path must go through that seam, or it
+  silently accepts unauthenticated responses. Failure → `EbicsResponseSignatureException` (an exception,
+  not a return code: an unattributable response has no trustworthy code in it). Opt-out per connection via
+  `EbicsConnectionOptions.VerifyResponseSignature`. A connector test whose fake server answers must
+  therefore **sign** — see `FakeBankIdentity` in `tests/EBICO.Tests/Connector/TestDoubles.cs`.
 
 ## Client-side send validation (ADR-0025)
 

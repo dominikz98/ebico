@@ -60,13 +60,18 @@ Read `docs/development/testing.md`, `docs/development/e2e-connector-server.md` a
   authorisation `090003`, invalid pain.001 `090004`.
 - Enable server-side X002 verification via `X002EbicsRequestVerifier` (the default since ADR-0023);
   for pure flow tests without signature checking, substitute `NoOpEbicsRequestVerifier` before `AddEbicoServer`.
+- The **response direction** is signed by default too (`X002EbicsResponseSigner`, ADR-0032/#143) and the
+  connector verifies it. To drive a "server does not sign" case, replace the signer on the test host
+  (`ConfigureTestServices` runs after `AddEbicoServer`, so use `services.Replace(…)` with
+  `UnsignedEbicsResponseSigner`) — see `E2E/ResponseSignatureE2ETests`. Onboarding still succeeds in that
+  setup; only the business orders fail, which is the shape of the original finding.
 
 ## Assertions & docs
 
 - Compare XML structurally with `CanonicalXmlComparer` (`tests/EBICO.Tests/Infrastructure/`), not as strings.
 - Load proprietary sample XML "skip-if-missing" (not in the repo).
 - **Mandatory:** the test XML-doc contains an explicit **"spec caveat"** paragraph (what is NOT checked:
-  ES/A00x, possibly the unsigned response, synthetic data, counterparty = emulator).
+  ES/A00x, the unevidenced byte-level X002 interop in both directions, synthetic data, counterparty = emulator).
 
 ## Sources
 
