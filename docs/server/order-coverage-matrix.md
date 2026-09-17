@@ -161,8 +161,9 @@ Consolidated list of the deliberately not-yet-covered items (the "gaps" to be fl
   [payment orders](payment-orders.md)).
 - **`SignatureFlag` (per-BTF ES requirement) unchecked.** Whether a `BTU` order requires an ES is not
   evaluated (separate from the plain order-type authorisation).
-- **ES/X002 verification deferred (M4).** Payloads are decrypted but not authenticated;
-  download responses are unsigned.
+- **ES verification deferred.** Payloads are decrypted but the authorising A00x order signature is
+  not verified. **X002 is checked in both directions** since #58 (requests) and #143 (responses, see
+  [response signature](../protocol/response-signature.md)).
 - **camt fixed at `.001.08`.** The classic DK profile `.02` is not implemented; no real
   ISO-20022 XSD validation (structural only).
 - **HAC/PTK wire format.** In-house projection instead of a spec-accurate camt.086 (HAC) or pain.002 (PTK).

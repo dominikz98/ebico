@@ -142,7 +142,11 @@ key (exposed bytes, `KeySizeBits`, imported RSA instance) match up again.
 From [#57](e2e-connector-server.md)/[#58](negative-security-cases.md) and the
 [order coverage matrix](../server/order-coverage-matrix.md), bundled here:
 
-- **Server responses are unsigned** (the connector checks no response signature).
+- ~~**Server responses are unsigned**~~ — **closed by #143**: the server signs every transaction
+  `ebicsResponse` and the connector verifies it
+  ([response signature](../protocol/response-signature.md)). What remains open is the same **C14N/
+  reference caveat** as for the request direction: byte-level interop with a third-party client is
+  unevidenced, and a captured real-bank response is what would close it.
 - **ES/A00x order signature** is not verified server-side.
 - **camt fixed to `.001.08`**; no real ISO 20022 XSD validation.
 - **HAC/PTK** as an own projection instead of a spec-accurate camt.086/pain.002; **HVT** order-summary.

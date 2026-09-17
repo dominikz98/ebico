@@ -16,9 +16,11 @@ Issue **#20** (Milestone M2), crypto library:
 > send/dispatch path as well as interop verification against real bank samples belong in
 > later milestones (M3–M6) — here X002 stays a policy-free crypto primitive.
 >
-> **Application:** The connector *sets* the `AuthSignature` when sending; the server *verifies* it
-> since **#58** for every signed `ebicsRequest` (`X002EbicsRequestVerifier` →
-> [Negative & security cases](../development/negative-security-cases.md)). The primitive here
+> **Application:** Both directions use this primitive, and both are wired up. **Request:** the
+> connector *signs*, the server *verifies* since **#58** (`X002EbicsRequestVerifier` →
+> [Negative & security cases](../development/negative-security-cases.md)). **Response:** the server
+> *signs*, the connector *verifies* since **#143** (`X002EbicsResponseSigner` /
+> `ResponseSignatureVerifier` → [Response signature](response-signature.md)). The primitive here
 > stays policy-free regardless.
 
 ## Building blocks
@@ -131,6 +133,7 @@ The permitted versions reside centrally in [`KeyVersions`](key-representation.md
 
 ## Related
 
+- [Response signature X002](response-signature.md) — the same primitive on the way back: the server signs the `ebicsResponse`, the connector verifies it (#143)
 - [Bank-technical signature A005/A006](bank-signature.md) — the authorising signature over order data (#19)
 - [Encryption E002](encryption-e002.md) — hybrid transport encryption (#21)
 - [XML serialization & C14N](serialization-c14n.md) — canonicalizer and C14N modes (#15)

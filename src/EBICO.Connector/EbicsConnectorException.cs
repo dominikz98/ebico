@@ -80,3 +80,37 @@ public sealed class EbicsTransportException : EbicsConnectorException
     {
     }
 }
+
+/// <summary>
+/// Raised when the bank's EBICS authentication signature (<c>AuthSignature</c>, X002) on a
+/// transaction <c>ebicsResponse</c> is missing or does not verify against the bank key stored during
+/// HPB — the response is unauthenticated and its content is not acted upon.
+/// </summary>
+/// <remarks>
+/// This is deliberately an exception rather than a return code: a failed signature means the response
+/// cannot be attributed to the bank at all, so there is no trustworthy return code in it to report.
+/// Verification is switched off per connection via
+/// <see cref="Configuration.EbicsConnectionOptions.VerifyResponseSignature"/>.
+/// </remarks>
+public sealed class EbicsResponseSignatureException : EbicsConnectorException
+{
+    /// <summary>Initializes a new instance of the <see cref="EbicsResponseSignatureException"/> class.</summary>
+    public EbicsResponseSignatureException()
+    {
+    }
+
+    /// <summary>Initializes a new instance with the given <paramref name="message"/>.</summary>
+    /// <param name="message">The error message.</param>
+    public EbicsResponseSignatureException(string message)
+        : base(message)
+    {
+    }
+
+    /// <summary>Initializes a new instance with the given message and inner exception.</summary>
+    /// <param name="message">The error message.</param>
+    /// <param name="innerException">The underlying cause.</param>
+    public EbicsResponseSignatureException(string message, Exception innerException)
+        : base(message, innerException)
+    {
+    }
+}

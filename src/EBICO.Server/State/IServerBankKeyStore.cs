@@ -7,10 +7,16 @@ namespace EBICO.Server.State;
 /// The bank's own key pair as held by the server: the <b>authentication</b> key (<c>X00x</c>) and the
 /// <b>encryption</b> key (<c>E00x</c>) whose public parts are handed to a subscriber via
 /// <c>HPB</c> (issue #28). Unlike the subscriber keys in <see cref="IServerKeyStore"/> these are the
-/// bank's <em>own</em> keys and may carry the private part (needed for the response authentication
-/// signature / upload decryption that arrive with M4).
+/// bank's <em>own</em> keys and carry the private part.
 /// </summary>
-/// <param name="Authentication">The bank's authentication key material (public part is enough for HPB).</param>
+/// <remarks>
+/// <b>The authentication key needs its private part</b> since issue #143: the server signs every
+/// transaction <c>ebicsResponse</c> with it
+/// (<see cref="EBICO.Server.Pipeline.X002EbicsResponseSigner"/>). A public-only pair still serves HPB
+/// but makes the signer throw on the first business order — seed a full pair, or register
+/// <see cref="EBICO.Server.Pipeline.UnsignedEbicsResponseSigner"/> to answer unsigned on purpose.
+/// </remarks>
+/// <param name="Authentication">The bank's authentication key material; the private part is required to sign responses.</param>
 /// <param name="AuthenticationVersion">The authentication key version (e.g. <c>X002</c>).</param>
 /// <param name="Encryption">The bank's encryption key material (public part is enough for HPB).</param>
 /// <param name="EncryptionVersion">The encryption key version (e.g. <c>E002</c>).</param>

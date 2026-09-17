@@ -176,8 +176,10 @@ internal sealed class FakeUploadServer
         _ => throw new InvalidOperationException("Unknown request type."),
     };
 
+    // Signed with the bank's X002 key, as the real server does — otherwise the connector's response
+    // signature check would reject every answer from this harness.
     private static EbicsHttpResponse Serialize(EBICO.Core.Versioning.IEbicsResponseEnvelope envelope)
-        => new() { StatusCode = 200, Payload = EbicsXmlSerializer.SerializeToUtf8Bytes(envelope) };
+        => new() { StatusCode = 200, Payload = FakeBankIdentity.SerializeSigned(envelope) };
 }
 
 /// <summary>
@@ -259,6 +261,10 @@ internal sealed class UploadTestHarness : IDisposable
         await keys.StoreAsync(KeyOwner.Subscriber, KeyPurpose.Signature, RsaKeyMaterial.Generate(), ct);
         await keys.StoreAsync(KeyOwner.Subscriber, KeyPurpose.Authentication, RsaKeyMaterial.Generate(), ct);
         await keys.StoreAsync(KeyOwner.Bank, KeyPurpose.Encryption, bankEncryptionKeyPair.ToPublicOnly(), ct);
+
+        // The bank's public X002 key, as HPB would have left it: the connector verifies the response
+        // signature against it.
+        await keys.StoreAsync(KeyOwner.Bank, KeyPurpose.Authentication, FakeBankIdentity.PublicAuthenticationKey, ct);
 
         var encryptionVersion = KeyVersions.Default(KeyPurpose.Encryption, version).Version;
         var client = provider.GetRequiredService<IEbicsClient>();

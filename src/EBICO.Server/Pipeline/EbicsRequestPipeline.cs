@@ -19,6 +19,8 @@ namespace EBICO.Server.Pipeline;
 /// Default <see cref="IEbicsRequestPipeline"/>. Runs the five stages
 /// (Parse → Version-Dispatch → Verify → Handle → Respond) over the raw request body, mapping every
 /// protocol/business error onto an EBICS return code carried in a well-formed <c>ebicsResponse</c>.
+/// The respond stage delegates serialisation to <see cref="IEbicsResponseSigner"/>, which also attaches
+/// the bank's X002 signature (issue #143).
 /// </summary>
 /// <remarks>
 /// Parsing and version dispatch reuse <see cref="EbicsXmlSerializer.DeserializeEnvelope"/> (XXE
@@ -29,6 +31,7 @@ namespace EBICO.Server.Pipeline;
 public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
 {
     private readonly IEbicsRequestVerifier _verifier;
+    private readonly IEbicsResponseSigner _responseSigner;
     private readonly IEbicsOrderHandlerResolver _resolver;
     private readonly IUploadTransactionEngine _uploadEngine;
     private readonly IDownloadTransactionEngine _downloadEngine;
@@ -40,6 +43,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
 
     /// <summary>Initializes the pipeline with its collaborators.</summary>
     /// <param name="verifier">The verify-stage extension point.</param>
+    /// <param name="responseSigner">The respond-stage extension point that serializes and signs the response.</param>
     /// <param name="resolver">The handle-stage order handler resolver.</param>
     /// <param name="uploadEngine">The upload transaction engine (issue #32) that owns the upload phases.</param>
     /// <param name="downloadEngine">The download transaction engine (issue #33) that owns the download phases.</param>
@@ -50,6 +54,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
     /// <param name="options">The server options.</param>
     public EbicsRequestPipeline(
         IEbicsRequestVerifier verifier,
+        IEbicsResponseSigner responseSigner,
         IEbicsOrderHandlerResolver resolver,
         IUploadTransactionEngine uploadEngine,
         IDownloadTransactionEngine downloadEngine,
@@ -60,6 +65,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         IOptions<EbicoServerOptions> options)
     {
         ArgumentNullException.ThrowIfNull(verifier);
+        ArgumentNullException.ThrowIfNull(responseSigner);
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(uploadEngine);
         ArgumentNullException.ThrowIfNull(downloadEngine);
@@ -70,6 +76,7 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
         ArgumentNullException.ThrowIfNull(options);
 
         _verifier = verifier;
+        _responseSigner = responseSigner;
         _resolver = resolver;
         _uploadEngine = uploadEngine;
         _downloadEngine = downloadEngine;
@@ -185,7 +192,13 @@ public sealed class EbicsRequestPipeline : IEbicsRequestPipeline
             };
         }
 
-        var body = EbicsXmlSerializer.SerializeToUtf8Bytes(response);
+        // Stage 5b: Serialize and sign. The bank's X002 authentication signature over the response's
+        // authenticated node-set is what lets the subscriber trust that this return code / segment /
+        // statement came from the bank; the signer owns the serialisation because signing is a
+        // serialise -> sign -> re-serialise cycle. The key-management responses (INI/HIA/HPB) have no
+        // AuthSignature element and go out unsigned, as they do at a real bank.
+        var host = context is null ? null : TryExtractSubscriber(context.Envelope).Host;
+        var body = await _responseSigner.SerializeAsync(response, host, ct).ConfigureAwait(false);
 
         // Raw-XML capture (issue #54): once the response is serialized, both the request and response XML
         // (and the resolved transaction id/phase/return code) are known — the only point where they

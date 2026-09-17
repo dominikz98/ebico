@@ -1,5 +1,6 @@
 using System.Text;
 using EBICO.Connector.Keys;
+using EBICO.Connector.Security;
 using EBICO.Connector.Transport;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
@@ -9,9 +10,10 @@ namespace EBICO.Connector.Download;
 
 /// <summary>
 /// Shared steps for the download handler: retrieving the subscriber keys and the serialize → transport
-/// → return-response-XML exchange (mirrors <c>UploadSupport</c>). A download only needs subscriber keys
-/// — the response is E002-encrypted for the subscriber and the requests are X002-signed — so there is
-/// no bank-key retrieval here.
+/// → verify → return-response-XML exchange (mirrors <c>UploadSupport</c>). A download needs no bank
+/// key to <em>build</em> its requests — the response is E002-encrypted for the subscriber and the
+/// requests are X002-signed with the subscriber's own key — but the bank's authentication key is read
+/// (by <see cref="ResponseSignatureVerifier"/>) to verify the signature on the way back.
 /// </summary>
 internal static class DownloadSupport
 {
@@ -28,11 +30,18 @@ internal static class DownloadSupport
                 $"No subscriber {purpose} key is present. Generate the subscriber keys and complete the " +
                 "onboarding flows (INI/HIA) before downloading.");
 
-    /// <summary>Serializes the envelope, sends it via the transport and returns the response XML.</summary>
+    /// <summary>
+    /// Serializes the envelope, sends it via the transport, verifies the bank's X002 signature on the
+    /// response and returns the response XML.
+    /// </summary>
     /// <param name="envelope">The request envelope.</param>
     /// <param name="ctx">The execution context.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The response XML.</returns>
+    /// <returns>The verified response XML.</returns>
+    /// <exception cref="EbicsResponseSignatureException">
+    /// The response is unsigned or its signature does not verify (unless verification is switched off
+    /// via <c>EbicsConnectionOptions.VerifyResponseSignature</c>).
+    /// </exception>
     public static async Task<string> ExchangeAsync(
         IEbicsRequestEnvelope envelope, EbicsContext ctx, CancellationToken ct)
     {
@@ -40,6 +49,11 @@ internal static class DownloadSupport
         var response = await ctx.Transport
             .SendAsync(new EbicsHttpRequest { Payload = payload }, ct)
             .ConfigureAwait(false);
-        return Encoding.UTF8.GetString(response.Payload.Span);
+        var responseXml = Encoding.UTF8.GetString(response.Payload.Span);
+
+        // The bank signs its ebicsResponse; verifying that signature here is what makes the return code
+        // and the payload below attributable to the bank rather than to whatever answered on the wire.
+        await ResponseSignatureVerifier.VerifyAsync(responseXml, ctx, ct).ConfigureAwait(false);
+        return responseXml;
     }
 }

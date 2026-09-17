@@ -1,5 +1,6 @@
 using System.Text;
 using EBICO.Connector.Keys;
+using EBICO.Connector.Security;
 using EBICO.Connector.Transport;
 using EBICO.Core.Crypto;
 using EBICO.Core.Serialization;
@@ -39,11 +40,18 @@ internal static class UploadSupport
                 $"No bank {purpose} key is present. Run the HPB onboarding flow to fetch and store the " +
                 "bank keys before uploading.");
 
-    /// <summary>Serializes the envelope, sends it via the transport and returns the response XML.</summary>
+    /// <summary>
+    /// Serializes the envelope, sends it via the transport, verifies the bank's X002 signature on the
+    /// response and returns the response XML.
+    /// </summary>
     /// <param name="envelope">The request envelope.</param>
     /// <param name="ctx">The execution context.</param>
     /// <param name="ct">A cancellation token.</param>
-    /// <returns>The response XML.</returns>
+    /// <returns>The verified response XML.</returns>
+    /// <exception cref="EbicsResponseSignatureException">
+    /// The response is unsigned or its signature does not verify (unless verification is switched off
+    /// via <c>EbicsConnectionOptions.VerifyResponseSignature</c>).
+    /// </exception>
     public static async Task<string> ExchangeAsync(
         IEbicsRequestEnvelope envelope, EbicsContext ctx, CancellationToken ct)
     {
@@ -51,6 +59,11 @@ internal static class UploadSupport
         var response = await ctx.Transport
             .SendAsync(new EbicsHttpRequest { Payload = payload }, ct)
             .ConfigureAwait(false);
-        return Encoding.UTF8.GetString(response.Payload.Span);
+        var responseXml = Encoding.UTF8.GetString(response.Payload.Span);
+
+        // The bank signs its ebicsResponse; verifying that signature here is what makes the return code
+        // and the payload below attributable to the bank rather than to whatever answered on the wire.
+        await ResponseSignatureVerifier.VerifyAsync(responseXml, ctx, ct).ConfigureAwait(false);
+        return responseXml;
     }
 }

@@ -100,7 +100,7 @@ dispatch instead of MediatR. Key store as an abstraction (`IKeyStore`).
   (`OrderCoverageMatrixTests`); contains its own gaps section. Since #124 it separates
   **server** and **connector** availability: implemented server-side does not mean
   the bundled client can send that order type.
-- `docs/adr/README.md` — 31 ADRs (0001–0031, MADR-lite, all `accepted`) + a backlog
+- `docs/adr/README.md` — 32 ADRs (0001–0032, MADR-lite, all `accepted`) + a backlog
   of open/superseded decisions. Every larger design question is reasoned out here.
 - `docs/ticket-overview.md` — milestones (M0–M9), issues, epics.
 - Feature docs live thematically under `docs/<area>/<name>.md`
@@ -147,10 +147,12 @@ dispatch instead of MediatR. Key store as an abstraction (`IKeyStore`).
   `extern alias EbicoServer` + `WebApplicationFactory<Program>`; E2E via `EbicsE2EHarness`
   + `E2EKeyPool` (RSA-2048 is a hard lower bound ⇒ key reuse);
   XML comparison with `CanonicalXmlComparer`; proprietary sample XML is "skip-if-missing".
-- **Spec caveats (current state):** server-side **X002 verification is active**
-  (`X002EbicsRequestVerifier`, ADR-0023/#58, only takes effect after HIA). **ES/A00x signature verification
-  of the order data remains deferred**; no key validity window; server responses are
-  unsigned. For the **VEU** (ADR-0020/#124) the emulator only evaluates the `OrderID` — the
+- **Spec caveats (current state):** **X002 is wired in both directions**: server-side verification of the
+  request (`X002EbicsRequestVerifier`, ADR-0023/#58, only takes effect after HIA) and server-side
+  **signing of the `ebicsResponse`** with connector-side verification (`X002EbicsResponseSigner` /
+  `ResponseSignatureVerifier`, ADR-0032/#143). What is **not** evidenced is byte-level interop of either
+  signature against a real bank/client — the C14N/reference caveat persists (#59). **ES/A00x signature
+  verification of the order data remains deferred**; no key validity window. For the **VEU** (ADR-0020/#124) the emulator only evaluates the `OrderID` — the
   remaining fields of the order params are sent schema-conformant but not checked; the parking triggers
   (`OZHNN`/`SignatureFlag`) and the HVE signature are unchecked. Parts of the architecture are design intent, not yet verified against the official
   XSDs (the schemas are proprietary). Two decisions are evidenced against a **real client**,

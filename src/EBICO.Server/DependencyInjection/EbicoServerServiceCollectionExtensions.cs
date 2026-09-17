@@ -68,6 +68,13 @@ public static class EbicoServerServiceCollectionExtensions
         // an auth key is on file (post-HIA); the unsecured onboarding requests and HPB are skipped. Still
         // pluggable via TryAdd, so a test can substitute NoOpEbicsRequestVerifier before AddEbicoServer.
         services.TryAddSingleton<IEbicsRequestVerifier, X002EbicsRequestVerifier>();
+
+        // Response signing (issue #143): the outbound mirror image. Every transaction ebicsResponse is
+        // signed with the bank's own X002 key, because a real bank signs and real clients verify — an
+        // unsigned response made every order after onboarding fail on such a client. The key-management
+        // responses (INI/HIA/HPB) have no AuthSignature element and stay unsigned. Pluggable via TryAdd:
+        // substitute UnsignedEbicsResponseSigner to opt out.
+        services.TryAddSingleton<IEbicsResponseSigner, X002EbicsResponseSigner>();
         services.TryAddSingleton<IEbicsErrorMapper, EbicsErrorMapper>();
         services.TryAddSingleton<EbicsResponseFactory>();
         services.TryAddSingleton<IEbicsOrderHandlerResolver, EbicsOrderHandlerResolver>();

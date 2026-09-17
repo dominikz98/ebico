@@ -128,8 +128,11 @@ return code in the envelope (see [host.md](host.md)); the business code sits in
   the `AuthSignature` is **M4** (the verify stage stays No-Op as with INI/HIA). Confidentiality
   is nevertheless preserved because the response is encrypted with the **subscriber's E002 key**
   — only its private key can decrypt it.
-- **The response is unsigned** — the response authentication signature (X002) is likewise
-  **M4** (consistent with `EbicsResponseFactory`); strict clients might reject unsigned responses.
+- The `ebicsKeyManagementResponse` is **unsigned, and stays that way**: its schema carries no
+  `AuthSignature` element, because these responses precede or bootstrap the key exchange a signature
+  would be checked against. Real clients skip verification for exactly these orders. The transaction
+  `ebicsResponse` **is** signed since #143 — see
+  [Response signature](../protocol/response-signature.md).
 - **`Ready` is presupposed.** HPB requires a `Ready` subscriber (INI + HIA run).
   EBICS practice may allow HPB even before final activation; this simplification
   is to be verified against the official flow (cf. [hia.md](hia.md)).

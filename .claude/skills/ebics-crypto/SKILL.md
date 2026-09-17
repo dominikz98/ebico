@@ -23,7 +23,12 @@ spec caveats against the annexes is written down.
   server side (spec caveat) — keep that in mind when extending.
 - **Authentication signature X002** (`docs/protocol/auth-signature-x002.md`): XML-DSig `AuthSignature`
   over all `authenticate="true"` nodes. Reference digest SHA-256 + `SignatureValue` RSA-PKCS#1 v1.5,
-  document-context C14N **inclusive**. Active on the server side (`X002EbicsRequestVerifier`, ADR-0023).
+  document-context C14N **inclusive**. The primitive is direction-agnostic and **both directions are
+  wired**: request — connector signs, server verifies (`X002EbicsRequestVerifier`, ADR-0023);
+  response — server signs, connector verifies (`X002EbicsResponseSigner` /
+  `ResponseSignatureVerifier`, ADR-0032, `docs/protocol/response-signature.md`).
+  *Note:* `ebicsKeyManagementResponse` (INI/HIA/HPB) has **no** `AuthSignature` element in its schema
+  and stays unsigned by protocol — do not "fix" that.
 - **Encryption E002** (`docs/protocol/encryption-e002.md`): hybrid — AES-128-CBC over the
   order data, RSAES-**OAEP-SHA256** over the transaction key. Type `EncryptionE002`.
 - **Public key fingerprints** (`docs/protocol/public-key-fingerprint.md`): SHA-256 over exponent+modulus,

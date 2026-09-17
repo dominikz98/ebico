@@ -19,7 +19,8 @@ public sealed class EbicsConnection
         UserId userId,
         EbicsVersion version,
         EbicsVersionInfo versionInfo,
-        IReadOnlySet<string> allowedOrderTypes)
+        IReadOnlySet<string> allowedOrderTypes,
+        bool verifyResponseSignature)
     {
         Url = url;
         HostId = hostId;
@@ -28,6 +29,7 @@ public sealed class EbicsConnection
         Version = version;
         VersionInfo = versionInfo;
         AllowedOrderTypes = allowedOrderTypes;
+        VerifyResponseSignature = verifyResponseSignature;
     }
 
     /// <summary>The absolute EBICS server endpoint URL.</summary>
@@ -55,6 +57,13 @@ public sealed class EbicsConnection
     /// deferred to the server. Compared against the request's <em>effective classical order type</em>.
     /// </summary>
     public IReadOnlySet<string> AllowedOrderTypes { get; }
+
+    /// <summary>
+    /// Whether the bank's X002 authentication signature on a transaction <c>ebicsResponse</c> is
+    /// verified against the stored bank key. Defaults to <see langword="true"/>; see
+    /// <see cref="EbicsConnectionOptions.VerifyResponseSignature"/>.
+    /// </summary>
+    public bool VerifyResponseSignature { get; }
 
     /// <summary>
     /// Validates <paramref name="options"/> and builds the immutable connection. This is the
@@ -88,7 +97,9 @@ public sealed class EbicsConnection
             .Select(code => code.Trim())
             .ToFrozenSet(StringComparer.Ordinal);
 
-        return new EbicsConnection(url, hostId, partnerId, userId, options.Version, versionInfo, allowedOrderTypes);
+        return new EbicsConnection(
+            url, hostId, partnerId, userId, options.Version, versionInfo, allowedOrderTypes,
+            options.VerifyResponseSignature);
     }
 
     /// <summary>
